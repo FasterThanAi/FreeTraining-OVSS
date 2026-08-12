@@ -19,11 +19,7 @@ import sys
 def describe(obj, name="output", indent=0):
     """Recursively print structure/shape/dtype/range of whatever SAM 3 returns."""
     pad = "  " * indent
-    try:
-        import torch
-        import numpy as np
-    except ImportError:
-        print("torch/numpy missing"); return
+    import numpy as np
 
     if isinstance(obj, dict):
         print(f"{pad}{name}: dict with {len(obj)} key(s)")
@@ -34,13 +30,17 @@ def describe(obj, name="output", indent=0):
         if obj:
             describe(obj[0], f"{name}[0]", indent + 1)
     elif hasattr(obj, "shape"):
-        t = obj.detach().cpu() if hasattr(obj, "detach") else obj
-        arr = t.numpy() if hasattr(t, "numpy") else t
+        rng = ""
         try:
-            lo, hi = float(np.min(arr)), float(np.max(arr))
+            if hasattr(obj, "detach"):
+                # numpy has no bfloat16, so go through float32
+                t = obj.detach().float().cpu()
+                lo, hi = float(t.min()), float(t.max())
+            else:
+                lo, hi = float(np.min(obj)), float(np.max(obj))
             rng = f"  range=[{lo:.4f}, {hi:.4f}]"
         except Exception:
-            rng = ""
+            pass
         print(f"{pad}{name}: shape={tuple(obj.shape)}  dtype={obj.dtype}{rng}")
     elif isinstance(obj, (int, float, bool, str)) or obj is None:
         print(f"{pad}{name}: {type(obj).__name__} = {obj}")
@@ -54,6 +54,8 @@ def main():
     ap.add_argument("--image", required=True)
     ap.add_argument("--prompt", default="building")
     ap.add_argument("--save-vis", default=None, help="write a mask overlay PNG here")
+    ap.add_argument("--raw", action="store_true",
+                    help="also dump raw forward_grounding outputs (presence head etc.)")
     args = ap.parse_args()
 
     # ---- 1. environment ------------------------------------------------
@@ -83,20 +85,44 @@ def main():
     # ---- 3. run --------------------------------------------------------
     image = Image.open(args.image).convert("RGB")
     print(f"image      : {args.image}  size={image.size}")
-    state = processor.set_image(image)
     print(f"prompt     : {args.prompt!r}")
-    output = processor.set_text_prompt(state=state, prompt=args.prompt)
+
+    # NOTE: autocast(bfloat16) is REQUIRED, not an optimisation.
+    # sam3/perflib/fused.py::addmm_act hardcodes .to(torch.bfloat16) on the
+    # fused fc1 path, so the MLP emits bf16 activations. fc2 is a plain
+    # nn.Linear holding fp32 weights, so outside autocast you get
+    #   "mat1 and mat2 must have the same dtype, but got BFloat16 and Float"
+    # Inside autocast, fc2 casts its weight to bf16 and the matmul matches.
+    # Upstream issue: facebookresearch/sam3 #507
+    with torch.autocast("cuda", dtype=torch.bfloat16):
+        state = processor.set_image(image)
+        output = processor.set_text_prompt(state=state, prompt=args.prompt)
 
     # ---- 4. introspect -------------------------------------------------
+    # set_text_prompt returns the SAME dict it was given - output IS state.
     print("\n" + "=" * 60)
-    print("OUTPUT STRUCTURE")
+    print("STATE AFTER INFERENCE")
     print("=" * 60)
-    describe(output, "output")
+    describe(output, "state")
 
-    print("\n" + "=" * 60)
-    print("INFERENCE STATE  (where P_sem / presence score may live)")
-    print("=" * 60)
-    describe(state, "state")
+    if args.raw:
+        # The public API discards the richer head outputs. forward_grounding
+        # is where presence_logit_dec / pred_logits / pred_masks actually live -
+        # these are what your pipeline needs, not just the filtered masks.
+        print("\n" + "=" * 60)
+        print("RAW forward_grounding OUTPUTS  (presence head, per-query logits)")
+        print("=" * 60)
+        with torch.autocast("cuda", dtype=torch.bfloat16), torch.inference_mode():
+            raw = model.forward_grounding(
+                backbone_out=state["backbone_out"],
+                find_input=processor.find_stage,
+                geometric_prompt=state["geometric_prompt"],
+                find_target=None,
+            )
+        describe(raw, "raw")
+        if "presence_logit_dec" in raw:
+            p = raw["presence_logit_dec"].sigmoid()
+            print(f"\n>>> presence score for {args.prompt!r}: {float(p.flatten()[0]):.4f}")
 
     n = len(output["masks"]) if "masks" in output else 0
     print(f"\n>>> {n} instance mask(s) returned for {args.prompt!r}")
