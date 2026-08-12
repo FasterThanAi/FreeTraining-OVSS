@@ -94,10 +94,22 @@ def accumulate(mask_paths, n_classes, verbose=True):
     return M, pix
 
 
-def analyse(M, pix, names):
-    """Row-normalised adjacency, and PMI against an independence baseline."""
+def analyse(M, pix, names, drop=()):
+    """Row-normalised adjacency, and PMI against an independence baseline.
+
+    drop: class names to exclude entirely. Use this to test whether the signal
+    survives without catch-all classes like LoveDA's "background" - if mean
+    |PMI| collapses once background is removed, the prior is mostly recording
+    "everything touches the leftover class", which cannot help you label an
+    ambiguous patch.
+    """
     n = len(names)
-    valid = [i for i in range(1, n) if pix[i] > 0]   # skip ignore, skip absent
+    drop = {d.lower() for d in drop}
+    valid = [i for i in range(1, n)                  # skip ignore
+             if pix[i] > 0                           # skip absent
+             and names[i].lower() not in drop]       # skip explicitly dropped
+    if len(valid) < 2:
+        raise SystemExit(f"Only {len(valid)} class(es) left after --drop.")
 
     Mv = M[np.ix_(valid, valid)].astype(float)
     pv = pix[valid].astype(float)
@@ -219,8 +231,17 @@ def main():
     ap.add_argument("--limit", type=int, default=0, help="cap number of masks")
     ap.add_argument("--split-domains", action="store_true",
                     help="analyse Urban and Rural separately (transfer experiment)")
+    ap.add_argument("--drop", nargs="+", default=[], metavar="CLASS",
+                    help="exclude these classes, e.g. --drop background")
     ap.add_argument("--outdir", default="outputs/cooccurrence")
     args = ap.parse_args()
+
+    if args.drop:
+        known = {c.lower() for c in LOVEDA_CLASSES}
+        bad = [d for d in args.drop if d.lower() not in known]
+        if bad:
+            sys.exit(f"Unknown class(es) {bad}. Known: {LOVEDA_CLASSES[1:]}")
+        print(f"Dropping class(es): {', '.join(args.drop)}")
 
     root = os.path.expanduser(args.root)
     os.makedirs(args.outdir, exist_ok=True)
@@ -245,11 +266,15 @@ def main():
             paths = paths[: args.limit]
         print(f"\n[{name}] {len(paths)} masks")
         M, pix = accumulate(paths, n)
-        res = analyse(M, pix, LOVEDA_CLASSES)
-        report(res, f"{name}  ({len(paths)} masks)")
-        plot(res, os.path.join(args.outdir, f"cooccurrence_{name}.png"),
-             f"LoveDA {name} - land-cover adjacency")
-        np.save(os.path.join(args.outdir, f"M_{name}.npy"), res["M_raw"])
+        res = analyse(M, pix, LOVEDA_CLASSES, drop=args.drop)
+        suffix = ("_no-" + "-".join(d.lower() for d in args.drop)) if args.drop else ""
+        title = f"{name}  ({len(paths)} masks)"
+        if args.drop:
+            title += f"  [without {', '.join(args.drop)}]"
+        report(res, title)
+        plot(res, os.path.join(args.outdir, f"cooccurrence_{name}{suffix}.png"),
+             f"LoveDA {name} - land-cover adjacency{suffix.replace('_', ' ')}")
+        np.save(os.path.join(args.outdir, f"M_{name}{suffix}.npy"), res["M_raw"])
         results[name] = res
 
     if len(results) == 2:
