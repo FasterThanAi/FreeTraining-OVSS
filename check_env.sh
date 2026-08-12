@@ -46,10 +46,12 @@ fi
 
 echo
 echo "--- 3. Other GPU users (shared machine?) ---"
-if command -v nvidia-smi &>/dev/null; then
-    PROCS=$(nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader 2>/dev/null)
+if command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null; then
+    PROCS=$(nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader 2>/dev/null | grep -v '^$')
     if [ -z "$PROCS" ]; then echo "GPU is idle - you have it to yourself right now."
     else echo "$PROCS"; echo ">>> Someone else is using the GPU. Coordinate, and set CUDA_VISIBLE_DEVICES."; fi
+else
+    echo "(skipped - driver not responding)"
 fi
 
 echo
