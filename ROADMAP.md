@@ -220,14 +220,19 @@ M_image  = build_from_single_image(identified_patches)
 M_eff    = lam * M_global + (1 - lam) * M_image
 ```
 
-Design decisions to make explicitly, and defend in your writeup:
+Three of these decisions are already **settled by measurement** — see `ANALYSIS.md §4`:
 
-- **Adjacency definition** — boundary contact (dilate-and-intersect) is more meaningful for land cover than centroid distance. Your current repo uses centroid distance; that's the weaker choice.
-- **Directed or symmetric?** Land cover adjacency is genuinely asymmetric. Try directed.
-- **Weight by shared boundary length**, not just binary contact. A building sharing 200 px of border with a road is stronger evidence than one touching at a corner.
-- **Scale sensitivity** — co-occurrence changes with GSD. Note it; a GSD-conditioned M is your stretch contribution.
+- **Adjacency = shared boundary length.** Not centroid distance (what your old repo used). Already implemented in `scripts/cooccurrence_gt.py`.
+- **Store signed PMI, not raw counts.** §4.2 — exclusion carries the largest magnitudes (building–water at 0.02× chance), and additive-positive scoring cannot represent it.
+- **λ blend is required, not optional.** §4.4 — six of fifteen class pairs flip sign between urban and rural.
 
-**Validation gate:** compare `M_global` against the GT co-occurrence matrix you computed in Phase 1. If they diverge wildly, §3.2's circularity problem is real and you need to handle it before proceeding.
+Still open, decide and defend:
+
+- **Directed or symmetric?** Current script symmetrises. Land-cover adjacency may genuinely be asymmetric — worth testing.
+- **Discriminability weighting** — §4.3. Weight each neighbour by the variance of its PMI row so hub classes like `road` don't drown out exclusive ones like `building`.
+- **Scale sensitivity** — co-occurrence changes with GSD. A GSD-conditioned M is your stretch contribution.
+
+**Validation gate:** compare `M_global` (estimated from SAM 3's confident predictions) against the ground-truth matrices already in `outputs/cooccurrence/`. Large divergence means §3.2's circularity problem is real. You have the reference numbers, so this is a direct comparison, not a guess.
 
 ## Week 8 — Steps 4a & 4b: atoms, then labelling
 
@@ -263,7 +268,7 @@ Two engineering notes that will save you days:
 
 # PHASE 4 — Prove (Weeks 10–11, ~50 hrs)
 
-Per `ANALYSIS.md §5`.
+Per `ANALYSIS.md §6`.
 
 **Week 10 — main results.** Three-row table (SAM 3 instance-only → SegEarth-OV3 → +yours) across OpenEarthMap, LoveDA, Potsdam. Then the table that actually sells the paper: **mIoU restricted to pixels the baseline assigned to background.** That isolates exactly what you added.
 
@@ -289,8 +294,8 @@ Overleaf + the CVPR or IEEE TGRS template. Start the LaTeX skeleton in **week 9*
 
 | End of week | Must be true |
 |---|---|
-| 1 | SAM 3 segments an aerial tile from a text prompt |
-| 3 | GT co-occurrence heatmap computed; mIoU implemented and trusted |
+| 1 | SAM 3 segments an aerial tile from a text prompt — **done 12 Aug** |
+| 3 | GT co-occurrence heatmap computed — **done 12 Aug, premise validated (`ANALYSIS.md §4`)**; mIoU implemented and trusted |
 | 5 | SegEarth-OV3 reproduced within 2% on OpenEarthMap |
 | 7 | M_global built and validated against GT |
 | 9 | End-to-end pipeline produces a number |
