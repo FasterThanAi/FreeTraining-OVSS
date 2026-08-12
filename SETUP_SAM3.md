@@ -200,6 +200,52 @@ conda install -c conda-forge gcc_linux-64 gxx_linux-64 make cmake -y
 
 ## Troubleshooting
 
+### `nvidia-smi has failed because it couldn't communicate with the NVIDIA driver`
+
+If `diagnose_gpu.sh` shows the DKMS module **is** built for your running kernel and the `.ko` files **are** present in `/lib/modules/$(uname -r)/updates/dkms/`, but the module is **not loaded** — and Secure Boot is **enabled** — then Secure Boot is rejecting the module. The driver is fine; the kernel is refusing to load an unsigned module.
+
+Confirm it:
+
+```bash
+sudo modprobe nvidia
+# "Key was rejected by service"  ->  Secure Boot confirmed
+```
+
+Fix by enrolling Ubuntu's Machine Owner Key (keeps Secure Boot on — the correct fix):
+
+```bash
+mokutil --list-enrolled | grep -ci 'Subject'          # is a key already enrolled?
+ls -l /var/lib/shim-signed/mok/                       # does the key exist?
+sudo mokutil --import /var/lib/shim-signed/mok/MOK.der
+# set a simple one-time password - you'll type it at boot on a US layout
+sudo reboot
+```
+
+On reboot a blue **MOK Manager** screen appears: `Enroll MOK` → `Continue` → `Yes` → password → `Reboot`.
+
+> The MOK screen times out in ~10 seconds and only appears once. Don't walk away from the machine. If you miss it, re-run `mokutil --import` and reboot again.
+
+Then verify with `nvidia-smi`.
+
+**Booting an older kernel does not help here** — Secure Boot blocks the module on every kernel. Only enrolment (or disabling Secure Boot in BIOS) fixes it.
+
+If `/var/lib/shim-signed/mok/MOK.der` doesn't exist, regenerate it by reinstalling the DKMS package:
+
+```bash
+sudo dpkg-reconfigure nvidia-dkms-580
+```
+
+### Multiple driver versions installed
+
+`dpkg -l | grep nvidia-driver` showing several versions (e.g. 535, 550 and 580 together) is an unstable state and a common source of `Driver/library version mismatch`. Once the GPU is working, clean up — **one change at a time, and not before it works**:
+
+```bash
+sudo apt remove --purge nvidia-driver-535 nvidia-driver-550 nvidia-utils-550
+sudo apt autoremove
+```
+
+### Other issues
+
 | Symptom | Cause / fix |
 |---|---|
 | `torch.cuda.is_available()` is `False` | Driver/CUDA mismatch. Compare `nvidia-smi` CUDA version against your wheel's cu128. Reinstall torch for a lower CUDA if needed. |
