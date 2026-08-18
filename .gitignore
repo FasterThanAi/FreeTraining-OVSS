@@ -13,6 +13,7 @@ outputs/
 work_dirs/
 *.png
 !resources/*.png
+!docs/*.png
 results.xlsx
 
 # python
