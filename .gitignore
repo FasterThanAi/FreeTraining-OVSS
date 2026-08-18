@@ -1,60 +1,31 @@
-# Byte-compiled / optimized / DLL files
+# checkpoints / weights
+*.pt
+*.pth
+*.ckpt
+weights/
+
+# data
+data/
+!data/.gitkeep
+
+# outputs
+outputs/
+work_dirs/
+*.png
+!resources/*.png
+results.xlsx
+
+# python
 __pycache__/
 *.py[cod]
-*$py.class
-
-# C extensions
-*.so
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual Environments
+.ipynb_checkpoints/
 venv/
-env/
-ENV/
 .venv/
-env.bak/
-venv.bak/
+*.egg-info/
 
-# Testing & Pytest
-.pytest_cache/
-.coverage
-htmlcov/
+# logs
+logs/
+*.log
 
-# Notebooks & IDEs
-.ipynb_checkpoints
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Large ML/Data & Outputs (Keep structure, ignore massive binaries)
-data/*
-!data/.gitkeep
-outputs/*
-!outputs/.gitkeep
-*.pth
-*.pt
-*.onnx
-*.bin
-*.h5
-
-# OS generated files
+# os
 .DS_Store
-Thumbs.db

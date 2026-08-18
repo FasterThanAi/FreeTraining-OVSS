@@ -1,6 +1,6 @@
 # Problem Statement Analysis — Unsupervised Semantic Segmentation of Remote Sensing Images
 
-*Analysis date: August 2026*
+*Analysis date: August 2026 · last updated 18 Aug 2026 (baseline reproduced; ConInfer added)*
 
 ---
 
@@ -13,6 +13,34 @@
 > arXiv:2512.08730v2 (v2 dated 22 Apr 2026) · [code](https://github.com/earth-insights/SegEarth-OV-3) · 205 stars
 
 This matters enormously, because **that paper already does a large part of what your problem statement proposes**, by the same group that wrote your first PDF (SegEarth-OV, CVPR 2025). You have accidentally been handed your own most direct competitor.
+
+> ### ⚠️ Second competitor, found later: ConInfer (arXiv:2603.29271, ~Mar 2026)
+>
+> **ConInfer: Context-Aware Inference for Training-Free Open-Vocabulary Remote Sensing
+> Segmentation** (Chen et al., Yunnan Normal University) claims to be the *first work to
+> explicitly incorporate contextual information at inference* for OVRSS. It fits a GMM over
+> DINOv3 patch features and fuses the resulting posterior with a VLM prior via a joint
+> KL-divergence objective, reporting **+2.80 mIoU** over SegEarth-OV on the same eight
+> benchmarks you plan to use.
+>
+> This overlaps your Step 4. **Any reviewer in this area will know it.** But it does not
+> close your gap:
+>
+> | | ConInfer | Yours |
+> |---|---|---|
+> | Backbone | CLIP / MaskCLIP | **SAM 3** (presence + semantic + instance heads) |
+> | Context type | **Visual only** (GMM over DINOv3 features) | **Semantic** — class-pair adjacency prior |
+> | Granularity | **Patch** level | **Region** level (SAM 3 masks) |
+> | Prior source | Per-scene, fitted at inference | **Corpus-level**, mined across the dataset |
+> | Exclusion evidence | Not representable | **Signed PMI** — negative evidence suppresses classes |
+>
+> ConInfer's own conclusion states it operates at patch level, which limits fine-grained
+> boundary delineation, and names pixel-level contextual modelling as future work.
+> **That is precisely your opening.** Cite it as the nearest neighbour, position against it
+> explicitly, and — if at all possible — run it as a baseline row.
+>
+> **Revised one-sentence contribution:** *a corpus-level semantic co-occurrence prior over
+> SAM 3 region proposals, where ConInfer uses a per-scene visual prior over CLIP patches.*
 
 This is good news, not bad. It means:
 
@@ -98,6 +126,41 @@ Stop describing it as "unsupervised segmentation with SAM 3." Describe it as:
 > **Context-aware label propagation for training-free open-vocabulary remote sensing segmentation** — recovering the ambiguous-region residual that presence-gated SAM 3 pipelines discard.
 
 And make SegEarth-OV3 your **explicit baseline**. Your headline number becomes "+X% mIoU over SegEarth-OV3, particularly on the pixels it assigns to background." That is a much stronger story than an unanchored number.
+
+---
+
+## 2.5 Baseline reproduced — 18 Aug 2026
+
+`python eval.py ./configs/cfg_loveda.py` → **mIoU 47.38** against the paper's **47.4**
+(Δ 0.02). 1669 LoveDA val images, 0.85 s/image, 6115 MB peak on a 16 GB RTX 2000 Ada.
+Environment and full per-class table in `WEEK1_RESULTS.md`.
+
+**The per-class breakdown is evidence for the premise, not just a sanity check:**
+
+| Class | IoU | Precision | Recall | P−R gap |
+|---|---|---|---|---|
+| building | 63.81 | 77.2 | 78.6 | −1.4 |
+| road | 53.89 | 69.6 | 70.5 | −1.0 |
+| **water** | 51.44 | **89.5** | **54.7** | **+34.8** |
+| agricultural | 47.47 | 66.9 | 62.0 | +4.9 |
+| **background** | 45.50 | **56.9** | **69.4** | **−12.5** |
+| barren | 35.73 | 51.5 | 53.9 | −2.4 |
+| forest | 33.78 | 57.9 | 44.8 | +13.1 |
+
+Three readings:
+
+1. **Water: 89.5 precision / 54.7 recall.** SAM 3 is right nine times in ten when it fires,
+   but finds half the water present. Those pixels are not *misclassified* — they fall below
+   τ = 0.5 and are discarded to background.
+2. **Background: 56.9 precision / 69.4 recall — the inverse.** Background is over-predicted
+   and impure: it is absorbing pixels that belong to real classes. This is the discard
+   bucket, directly visible in the metrics.
+3. **Building (−1.4) and road (−1.0) are balanced.** The weakness is confined to amorphous
+   "stuff", matching SegEarth-OV3's own things/stuff duality. Your method should be evaluated
+   *per class*, and the gain should concentrate in water, forest, and agricultural.
+
+This is indirect evidence — §6's discard-rate instrumentation converts it into a direct
+number for the paper's introduction.
 
 ---
 
@@ -291,10 +354,15 @@ Still open, and the next thing to measure: **does the embedding-similarity term 
 
 ## 5. What is genuinely novel, ranked
 
+*Recalibrated after finding ConInfer (arXiv:2603.29271), which published context-at-inference
+for OVRSS in March 2026.*
+
 | Idea | Novelty | Risk | Worth doing? |
 |---|---|---|---|
-| Corpus-level co-occurrence prior mined from unlabeled RS data | **High** | ~~Medium~~ → **Low** (§4.1 measured the premise) | **Yes — this is the thesis** |
-| Contextual clustering to recover background-assigned pixels | **High** | Medium | **Yes — this is the experiment** |
+| Corpus-level **semantic** co-occurrence prior (signed PMI over class pairs) | **High** — ConInfer's context is purely visual; no published work uses a class-adjacency prior here | **Low** (§4.1 measured the premise) | **Yes — this is the thesis** |
+| Context at **region** level via SAM 3 masks | **Medium-High** — ConInfer is patch-level and names this as future work | Low | **Yes — this is the differentiator** |
+| Recovering background-assigned pixels as the headline evaluation | **Medium** — the framing is yours; §2.5 measured the opportunity | Medium | **Yes — this is the experiment** |
+| Context modelling at inference *in general* | ~~High~~ → **None** (ConInfer, Mar 2026) | — | Cite, position against, don't claim |
 | RAG-based agglomeration of SAM 3 low-confidence masks | Medium | Low | Yes — solid supporting contribution |
 | Dual-head fusion | None (published) | — | Reuse, cite, don't claim |
 | Presence-guided filtering | None (published) | — | Reuse, cite, don't claim |
@@ -317,7 +385,18 @@ Your project lives or dies on whether you can show a number beating SegEarth-OV3
 - **Then:** Potsdam / Vaihingen (6 classes, ultra-high 5 cm / 9 cm resolution).
 - **Optional:** iSAID (15 classes, instance-heavy — stress-tests the "things" side).
 
-**Baselines to run, in order:** SAM 3 instance-head only → SegEarth-OV3 (dual-head + presence) → SegEarth-OV3 + your co-occurrence module. Three rows, one story.
+**Baselines to run, in order:**
+
+1. SAM 3 instance-head only
+2. **SegEarth-OV3** (dual-head + presence) — ✅ reproduced, LoveDA **47.38**
+3. SegEarth-OV3 with τ lowered — *the trivial alternative a reviewer will raise. If simply
+   dropping τ recovers the same pixels, your method has no reason to exist. Run this early.*
+4. DenseCRF over SAM 3 logits — the classical "use spatial context" answer
+5. **ConInfer** ([code](https://github.com/Dog-Yang/ConInfer)) — the nearest published competitor
+6. SegEarth-OV3 + your co-occurrence module
+
+Rows 3 and 5 are not optional. Row 3 is the cheapest possible refutation of your method; row 5
+is the reviewer's "how is this different from ConInfer?" answered with a number.
 
 **Ablations:** M_global only / M_image only / hierarchical · embedding term on-off · neighbour term on-off · SLIC atoms vs. SAM 3 mask atoms · λ sweep.
 
@@ -329,7 +408,11 @@ Also look at **OVRSISBenchV1** ([arXiv:2604.15652](https://arxiv.org/html/2604.1
 
 Your instinct is good and the co-occurrence idea is real. Three things have to change:
 
-1. **Reframe** around recovering the ambiguous residual, with SegEarth-OV3 as your named baseline — not as a from-scratch SAM 3 pipeline.
+1. **Reframe** around recovering the ambiguous residual, with SegEarth-OV3 as your named
+   baseline — not as a from-scratch SAM 3 pipeline. ✅ Baseline reproduced (47.38 vs 47.4),
+   and §2.5 shows the residual is measurable in the per-class metrics.
+   **Position explicitly against ConInfer**: semantic vs. visual context, region vs. patch
+   granularity, corpus-level vs. per-scene prior.
 2. **Make M corpus-level and hierarchically smoothed**, which fixes the statistics *and* earns you the "unsupervised" claim honestly.
 3. **Migrate off SAM 1 + CLIP to SAM 3**, because your method needs the presence head and the semantic head.
 

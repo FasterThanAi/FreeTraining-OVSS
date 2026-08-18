@@ -22,7 +22,7 @@ So this roadmap uses **just-in-time learning**. You learn each concept in the we
 |---|---|---|---|
 | **0. Ignition** | 1 | SAM 3 running on your GPU | You've segmented an aerial image with a text prompt |
 | **1. Foundations** | 2–3 | Enough DL/CV to read the code | You can explain what a ViT patch token is |
-| **2. Baseline** | 4–5 | Reproduce SegEarth-OV3 | Your mIoU on OpenEarthMap matches their paper ±2% |
+| **2. Baseline** | 4–5 | Reproduce SegEarth-OV3 | ✅ **DONE — LoveDA 47.38 vs paper 47.4** |
 | **3. Build** | 6–9 | Implement the co-occurrence method | End-to-end pipeline producing masks |
 | **4. Prove** | 10–11 | Evaluation + ablations | Tables + figures showing you beat the baseline |
 | **5. Write** | 12 | Report / paper | Submitted draft |
@@ -37,22 +37,42 @@ The single highest-value thing you can do in week one is get SAM 3 producing a m
 
 ## 0.1 Environment (Day 1–2)
 
-**See `SETUP_SAM3.md` for the full Linux / lab-PC walkthrough.** Short version — note the hard requirements from the official README:
+**See `SETUP_SAM3.md` for the full walkthrough, and `scripts/setup_env.sh` to rebuild it.**
 
-> Python **3.12+** · PyTorch **2.7+** · CUDA-compatible GPU with **CUDA 12.6 or higher**
+> ⚠️ **The SAM 3 README's stated requirements (Python 3.12+, torch 2.7+, CUDA 12.6+) do not
+> work for this project.** MMSegmentation is also required — SegEarth-OV3 is built on it —
+> and mmcv has no prebuilt wheel above torch 2.4. Three constraints intersect at exactly one
+> point:
+>
+> | Component | Constraint |
+> |---|---|
+> | SAM 3 | torch **≥ 2.3** (`torch.nn.attention`) |
+> | mmcv prebuilt wheels | torch 2.1–2.4 only; **none for 2.5+** |
+> | mmsegmentation 1.2.2 | `mmcv >= 2.0.0rc4, < 2.2.0` |
+>
+> **Verified working (18 Aug 2026): Python 3.11 · torch 2.4.1+cu121 · mmcv 2.2.0 · mmseg 1.2.2
+> with `MMCV_MAX` patched to 2.3.0.** Runs fine on a CUDA 13.3 driver — the driver version is
+> a ceiling, not a match requirement.
 
 ```bash
-conda create -n sam3 python=3.12 -y && conda activate sam3
-pip install torch==2.10.0 torchvision --index-url https://download.pytorch.org/whl/cu128
-git clone https://github.com/facebookresearch/sam3.git && cd sam3
-pip install -e ".[notebooks]"
+conda create -n segov3 python=3.11 -y && conda activate segov3
+pip install torch==2.4.1 torchvision==0.19.1 --index-url https://download.pytorch.org/whl/cu121
+pip install "numpy<2"
+pip install mmcv==2.2.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.4/index.html
+pip install "mmsegmentation==1.2.2"
+sed -i "s/MMCV_MAX = '2.2.0'/MMCV_MAX = '2.3.0'/" \
+  $CONDA_PREFIX/lib/python3.11/site-packages/mmseg/__init__.py
+pip install einops psutil pycocotools hydra-core iopath timm huggingface_hub omegaconf
 ```
+
+**Do not use `mmcv-lite`, and do not build mmcv from source.** Both were tried and both fail —
+see `SETUP_SAM3.md §1` for the failure mode of each.
 
 **Checkpoints are gated.** Request access at [huggingface.co/facebook/sam3](https://huggingface.co/facebook/sam3) — do this on **day one**, approval is not instant. Then `hf auth login`. Mirror: [ModelScope](https://modelscope.cn/models/facebook/sam3).
 
 **Use SAM 3.1** if starting fresh — improved checkpoints released 27 Mar 2026, separate repo: [huggingface.co/facebook/sam3.1](https://huggingface.co/facebook/sam3.1). Requires latest repo code.
 
-**VRAM:** the model is 848M parameters. Image inference is comfortable on 16 GB and workable on 8–12 GB with FP16 + tiling. Check `nvidia-smi` — it constrains your tile size.
+**VRAM — measured, not estimated:** LoveDA evaluation at native 1024×1024 peaks at **6115 MB** on an RTX 2000 Ada (16 GB). No OOM, no fp16, no tiling needed. That leaves ~10 GB of headroom for DINOv3 features and cached region embeddings later.
 
 **Optional speedups:** `flash-attn-3`, `einops`, `ninja`, `cc_torch`. Skip until something is actually slow.
 
@@ -125,16 +145,39 @@ Theory track ~15 hrs/wk, code track ~10 hrs/wk, running concurrently.
 
 # PHASE 2 — Baseline (Weeks 4–5, ~50 hrs)
 
-## 2.1 Reproduce SegEarth-OV3
+## 2.1 Reproduce SegEarth-OV3 — ✅ **DONE (18 Aug 2026)**
 
 ```bash
-# mmcv + mmsegmentation are the only fussy dependencies — their words, and they're right
-python eval.py ./configs/cfg_OpenEarthMap.py
+ln -s ~/data/loveda data/LoveDA
+python eval.py ./configs/cfg_loveda.py
 ```
 
-Budget real time for mmsegmentation install pain. Match the versions in their repo exactly; do not improvise.
+**Result: mIoU 47.38 against the paper's 47.4** — a difference of 0.02, i.e. rounding.
+1669 LoveDA val images, 0.85 s/image, ~24 min wall, 6115 MB peak. Full numbers and the
+per-class table are in `WEEK1_RESULTS.md`.
 
-**Success = your mIoU lands within ~2% of their published number.** Until that holds, every later number you produce is meaningless. Do not proceed past this gate.
+The gate is passed. Every subsequent number is now measured against a baseline reproduced on
+this machine rather than quoted from a paper.
+
+**What the per-class breakdown showed** (this is the important part, not the headline number):
+
+| Class | Precision | Recall | Gap |
+|---|---|---|---|
+| water | 89.5 | 54.7 | **+34.8** |
+| forest | 57.9 | 44.8 | +13.1 |
+| background | 56.9 | 69.4 | **−12.5** |
+| building | 77.2 | 78.6 | −1.4 |
+
+SAM 3 is right ~90% of the time it says "water" but finds only half of it. Background shows
+the inverse — over-predicted and impure, absorbing pixels from real classes. That asymmetry
+is the τ = 0.5 threshold discarding low-confidence pixels, and it is concentrated in
+amorphous "stuff"; sharp-boundary "things" are balanced. **The project premise is visible in
+the baseline's own metrics.**
+
+> Note: reproduction was done on **LoveDA**, not OpenEarthMap as originally planned. LoveDA
+> is the better first target — smaller, urban/rural split for the cross-domain experiment,
+> and both SegEarth-OV and SegEarth-OV3 report on it. Run OpenEarthMap next for a second
+> reference point.
 
 ## 2.2 Papers — tiered reading list
 
@@ -172,10 +215,11 @@ Read in order. **Skim tier 0 for architecture only** — you need to recognise c
 |---|---|---|
 | 17 | **SegEarth-OV** (CVPR 2025) | ✅ You have it. Source of your dataset protocol. |
 | 18 | **SegEarth-OV3** (arXiv:2512.08730) | ✅ You have it. **Your baseline. Read until you could re-derive equations 1–3 from memory.** |
-| 19 | **Towards Realistic Open-Vocabulary RS Segmentation** ([arXiv:2604.15652](https://arxiv.org/html/2604.15652)) | OVRSISBenchV1 — the unified 2026 eval protocol. Evaluate on it if you can. |
-| 20 | **SkySense-O** (Zhu+ 2025) | RS-specific vision-language pretraining — the "just train on RS data" counter-argument you must address. |
-| 21 | **AerOSeg** (Dutta+ 2025) | SAM features for structural guidance in aerial imagery. |
-| 22 | **RemoteSAM** / **InstructSAM** (Yao+, Zheng+ 2025) | SAM-based unified RS pipelines. |
+| 19 | **ConInfer** ([arXiv:2603.29271](https://arxiv.org/abs/2603.29271)) | ⚠️ **Your closest competitor — read first.** Claims *first* context-at-inference for OVRSS: DINOv3 features → GMM → KL-consensus fusion with a VLM prior. +2.80 mIoU over SegEarth-OV. Purely **visual** context, **patch**-level, **CLIP**-based. No semantic class-pair prior. Its own limitations section names pixel/region-level contextual modelling as future work — that is your opening. |
+| 20 | **Towards Realistic Open-Vocabulary RS Segmentation** ([arXiv:2604.15652](https://arxiv.org/html/2604.15652)) | OVRSISBenchV1 — the unified 2026 eval protocol. Evaluate on it if you can. |
+| 21 | **SkySense-O** (Zhu+ 2025) | RS-specific vision-language pretraining — the "just train on RS data" counter-argument you must address. |
+| 22 | **AerOSeg** (Dutta+ 2025) | SAM features for structural guidance in aerial imagery. |
+| 23 | **RemoteSAM** / **InstructSAM** (Yao+, Zheng+ 2025) | SAM-based unified RS pipelines. |
 
 ### Tier 3 — Context modelling (your novelty — thin literature, go mining)
 
@@ -294,9 +338,9 @@ Overleaf + the CVPR or IEEE TGRS template. Start the LaTeX skeleton in **week 9*
 
 | End of week | Must be true |
 |---|---|
-| 1 | SAM 3 segments an aerial tile from a text prompt — **done 12 Aug** |
-| 3 | GT co-occurrence heatmap computed — **done 12 Aug, premise validated (`ANALYSIS.md §4`)**; mIoU implemented and trusted |
-| 5 | SegEarth-OV3 reproduced within 2% on OpenEarthMap |
+| 1 | SAM 3 segments an aerial tile from a text prompt — **✅ done 12 Aug** |
+| 3 | GT co-occurrence heatmap computed — **✅ done 12 Aug, premise validated (`ANALYSIS.md §4`)**; mIoU implemented and trusted |
+| 5 | SegEarth-OV3 reproduced within 2% — **✅ done 18 Aug, LoveDA 47.38 vs 47.4 (Δ 0.02)** |
 | 7 | M_global built and validated against GT |
 | 9 | End-to-end pipeline produces a number |
 | 11 | Main table + ablations complete |
@@ -304,7 +348,11 @@ Overleaf + the CVPR or IEEE TGRS template. Start the LaTeX skeleton in **week 9*
 
 ## Risks, ranked by likelihood
 
-1. **mmsegmentation dependency hell** (very likely) — budget 2 full days in week 4. Use their exact pinned versions. Docker if you have it.
+1. ~~**mmsegmentation dependency hell**~~ — **hit, and resolved (18 Aug).** Cost most of a
+   day. The repo pins no versions, so the working combination had to be found by elimination:
+   torch 2.4.1 + mmcv 2.2.0 (prebuilt wheel) + mmseg 1.2.2 with `MMCV_MAX` patched.
+   `mmcv-lite` and source builds both fail. Captured in `scripts/setup_env.sh` — **do not
+   rebuild the env by hand.**
 2. **HF checkpoint access delay** (likely) — request on day 1.
 3. **Co-occurrence signal is weak** (possible) — the Phase 1 GT heatmap tells you by week 3, cheaply. If adjacency is near-uniform, pivot to the RAG-agglomeration contribution instead.
 4. **Baseline won't reproduce** (possible) — open an issue on their repo early; the authors are active (205 stars, 12 open issues).

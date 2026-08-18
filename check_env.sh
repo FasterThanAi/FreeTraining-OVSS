@@ -7,7 +7,8 @@
 # ============================================================
 
 echo "=========================================="
-echo " SAM 3 environment check"
+echo " SAM 3 + MMSegmentation environment check"
+echo " Target stack: Python 3.11 | torch 2.4.1+cu121 | mmcv 2.2.0 | mmseg 1.2.2"
 echo " host: $(hostname)   user: $(whoami)   date: $(date)"
 echo "=========================================="
 
@@ -27,12 +28,9 @@ if command -v nvidia-smi &>/dev/null; then
     echo "Driver's max supported CUDA: ${CUDA_VER:-UNKNOWN}"
     if [ -n "$CUDA_VER" ]; then
         MAJ=${CUDA_VER%%.*}; MIN=${CUDA_VER##*.}
-        if [ "$MAJ" -gt 12 ] || { [ "$MAJ" -eq 12 ] && [ "$MIN" -ge 6 ]; }; then
-            echo ">>> OK. Meets SAM 3's CUDA 12.6+ requirement."
-        elif [ "$MAJ" -eq 12 ]; then
-            echo ">>> MARGINAL. CUDA 12.0-12.5. cu128 wheels usually still run via"
-            echo "    CUDA minor-version compatibility, but this is below spec."
-            echo "    Try it; if you hit driver errors you need an admin driver upgrade."
+        if [ "$MAJ" -ge 12 ]; then
+            echo ">>> OK. This project uses cu121 wheels; the driver version is a CEILING,"
+            echo "    not a match requirement. Verified working on a CUDA 13.3 driver."
         else
             echo ">>> BLOCKER. Below CUDA 12. You need a driver upgrade (requires root)."
             echo "    Email your lab admin now - this is the long pole."
@@ -59,7 +57,9 @@ echo "--- 4. Python ---"
 for p in python3 python3.12 python3.11 python3.10; do
     command -v $p &>/dev/null && echo "$p -> $($p --version 2>&1)"
 done
-echo "SAM 3 needs Python 3.12+. If absent, conda supplies it - no root needed."
+echo "This project uses Python 3.11 (NOT 3.12+ as SAM 3's README suggests)."
+echo "Reason: mmcv has no prebuilt wheels for 3.12/3.13, and mmsegmentation is required."
+echo "Conda supplies 3.11 - no root needed. See scripts/setup_env.sh."
 
 echo
 echo "--- 5. Conda ---"
@@ -77,7 +77,7 @@ for d in /scratch /data /mnt/scratch /tmp; do
     [ -d "$d" ] && [ -w "$d" ] && { echo "$d (writable):"; df -h "$d" | tail -1; }
 done
 echo "Home quota (if enforced):"; quota -s 2>/dev/null || echo "  (no quota command / not enforced)"
-echo ">>> Need ~40GB: conda env ~15GB, checkpoints ~5GB, datasets ~20GB+."
+echo ">>> Need ~40GB: conda env ~15GB, SAM 3 checkpoint 3.45GB, datasets ~20GB+."
 echo "    If HOME is small or quota'd, point conda + HF_HOME at a scratch disk."
 
 echo
@@ -106,6 +106,8 @@ echo "  (missing ones can come from conda: conda install -c conda-forge gcc_linu
 
 echo
 echo "=========================================="
-echo " Send this whole output to Claude and it can tell you exactly"
-echo " which install path to take."
+echo " Verified working stack (18 Aug 2026):"
+echo "   Python 3.11.15 | torch 2.4.1+cu121 | mmcv 2.2.0 (prebuilt torch2.4 wheel)"
+echo "   mmseg 1.2.2 with MMCV_MAX patched 2.2.0 -> 2.3.0 | numpy <2"
+echo " Rebuild with: bash scripts/setup_env.sh"
 echo "=========================================="
