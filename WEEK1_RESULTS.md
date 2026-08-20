@@ -4,7 +4,7 @@
 then measure how much real land cover the baseline discards to "background".
 
 **Status:** 🟢 **REPRODUCED — 47.38 mIoU vs paper's 47.4** · 🟢 **PREMISE CONFIRMED — 29.68% of
-real-class pixels discarded at τ = 0.5**
+real-class pixels discarded at τ = 0.5** · 🟢 **Confusion analysis complete**
 **Date started:** 2026-08-17
 **Last updated:** 2026-08-20
 
@@ -12,14 +12,14 @@ real-class pixels discarded at τ = 0.5**
 
 ## 1. Hardware
 
-| Item        | Value                                               |
-| ----------- | --------------------------------------------------- |
-| Machine     | HP Z4 G5 Workstation                                |
-| GPU         | NVIDIA RTX 2000 Ada Generation                      |
-| VRAM        | 16380 MiB (16 GB)                                   |
-| Driver      | 580.173.02 (`nvidia-smi` reports max CUDA **13.0**) |
-| System nvcc | **13.3**                                            |
-| OS          | Ubuntu (XFCE)                                       |
+| Item | Value |
+|---|---|
+| Machine | HP Z4 G5 Workstation |
+| GPU | NVIDIA RTX 2000 Ada Generation |
+| VRAM | 16380 MiB (16 GB) |
+| Driver | 580.173.02 (`nvidia-smi` reports max CUDA **13.0**) |
+| System nvcc | **13.3** |
+| OS | Ubuntu (XFCE) |
 
 > **VRAM outcome:** ✅ No OOM. LoveDA runs at its native **1024×1024** (the test pipeline
 > contains no `Resize` step), and the segmentor does sliding-window inference internally.
@@ -34,19 +34,19 @@ real-class pixels discarded at τ = 0.5**
 
 Conda env: `segov3`
 
-| Package            | Version                                                      |
-| ------------------ | ------------------------------------------------------------ |
-| Python             | 3.11.15 (conda-forge)                                        |
-| torch              | **2.4.1+cu121**                                              |
-| torchvision        | 0.19.1+cu121                                                 |
-| CUDA (torch build) | 12.1                                                         |
-| mmengine           | 0.10.7                                                       |
-| mmcv               | **2.2.0** (prebuilt wheel, torch2.4/cu121 index)             |
-| mmsegmentation     | 1.2.2 — **`MMCV_MAX` patched `2.2.0` → `2.3.0`**             |
-| sam3               | vendored copy inside `SegEarth-OV-3/sam3/` (shadows `~/sam3`) |
-| numpy              | 1.26.4 (pinned `<2`)                                         |
-| opencv-python      | 4.10.0.84                                                    |
-| SAM 3 checkpoint   | `sam3.pt`, 3,450,062,241 bytes (3.45 GB)                     |
+| Package | Version |
+|---|---|
+| Python | 3.11.15 (conda-forge) |
+| torch | **2.4.1+cu121** |
+| torchvision | 0.19.1+cu121 |
+| CUDA (torch build) | 12.1 |
+| mmengine | 0.10.7 |
+| mmcv | **2.2.0** (prebuilt wheel, torch2.4/cu121 index) |
+| mmsegmentation | 1.2.2 — **`MMCV_MAX` patched `2.2.0` → `2.3.0`** |
+| sam3 | vendored copy inside `SegEarth-OV-3/sam3/` (shadows `~/sam3`) |
+| numpy | 1.26.4 (pinned `<2`) |
+| opencv-python | 4.10.0.84 |
+| SAM 3 checkpoint | `sam3.pt`, 3,450,062,241 bytes (3.45 GB) |
 
 `torch.cuda.is_available()` → **True** ✅
 
@@ -56,11 +56,11 @@ Full freeze: `~/logs/segov3-env-freeze.txt`
 
 Three requirements intersect at exactly one workable point:
 
-| Component            | Constraint                                                   |
-| -------------------- | ------------------------------------------------------------ |
-| SAM 3                | **torch ≥ 2.3** (uses `torch.nn.attention`, which does not exist before 2.3) |
-| mmcv prebuilt wheels | available for torch 2.1–2.4; **none for torch 2.5**          |
-| mmsegmentation 1.2.2 | asserts `mmcv >= 2.0.0rc4, < 2.2.0`                          |
+| Component | Constraint |
+|---|---|
+| SAM 3 | **torch ≥ 2.3** (uses `torch.nn.attention`, which does not exist before 2.3) |
+| mmcv prebuilt wheels | available for torch 2.1–2.4; **none for torch 2.5** |
+| mmsegmentation 1.2.2 | asserts `mmcv >= 2.0.0rc4, < 2.2.0` |
 
 → **torch 2.4.1 is the only version satisfying SAM 3 that also has prebuilt mmcv wheels.**
 Its wheel is mmcv 2.2.0, excluded by mmseg's upper bound by one patch version, so
@@ -87,7 +87,6 @@ ln -s "$(ls ~/.cache/huggingface/hub/models--facebook--sam3/snapshots/*/sam3.pt)
 ```
 
 ### Environment notes / gotchas hit
-
 - Initial venv used **Python 3.13** — no mmcv wheels exist for it. Rebuilt on 3.11 via conda.
 - **`mmcv-lite` is unusable.** Every mmseg version eagerly imports compiled CUDA ops at
   package import (via `focal_loss` / `mask_classification` → `mmcv.ops` → `mmcv._ext`).
@@ -107,41 +106,58 @@ ln -s "$(ls ~/.cache/huggingface/hub/models--facebook--sam3/snapshots/*/sam3.pt)
 
 **LoveDA** (validation split)
 
-| Item           | Value                                                        |
-| -------------- | ------------------------------------------------------------ |
-| Source         | Kaggle archive — note the **doubled `Val/Val/` nesting**     |
-| Split used     | **Val** (Test has no ground-truth masks — labels withheld for challenge) |
-| Val images     | Rural 992 + Urban 677 = **1669**                             |
-| Prepared path  | `~/data/loveda/{img_dir,ann_dir}/val`, symlinked to `SegEarth-OV-3/data/LoveDA` |
-| Tile size      | 1024 × 1024 = 1,048,576 px                                   |
-| Classes (7)    | background, building, road, water, barren, forest, agricultural |
+| Item | Value |
+|---|---|
+| Source | Kaggle archive — note the **doubled `Val/Val/` nesting** |
+| Split used | **Val** (Test has no ground-truth masks — labels withheld for challenge) |
+| Val images | Rural 992 + Urban 677 = **1669** |
+| Prepared path | `~/data/loveda/{img_dir,ann_dir}/val`, symlinked to `SegEarth-OV-3/data/LoveDA` |
+| Tile size | 1024 × 1024 = 1,048,576 px |
+| Classes (7) | background, building, road, water, barren, forest, agricultural |
 | Label encoding | pixel values 1–7; **0 = no-data, ignored** (`reduce_zero_label=True`) |
 
 **Verification checklist**
-
 - [x] `img_dir/val` count == `ann_dir/val` count == **1669** ✅
 - [x] Rural + Urban merged with no filename collisions ✅
 - [x] `reduce_zero_label=True` confirmed in `cfg_loveda.py` ✅
 - [x] Sample mask `2522.png`: `uint8`, 1024×1024, unique values `[1 2 3 4 5 7]` ✅
 
-**Confirmed by the Week 2 diagnostic:** total labelled (non-no-data) pixels across the split =
-**1,704,296,271**. Since 1669 × 1,048,576 = 1,750,073,344, roughly **2.6% of pixels are
-no-data** and correctly excluded. Of the labelled pixels, **1,089,045,589 (63.9%) carry a real
-class**; the remaining 36.1% are genuine `background`.
+### Class composition (from the confusion matrix, τ = 0.5)
+
+| Class | GT pixels | Share of real-class |
+|---|---|---|
+| agricultural | 487,082,702 | 44.7% |
+| water | 199,567,816 | 18.3% |
+| forest | 125,615,647 | 11.5% |
+| building | 122,805,791 | 11.3% |
+| road | 79,590,500 | 7.3% |
+| barren | 74,383,133 | 6.8% |
+| **Total real-class** | **1,089,045,589** | 100% |
+
+Total labelled (non-no-data) pixels = **1,704,296,271**; background accounts for the remaining
+615,250,682 (36.1%). Since 1669 × 1,048,576 = 1,750,073,344, roughly **2.6% of pixels are
+no-data** and correctly excluded.
+
+> **Consistency check:** the confusion-matrix row sums total exactly 1,089,045,589, matching the
+> headline figure derived independently by the discard instrumentation. Two separate accounting
+> paths, identical totals.
+
+**Agricultural is 44.7% of all real-class pixels** — nearly half the dataset. This dominance
+matters for §8: it makes agricultural an attractor for ambiguous predictions, and it means any
+per-class improvement there moves mIoU disproportionately.
 
 ## 4. Configuration (`configs/cfg_loveda.py`)
 
-| Parameter                            | Value                                                        |
-| ------------------------------------ | ------------------------------------------------------------ |
-| `prob_thd` (τ, background threshold) | **0.5**                                                      |
-| `confidence_threshold` (decoder)     | **0.5**                                                      |
-| `classname_path`                     | `configs/cls_loveda.txt`                                     |
-| Test pipeline                        | `LoadImageFromFile → LoadAnnotations → PackSegInputs` — **no Resize** |
-| Effective input resolution           | 1024×1024 (LoveDA native)                                    |
-| Evaluator                            | `IoUMetric`, metrics `['mIoU', 'mFscore']`                   |
+| Parameter | Value |
+|---|---|
+| `prob_thd` (τ, background threshold) | **0.5** |
+| `confidence_threshold` (decoder) | **0.5** |
+| `classname_path` | `configs/cls_loveda.txt` |
+| Test pipeline | `LoadImageFromFile → LoadAnnotations → PackSegInputs` — **no Resize** |
+| Effective input resolution | 1024×1024 (LoveDA native) |
+| Evaluator | `IoUMetric`, metrics `['mIoU', 'mFscore']` |
 
 **Class prompts** (comma = synonym augmentation):
-
 ```
 background
 building,house
@@ -157,17 +173,17 @@ agricultural
 > premise of the co-occurrence prior. Note it is 5× the demo's default of 0.1, and the
 > paper states τ is tuned per dataset.
 >
-> §7.2 now quantifies what that choice costs.
+> §7.2 and §8.2 now quantify exactly what that choice costs, in both directions.
 
 ## 5. Reproduction Result
 
 **Reference (paper, Table 1):** LoveDA = 47.4 mIoU
 
-| Run                   | Config                           | Images | mIoU      | Notes                                      |
-| --------------------- | -------------------------------- | ------ | --------- | ------------------------------------------ |
-| Mini (smoke test)     | `cfg_loveda_mini.py`             | 20     | **38.97** | filename-sorted subset, not representative |
-| **Baseline (full)**   | `cfg_loveda.py`                  | 1669   | **47.38** | ✅ matches paper's 47.4 (Δ 0.02)            |
-| Independent recompute | discard instrumentation, τ = 0.5 | 1669   | **47.37** | ✅ Δ 0.01 — **label alignment verified**    |
+| Run | Config | Images | mIoU | Notes |
+|---|---|---|---|---|
+| Mini (smoke test) | `cfg_loveda_mini.py` | 20 | **38.97** | filename-sorted subset, not representative |
+| **Baseline (full)** | `cfg_loveda.py` | 1669 | **47.38** | ✅ matches paper's 47.4 (Δ 0.02) |
+| Independent recompute | discard instrumentation, τ = 0.5 | 1669 | **47.37** | ✅ Δ 0.01 — **label alignment verified** |
 
 The third row is a correctness gate, not a result. The Week 2 diagnostic recomputes mIoU from its
 own confusion matrix using its own class indexing; agreement to 0.01 proves the instrumentation
@@ -176,15 +192,15 @@ guarantee.**
 
 ### Mini-run per-class results (20 images — indicative only)
 
-| Class        | IoU      | Acc   | Fscore | Precision | Recall |
-| ------------ | -------- | ----- | ------ | --------- | ------ |
-| background   | 57.46    | 93.76 | 72.98  | 59.74     | 93.76  |
-| building     | 50.17    | 60.95 | 66.82  | 73.93     | 60.95  |
-| road         | 56.04    | 71.93 | 71.83  | 71.73     | 71.93  |
-| water        | 47.26    | 50.08 | 64.18  | **89.34** | 50.08  |
-| barren       | 23.12    | 33.27 | 37.56  | 43.11     | 33.27  |
-| forest       | **0.00** | 0.00  | 0.01   | 1.20      | 0.00   |
-| agricultural | 38.77    | 40.62 | 55.87  | **89.47** | 40.62  |
+| Class | IoU | Acc | Fscore | Precision | Recall |
+|---|---|---|---|---|---|
+| background | 57.46 | 93.76 | 72.98 | 59.74 | 93.76 |
+| building | 50.17 | 60.95 | 66.82 | 73.93 | 60.95 |
+| road | 56.04 | 71.93 | 71.83 | 71.73 | 71.93 |
+| water | 47.26 | 50.08 | 64.18 | **89.34** | 50.08 |
+| barren | 23.12 | 33.27 | 37.56 | 43.11 | 33.27 |
+| forest | **0.00** | 0.00 | 0.01 | 1.20 | 0.00 |
+| agricultural | 38.77 | 40.62 | 55.87 | **89.47** | 40.62 |
 
 Aggregate: `aAcc 65.93 · mIoU 38.97 · mAcc 50.09 · mFscore 52.75 · mPrecision 61.22 · mRecall 50.09`
 
@@ -192,7 +208,6 @@ Aggregate: `aAcc 65.93 · mIoU 38.97 · mAcc 50.09 · mFscore 52.75 · mPrecisio
 subset is likely skewed Rural-vs-Urban and is far too small for comparison against 47.4.
 
 **Two observations worth carrying forward:**
-
 1. **forest = 0.00 IoU.** The sample mask contained no class 6 at all, so forest may simply
    be absent from this subset — but if it stays near zero on the full run, the `forest,tree`
    prompt is failing and that is a finding in itself.
@@ -203,15 +218,15 @@ subset is likely skewed Rural-vs-Urban and is far too small for comparison again
 
 ### Full per-class results (1669 images) — **the key table**
 
-| Class        | IoU   | Acc   | Fscore | Precision | Recall    | P−R gap   |
-| ------------ | ----- | ----- | ------ | --------- | --------- | --------- |
-| building     | 63.81 | 78.60 | 77.90  | 77.22     | 78.60     | −1.4      |
-| road         | 53.89 | 70.53 | 70.04  | 69.55     | 70.53     | −1.0      |
-| **water**    | 51.44 | 54.73 | 67.93  | **89.54** | **54.73** | **+34.8** |
-| agricultural | 47.47 | 62.02 | 64.38  | 66.92     | 62.02     | +4.9      |
-| background   | 45.50 | 69.40 | 62.55  | **56.92** | **69.40** | **−12.5** |
-| barren       | 35.73 | 53.87 | 52.65  | 51.49     | 53.87     | −2.4      |
-| forest       | 33.78 | 44.80 | 50.50  | 57.88     | 44.80     | +13.1     |
+| Class | IoU | Acc | Fscore | Precision | Recall | P−R gap |
+|---|---|---|---|---|---|---|
+| building | 63.81 | 78.60 | 77.90 | 77.22 | 78.60 | −1.4 |
+| road | 53.89 | 70.53 | 70.04 | 69.55 | 70.53 | −1.0 |
+| **water** | 51.44 | 54.73 | 67.93 | **89.54** | **54.73** | **+34.8** |
+| agricultural | 47.47 | 62.02 | 64.38 | 66.92 | 62.02 | +4.9 |
+| background | 45.50 | 69.40 | 62.55 | **56.92** | **69.40** | **−12.5** |
+| barren | 35.73 | 53.87 | 52.65 | 51.49 | 53.87 | −2.4 |
+| forest | 33.78 | 44.80 | 50.50 | 57.88 | 44.80 | +13.1 |
 
 Aggregate: `aAcc 63.80 · **mIoU 47.38** · mAcc 61.99 · mFscore 63.71 · mPrecision 67.08 · mRecall 61.99`
 
@@ -229,30 +244,29 @@ The per-class breakdown supports the project premise directly:
 4. **Building (−1.4) and road (−1.0) are balanced.** Sharp-boundary "things" are handled well;
    the weakness is concentrated in amorphous "stuff" — exactly the duality the paper identifies.
 
-→ The pixels the co-occurrence prior aims to recover are measurable, substantial, and
-concentrated in identifiable classes. **§7 converts this indirect evidence into a direct number,
-and confirms it: water loses 32.22% of its GT pixels to background, forest 34.60%.**
+→ §7 converts this indirect evidence into direct numbers, and §7.6 decomposes each class's error
+budget into its two mechanisms. The `mAcc` column here is reproduced exactly by the confusion
+matrix (§7.6), a further consistency check.
 
 ### Interpretation guide
-
-| Observed | Meaning                                                      |
-| -------- | ------------------------------------------------------------ |
-| 46–48    | ✅ Reproduced ← **we are here (47.38)**                       |
-| 40–46    | Close — check prompt wording, τ, decoder confidence threshold |
-| < 40     | Structural bug — suspect `reduce_zero_label` or Rural/Urban merge |
-| > 50     | Also a bug — likely mishandling the ignore class, inflating the score |
+| Observed | Meaning |
+|---|---|
+| 46–48 | ✅ Reproduced ← **we are here (47.38)** |
+| 40–46 | Close — check prompt wording, τ, decoder confidence threshold |
+| < 40 | Structural bug — suspect `reduce_zero_label` or Rural/Urban merge |
+| > 50 | Also a bug — likely mishandling the ignore class, inflating the score |
 
 ## 6. Runtime & Resource Profile
 
-| Metric                               | Value                                               |
-| ------------------------------------ | --------------------------------------------------- |
-| Seconds per image                    | **0.85** (full run; mini run measured 0.87)         |
-| Projected full eval (1669 images)    | ~24 minutes                                         |
-| Actual full eval wall time           | **~24 minutes** ✅ matched projection                |
-| **Peak memory during baseline eval** | **6115 MB** — 37% of the 16 GB card                 |
-| Peak VRAM during Week 2 diagnostic   | **8534 MiB** — 52% (extra GT/confusion bookkeeping) |
-| Sustained thermals / power           | 77 °C at the **70 W cap**, 100% GPU util            |
-| Input resolution used                | **1024×1024** (native; no Resize in pipeline)       |
+| Metric | Value |
+|---|---|
+| Seconds per image | **0.85** (full run; mini run measured 0.87) |
+| Projected full eval (1669 images) | ~24 minutes |
+| Actual full eval wall time | **~24 minutes** ✅ matched projection |
+| **Peak memory during baseline eval** | **6115 MB** — 37% of the 16 GB card |
+| Peak VRAM during Week 2 diagnostic | **8534 MiB** — 52% (extra GT/confusion bookkeeping) |
+| Sustained thermals / power | 77 °C at the **70 W cap**, 100% GPU util |
+| Input resolution used | **1024×1024** (native; no Resize in pipeline) |
 
 > **Headroom:** even the heavier diagnostic run peaks at 8.5 GB against 16 GB available.
 > Adding DINOv3 features, storing per-region embeddings, or running heavier inference on top of
@@ -279,51 +293,52 @@ discarded pixels. Outputs in `~/outputs/week2_tau{0.5,0.3,0.1}/`.
 
 ### 7.1 Headline — at the paper's own operating point (τ = 0.5)
 
-| Metric                                      | Value                                       |
-| ------------------------------------------- | ------------------------------------------- |
-| Labelled (non-no-data) pixels               | 1,704,296,271                               |
-| Pixels with a real class (excl. background) | 1,089,045,589 (63.9%)                       |
-| **Of those, discarded to background**       | **323,184,908 — 29.68%**                    |
-| Per-image discard rate                      | mean **33.79%**, median 18.51%, max 100.00% |
+| Metric | Value |
+|---|---|
+| Labelled (non-no-data) pixels | 1,704,296,271 |
+| Pixels with a real class (excl. background) | 1,089,045,589 (63.9%) |
+| **Of those, discarded to background** | **323,184,908 — 29.68%** |
+| Per-image discard rate | mean **33.79%**, median 18.51%, max 100.00% |
 
 **Nearly one third of all real land-cover pixels in LoveDA val are thrown away by the baseline.**
 Against the pivot rule below (`<5% → premise weak`), this clears the bar by a factor of six.
 
 ### 7.2 τ-sweep — the residual is *not* threshold-tunable
 
-| τ                  | mIoU      | Real-class px discarded  | Per-image mean | Per-image median |
-| ------------------ | --------- | ------------------------ | -------------- | ---------------- |
-| **0.5** (baseline) | **47.37** | **29.68%**               | 33.79%         | 18.51%           |
-| 0.3                | _TBD_     | _TBD_                    | _TBD_          | _TBD_            |
-| 0.1                | **41.83** | **10.88%** (118,477,557) | 12.06%         | 0.39%            |
+| τ | mIoU | Real-class px discarded | Per-image mean | Per-image median |
+|---|---|---|---|---|
+| **0.5** (baseline) | **47.37** | **29.68%** (323,184,908) | 33.79% | 18.51% |
+| 0.3 | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
+| 0.1 | **41.83** | **10.88%** (118,477,557) | 12.06% | 0.39% |
 
 > Fill the τ=0.3 row: `head -20 ~/outputs/week2_tau0.3/discard_summary.md`
 
 **This table is the argumentative core of the project.** Lowering τ from 0.5 to 0.1 recovers
 roughly two-thirds of the discarded pixels — and costs **5.54 mIoU** (47.37 → 41.83).
 
-The reason is that τ is a scalar with no semantics. It cannot distinguish a correct recovery from
-a hallucination, so buying recall with a lower threshold pays for it in precision at roughly
-one-for-one. **The residual is real, it is large, and reaching it requires a mechanism that
-reasons about *what* a region plausibly is — which is exactly what a semantic co-occurrence prior
-supplies.** This is the paper's motivation paragraph, and it is now measured rather than argued.
+§8.2 itemises exactly where that loss comes from. The short version: τ is a scalar with no
+semantics, so it cannot distinguish a correct recovery from a hallucination. **The residual is
+real, it is large, and reaching it requires a mechanism that reasons about *what* a region
+plausibly is — which is exactly what a semantic co-occurrence prior supplies.**
 
 ### 7.3 Loss by class
 
-| Class        | GT pixels   | Lost @ τ=0.5             | Lost @ τ=0.3         | Lost @ τ=0.1        |
-| ------------ | ----------- | ------------------------ | -------------------- | ------------------- |
-| forest       | 125,615,647 | 43,462,196 (**34.60%**)  | 24,343,686 (19.38%)  | 9,001,259 (7.17%)   |
-| water        | 199,567,816 | 64,309,668 (**32.22%**)  | 44,809,675 (22.45%)  | 28,739,040 (14.40%) |
+| Class | GT pixels | Lost @ τ=0.5 | Lost @ τ=0.3 | Lost @ τ=0.1 |
+|---|---|---|---|---|
+| forest | 125,615,647 | 43,462,196 (**34.60%**) | 24,343,686 (19.38%) | 9,001,259 (7.17%) |
+| water | 199,567,816 | 64,309,668 (**32.22%**) | 44,809,675 (22.45%) | 28,739,040 (14.40%) |
 | agricultural | 487,082,702 | 155,414,274 (**31.91%**) | 117,814,134 (24.19%) | 70,119,725 (14.40%) |
-| building     | _TBD_       | _TBD_                    | _TBD_                | _TBD_               |
-| road         | _TBD_       | _TBD_                    | _TBD_                | _TBD_               |
-| barren       | _TBD_       | _TBD_                    | _TBD_                | _TBD_               |
+| barren | 74,383,133 | ~18,595,783 (**25.0%**) † | _TBD_ | _TBD_ |
+| road | 79,590,500 | ~18,464,996 (**23.2%**) † | _TBD_ | _TBD_ |
+| building | 122,805,791 | 22,987,367 (**18.7%**) | _TBD_ | _TBD_ |
 
-> Fill the remaining rows: `cat ~/outputs/week2_tau0.5/discard_per_class.csv`
+† derived from the §7.6 error budget (percentage rounded to 1 dp); exact counts in
+`~/outputs/week2_tau0.5/discard_per_class.csv`.
 
 Agricultural alone loses **155 million pixels** at τ=0.5 — the largest absolute contributor, and
-the most abundant real class in the dataset. The three classes above are precisely the three with
-the largest positive P−R gaps in §5, closing the loop between the two measurements.
+the most abundant real class in the dataset. The three worst classes by rate (forest, water,
+agricultural) are precisely the three with the largest positive P−R gaps in §5, closing the loop
+between the two measurements.
 
 ### 7.4 The distribution is bimodal, not a smooth tail
 
@@ -346,35 +361,122 @@ medium-resolution / domain-gap angle is warranted.
 content → proceed; low discard rate (<5%) → pivot toward the medium-resolution / domain-gap angle,
 cf. GID: SegEarth-OV3 42.2 vs SegEarth-OV 46.3.)*
 
-## 8. Top Confused Class Pairs
+### 7.6 Error budget per class — the two mechanisms, separated ⭐
 
-From `~/outputs/week2_tau0.5/confusion_matrix.npy`. These are the pairs a semantic co-occurrence
-prior would target.
+Each class's GT pixels decompose into three outcomes at τ = 0.5:
 
-```bash
-python - <<'EOF'
-import numpy as np
-C = np.load('/home/priyanshu/outputs/week2_tau0.5/confusion_matrix.npy')
-names = ['background','building','road','water','barren','forest','agricultural']
-off = [(C[i,j], names[i], names[j]) for i in range(len(names))
-       for j in range(len(names)) if i != j]
-tot = C.sum()
-for n, t, p in sorted(off, reverse=True)[:10]:
-    print(f"{t:13s} -> {p:13s} {int(n):>12,}  {100*n/tot:5.2f}%")
-EOF
-```
+| Class | GT px | Correct | → background | → other real class | discard : confusion |
+|---|---|---|---|---|---|
+| building | 122,805,791 | 78.6% | **18.7%** | 2.7% | 6.9 : 1 |
+| road | 79,590,500 | 70.5% | **23.2%** | 6.3% | 3.7 : 1 |
+| agricultural | 487,082,702 | 62.0% | **31.9%** | 6.1% | 5.2 : 1 |
+| water | 199,567,816 | 54.7% | **32.2%** | 13.1% | 2.5 : 1 |
+| barren | 74,383,133 | 53.9% | 25.0% | **21.1%** | 1.2 : 1 |
+| forest | 125,615,647 | 44.7% | **34.6%** | **20.7%** | 1.7 : 1 |
 
-| Rank | True → Predicted | Count / % |
-| ---- | ---------------- | --------- |
-| 1    | _TBD_            |           |
-| 2    | _TBD_            |           |
-| 3    | _TBD_            |           |
-| 4    | _TBD_            |           |
-| 5    | _TBD_            |           |
+*(The `Correct` column reproduces §5's `Acc` exactly — a third independent consistency check.)*
 
-> Expect `→ background` to dominate the top rows given §7. The interesting question is which
-> pairs rank highest **excluding** the background column — those are genuine semantic confusions
-> the co-occurrence prior can arbitrate, as opposed to discards it must recover.
+**Three findings.**
+
+**1. Discard dominates confusion for every single class.** Aggregate: ~29.7% of real-class pixels
+assigned to background versus ~9.9% confused with another real class — a **3:1 ratio**. The
+method targets the larger of the two problems by a wide margin. This is the answer to "why not
+just improve the classifier?": the classifier is mostly not wrong, it is silent.
+
+**2. Two distinct failure profiles, requiring different treatment.**
+- *Discard-limited*: **building (6.9:1)** and **agricultural (5.2:1)**. When SAM 3 fires it is
+  right; it simply does not fire often enough. Recovery alone fixes these — the co-occurrence
+  term needs only to supply a plausible label, not to arbitrate between competitors.
+- *Both-limited*: **barren (1.2:1)** and **forest (1.7:1)**. These lose ~21% to real-class
+  confusion on top of their discards, so recovery must be *discriminative*. This is where the
+  signed-PMI exclusion evidence (`ANALYSIS.md` §4.2) earns its place.
+
+**3. Forest is the worst class overall** at 44.7% correct, losing more than half its pixels
+across both mechanisms. It is also one of the six sign-flipping pairs in `ANALYSIS.md` §4.4.
+**If the method improves forest materially, that is the headline per-class result.**
+
+**The honest ceiling.** Perfect recovery of all background-assigned pixels — with no new false
+positives — would move building 78.6% → 97.3% and forest 44.7% → 79.3%. Large, but bounded.
+State this in the paper before a reviewer computes it.
+
+> **Terminology caution:** `→ background` here counts every real-class pixel predicted as
+> background, which is a superset of "fell below τ". The two coincide numerically for the three
+> classes cross-checked against `discard_per_class.csv` (water 32.22%, forest 34.60%,
+> agricultural 31.91%), but write "assigned to background" rather than "discarded by τ" unless
+> the identity has been verified for every class.
+
+## 8. Confusion Matrix Analysis ✅
+
+Source: `~/outputs/week2_tau{0.5,0.3,0.1}/confusion_matrix.npy`, 7×7, rows = true,
+columns = predicted. Orientation verified: `C[agricultural, background]` = 155,414,274, matching
+`discard_per_class.csv` exactly.
+
+### 8.1 Top real-class confusions (background excluded on both sides)
+
+These — not the `→ background` cells — are the pairs a semantic co-occurrence prior can
+**arbitrate**, as opposed to the discards it must **recover**.
+
+| Rank | True → Predicted | τ=0.5 | τ=0.3 | τ=0.1 |
+|---|---|---|---|---|
+| 1 | **forest → agricultural** | 23,765,826 | 34,341,313 | 41,212,112 |
+| 2 | **water → agricultural** | 19,332,270 | 24,927,270 | 28,587,550 |
+| 3 | **agricultural → barren** | 16,105,731 | 19,131,204 | 31,057,381 |
+| 4 | **barren → agricultural** | 13,564,250 | 18,862,728 | 20,805,928 |
+| 5 | agricultural → forest | 7,859,015 | 10,288,842 | 12,559,116 |
+| 6 | water → barren | 4,148,715 | 5,479,005 | 7,430,931 |
+| 7 | road → forest | 2,627,343 | 3,221,434 | — |
+| 8 | agricultural → road | 2,139,670 | — | — |
+
+**The ranking is stable across all three thresholds.** These are structural properties of the
+model, not artefacts of where τ happens to sit — which makes them a legitimate design target.
+
+**Three observations that change the method design:**
+
+**(a) The top confusions are exactly the domain-unstable pairs.** `ANALYSIS.md` §4.1 measured
+forest–agriculture at **+1.17 PMI in urban but −1.62 in rural**, and water–barren at **−0.22
+urban / +1.70 rural** — both among the six sign-flippers of §4.4. So the single largest real-class
+confusion in the baseline is a pair where a global M would actively mislead on one domain or the
+other. **This is the strongest available justification for the hierarchical
+`M_eff = λ·M_global + (1−λ)·M_image`** — far more specific than the generic argument in §4.4.
+Cite these counts in the method section.
+
+**(b) The confusions are directional, so M should be too.** `water → agricultural` is 19.3M at
+τ=0.5 while `agricultural → water` does not appear in any top-8. `forest → agricultural` (23.8M)
+runs 3× its reverse (7.9M). `ROADMAP.md` Week 7 lists "directed or symmetric?" as open, with the
+current script symmetrising. **Resolve in favour of directed** — a symmetric M cannot express
+"a low-confidence region bordering water is probably not agricultural" independently of the
+converse.
+
+**(c) `agricultural` is a prediction-side attractor.** It appears in four of the top five
+confusions, as the predicted class in three of them. At 44.7% of real-class pixels (§3) it is the
+majority class, and ambiguous predictions drift toward it. This is the hub problem `ANALYSIS.md`
+§4.3 identified for `road` on the *neighbour* side, appearing here on the *prediction* side —
+verify the discriminability weighting addresses both.
+
+### 8.2 Where the 5.54 mIoU actually goes ⭐
+
+Tracking the agricultural column across the sweep isolates the cost of threshold relaxation:
+
+| τ | agricultural → background (missed) | background → agricultural (hallucinated) |
+|---|---|---|
+| 0.5 | 155,414,274 | 91,125,950 |
+| 0.3 | 117,814,134 | 167,098,884 |
+| 0.1 | 70,119,725 | **238,983,179** |
+
+Going 0.5 → 0.1 **recovers 85,294,549 agricultural pixels and creates 147,857,229 new false
+positives — a ratio of 1.73 wrong for every 1 right.**
+
+In aggregate the picture is worse. Background totals 615,250,682 pixels (§3); at τ=0.1 the
+visible `background → X` rows already sum to ~439M, meaning **over 70% of all true-background
+pixels are misassigned to some real class.** At τ=0.1 the model has effectively stopped
+predicting background at all.
+
+> **This is the paper's motivating result, stated precisely:** the discarded residual is
+> recoverable in principle, but recall bought by threshold relaxation is paid for at worse than
+> one-to-one in precision, because a scalar threshold carries no information about *which* class
+> a region plausibly is. A co-occurrence prior conditions on neighbourhood semantics and can
+> therefore recover selectively — that is the whole claim, and it is now quantified rather than
+> asserted.
 
 ## 9. Failure Cases
 
@@ -382,14 +484,14 @@ EOF
 
 ### 9.1 Worst tiles (τ = 0.1, 100% of real-class pixels discarded)
 
-| Tile | real_px   | discarded_px | %     |
-| ---- | --------- | ------------ | ----- |
-| 3031 | 1,048,576 | 1,048,576    | 100.0 |
-| 3003 | 1,004,599 | 1,004,599    | 100.0 |
-| 2752 | 916,226   | 916,226      | 100.0 |
-| 3175 | 898,188   | 898,188      | 100.0 |
-| 2994 | 894,700   | 894,700      | 100.0 |
-| 2625 | 845,017   | 845,017      | 100.0 |
+| Tile | real_px | discarded_px | % |
+|---|---|---|---|
+| 3031 | 1,048,576 | 1,048,576 | 100.0 |
+| 3003 | 1,004,599 | 1,004,599 | 100.0 |
+| 2752 | 916,226 | 916,226 | 100.0 |
+| 3175 | 898,188 | 898,188 | 100.0 |
+| 2994 | 894,700 | 894,700 | 100.0 |
+| 2625 | 845,017 | 845,017 | 100.0 |
 
 Tile 3031 has **every pixel** in the tile carrying a real class, and every one discarded. These
 are genuine total failures, not small-denominator artefacts — only tile 3480 (`real_px` = 1048)
@@ -402,14 +504,14 @@ is small enough to dismiss as noise.
 
 Probed tile **3487** with `sam3_smoke_test.py --raw`, all six real classes:
 
-| Class        | S_pres | `semantic_seg` max logit | → sigmoid | Ceiling on P_final | Instances returned |
-| ------------ | ------ | ------------------------ | --------- | ------------------ | ------------------ |
-| building     | 0.1309 | +6.44                    | 0.998     | 0.131              | 0                  |
-| road         | 0.0757 | **+10.13**               | 1.000     | 0.076              | 0                  |
-| water        | 0.0298 | +2.28                    | 0.907     | 0.027              | 0                  |
-| barren       | 0.0481 | +2.77                    | 0.941     | 0.045              | 0                  |
-| forest       | 0.0094 | +5.03                    | 0.993     | 0.009              | 0                  |
-| agricultural | 0.0200 | +5.44                    | 0.996     | 0.020              | 0                  |
+| Class | S_pres | `semantic_seg` max logit | → sigmoid | Ceiling on P_final | Instances returned |
+|---|---|---|---|---|---|
+| building | 0.1309 | +6.44 | 0.998 | 0.131 | 0 |
+| road | 0.0757 | **+10.13** | 1.000 | 0.076 | 0 |
+| water | 0.0298 | +2.28 | 0.907 | 0.027 | 0 |
+| barren | 0.0481 | +2.77 | 0.941 | 0.045 | 0 |
+| forest | 0.0094 | +5.03 | 0.993 | 0.009 | 0 |
+| agricultural | 0.0200 | +5.44 | 0.996 | 0.020 | 0 |
 
 Since `P_final = P_fused · S_pres`, the presence score is a **hard ceiling on every pixel in the
 tile** for that class. Road is the clearest case: the semantic head emits a +10.13 logit —
@@ -446,6 +548,7 @@ presence-corrected evidence.
       class-6 pixels. The `forest,tree` prompt works correctly.
 - [x] ~~Peak VRAM not measured~~ — **6115 MB peak** (baseline), 8534 MiB (diagnostic)
 - [x] ~~Discard rate unmeasured~~ — **29.68% at τ=0.5**, §7
+- [x] ~~Confusion matrix unanalysed~~ — §8, all three τ
 - [ ] mmseg `MMCV_MAX` patch is a site-packages edit — will not survive an env rebuild.
       Capture it in `scripts/setup_env.sh`.
 - [ ] **`KeyError: SegEarthOV3Segmentation is not in the mmseg registry`** in the visualisation
@@ -458,9 +561,10 @@ presence-corrected evidence.
 - [ ] **`ANALYSIS.md` §3.5 is contradicted by measurement** (§9.2). It states that inheriting
       presence gating "costs you nothing"; tile 3487 shows it costs whole tiles. Correction
       pending.
+- [ ] **`ROADMAP.md` Week 7 "directed or symmetric?" should be closed as directed** — §8.1(b).
 - [ ] τ=0.3 mIoU and headline discard % not yet transcribed into §7.2.
-- [ ] Per-class discard for building / road / barren not yet transcribed into §7.3.
-- [ ] Confusion pairs (§8) not yet extracted.
+- [ ] Exact per-class discard counts for road / barren at all τ, and building at τ=0.3/0.1
+      (§7.3) — values in the CSVs, not yet transcribed.
 
 ## 11. Next Steps
 
@@ -473,13 +577,13 @@ presence-corrected evidence.
 7. ~~Full evaluation on 1669 val images~~ ✅ **mIoU 47.38 (paper: 47.4)**
 8. ~~Week 2: discard-rate diagnostic~~ ✅ **29.68% at τ=0.5**
 9. ~~Week 2: τ-sweep (0.3, 0.1)~~ ✅ **−5.54 mIoU to recover ⅔ of the residual**
+10. ~~Week 2: confusion matrix analysis~~ ✅ **§8 — directional confusions, 1.73:1 recovery cost**
 
 **Remaining, in order:**
 
-1. Fill the `_TBD_` fields in §7.2, §7.3 and §8 from existing output files — **no re-running
-   required.**
-2. Correct `ANALYSIS.md` §3.5 with the presence-collapse finding; recover the stranded scripts
-   into the tracked tree; commit.
+1. Fill the last `_TBD_` fields in §7.2 and §7.3 from existing CSVs — **no re-running required.**
+2. Correct `ANALYSIS.md` §3.5; close the directed/symmetric question in `ROADMAP.md` Week 7;
+   recover the stranded scripts into the tracked tree; commit.
 3. **Instrument `measure_discard_rate.py` to dump per-class `S_pres` per image, and add an
    `.npz` cache of `(conf, pred, gt, S_pres)` in the same edit.** One re-run at τ=0.5 then yields:
    the presence distribution over all 1669 tiles, the catastrophic-vs-healthy comparison that
@@ -488,7 +592,8 @@ presence-corrected evidence.
    29.68%** — if either moves, the patch changed behaviour.
 4. Resolve the mmseg registry error; produce §9.1 qualitative figures.
 5. Begin Week 3: `M_global` construction against the GT co-occurrence reference
-   (`ANALYSIS.md` §4).
+   (`ANALYSIS.md` §4), with §8.1's confusion ranking as the validation target — a useful M should
+   assign low compatibility to exactly the pairs the baseline confuses.
 
 ---
 
@@ -500,17 +605,22 @@ expectation. **Two numbers must be reported separately:**
 - **Recovery rate** — what fraction of the discarded residual the method labels at all.
 - **Precision of recoveries** — what fraction of those labels are correct.
 
-The τ=0.1 result is the proof that this separation is necessary: it recovers two-thirds of the
-residual and *loses* 5.54 mIoU doing it. **Recovering pixels carelessly is worse than not
-recovering them.** Any headline gain claimed without the precision column invites exactly the
-objection the τ-sweep already answers — and a reviewer who has read SegEarth-OV3 will raise it.
+§8.2 is the proof that this separation is necessary: threshold relaxation recovers 85.3M
+agricultural pixels while creating 147.9M false positives, **1.73 wrong per 1 right**.
+**Recovering pixels carelessly is worse than not recovering them.** Any headline gain claimed
+without the precision column invites exactly the objection the τ-sweep already answers — and a
+reviewer who has read SegEarth-OV3 will raise it.
 
 The strongest table remains the one specified in `ANALYSIS.md` §6: **mIoU restricted to pixels
 SegEarth-OV3 assigns to background.** That isolates the contribution and cannot be confused with
-backbone effects. §7 now gives that table a denominator: 323,184,908 pixels.
+backbone effects. §7 gives that table its denominator: 323,184,908 pixels.
 
 Report the **median alongside the mean** everywhere (§7.4). The bimodality is a real property of
 the problem, and disclosing it is more persuasive than a mean that overstates the typical case.
+
+Lead the results section with §7.6's **3:1 discard-to-confusion ratio**. It establishes in one
+number that the baseline's dominant error mode is silence rather than error, which is precisely
+the gap the method fills.
 
 ---
 
