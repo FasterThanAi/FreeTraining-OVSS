@@ -602,7 +602,86 @@ Two refinements to how §9.2 must be described:
 > Without (b), the competing reading survives: *hard tiles are hard, and low presence is a
 > symptom rather than a cause.* **A reviewer will raise this.** State it before they do.
 
-### 9.2b The counterfactual — pending
+### 9.2b The counterfactual — ✅ run 21 Aug. **Presence gating is a correlate, NOT a cause.**
+
+`--no-presence` (`P_final = P_fused`) over all 1669 tiles, compared with
+`scripts/compare_presence_counterfactual.py`. **The hypothesis is refuted.**
+
+| Tile set (by baseline discard) | n | discard before | after | change |
+|---|---|---|---|---|
+| catastrophic (≥99%) | 198 | 99.97% | 60.82% | **−39.15** |
+| middle | 1394 | 26.23% | 37.83% | **+11.60** |
+| healthy (<1%) | 77 | 0.46% | 54.11% | **+53.64** |
+
+mIoU **47.37 → 35.39 (−11.97)**.
+
+**Three findings, and together they kill the causal claim:**
+
+1. **`correlation(spres_max, recovery) = +0.018` over the 198 catastrophic tiles.** This is
+   decisive. If gating were suppressing recoverable evidence, the *lowest*-presence tiles would
+   recover *most* and this would be strongly negative. It is zero. **The tiles that recover are
+   not the presence-suppressed ones.**
+2. **The same intervention wrecks barely-gated tiles.** Healthy tiles had median `spres_max`
+   0.918 — almost ungated — yet their discard rises 0.46% → 54.11%. Whatever removing gating
+   does, it is not "releasing suppressed evidence."
+3. **Recovery is partial even where it happens:** only 73/198 (36.9%) fall below 50% discard,
+   32/198 (16.2%) below 10%.
+
+**Aggregate effect — worse on every axis** (signs not clamped; an earlier version of the script
+clamped at zero and produced an incoherent total row):
+
+| | Δ with gating off |
+|---|---|
+| real-class pixels sent to background | **+141,838,608 more** |
+| correctly-labelled pixels | **−188,046,270 fewer** |
+| new false positives | +53,629,017 |
+
+Only **barren (+360,396)** and **forest (+4,013,494)** gained correct pixels — at **113.6** and
+**6.45** wrong per right. Those are precisely the two *both-limited* classes of §7.6: recoverable
+signal exists there, but reaching it needs discrimination, not a bigger hammer.
+
+**Consequence for the writeup.** §9.2 and §9.2a stand as *observation*: presence scores are
+systematically lower on catastrophic tiles (median 0.273 vs 0.918, r = −0.750). Tile 3487 shows
+the mechanism *can* occur. Neither supports the claim that gating *causes* the collapse. Write it
+as a correlate. **Do not put a causal claim about presence gating in the paper.**
+
+#### Why discard went *up* — the likely mechanism, and a cheap test
+
+Counter-intuitive: `P_final = P_fused · S_pres`, so dropping `S_pres` makes every score larger,
+and thresholding should discard *fewer* pixels. But in `predict()` background wins **two** ways:
+
+```python
+seg_pred = torch.argmax(seg_logits, dim=0)      # background is one of the 7 queries
+seg_pred[max_vals < self.prob_thd] = self.bg_idx
+```
+
+`background` is itself a gated query. If `S_pres[background]` is low, gating was holding
+background *down*; remove it and background surges and wins the argmax outright on tiles it used
+to lose. **That would invert SegEarth-OV3's stated motivation** — they present gating as
+preventing hallucination of *absent* classes; on healthy tiles its dominant effect may be
+suppressing *background*.
+
+Testable in seconds from `per_image_presence.csv` (compare `spres_background` against the real
+classes). Worth doing: if confirmed, it is a mechanism the SegEarth-OV3 paper does not report,
+and unlike the causal claim above it is directly measurable.
+
+#### Why this strengthens the paper
+
+Three blunt interventions are now measured, and all three fail:
+
+| Intervention | mIoU cost | Wrong per right |
+|---|---|---|
+| lower τ to 0.1 | −5.54 | 1.73 |
+| remove presence gating | **−11.97** | no net recovery at all |
+| do nothing | — | 29.68% of real-class pixels discarded |
+
+The motivation section is stronger with two refutations than one: *the residual is real, every
+global knob that reaches it costs more than it returns, and recovery therefore has to be
+selective and semantic.* That is the thesis, now with the trivial alternatives measured rather
+than argued away.
+
+<details>
+<summary>Original pre-registered reading (retained — the interpretation was fixed before the number was seen)</summary>
 
 `measure_discard_rate.py --no-presence` disables the `S_pres` multiply (`P_final = P_fused`) and
 re-measures. One 25-min run converts the correlation above into a causal claim:
@@ -626,6 +705,16 @@ nohup python ~/FreeTraining-OVSS/scripts/measure_discard_rate.py \
 
 Compare per-tile against `~/outputs/week2_tau0.5_instrumented/per_image_discard.csv`, restricted
 to the 198 catastrophic tiles — **not** on aggregate mIoU, which answers a different question.
+
+</details>
+
+> **Method note worth keeping.** Both readings above were written *before* the run. The measured
+> outcome matched neither cleanly — catastrophic tiles did improve by 39 points, which the
+> pre-written rule would have called a causal result, but the selectivity correlation (+0.018)
+> and the collateral damage to healthy tiles (+53.64) refuted it. Pre-registering the reading was
+> still worth it: it made the gap between "the number I expected to be decisive" and "the number
+> that actually decided it" impossible to paper over. The disqualifying evidence was the
+> *correlation*, not the headline drop.
 
 ⚠️ **Scope risk, decide before Week 8.** The method labels unidentified regions by conditioning on
 the labels of *identified* neighbours. On a 100%-discard tile there are **no identified patches** —

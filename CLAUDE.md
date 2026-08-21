@@ -107,17 +107,25 @@ the exact baseline code behind 47.38. The instrumented τ=0.5 run **passed the g
 - per-class `S_pres` recorded for all 1669 tiles
 - `.npz` cache written → any future τ or ablation is a numpy pass, not a 25-min GPU run
 
-**New finding, WEEK1_RESULTS §9.2a.** Presence-head collapse generalises from n=1:
-catastrophic tiles (≥99% discard, n=198) have median `spres_max` **0.273** against **0.918**
-for healthy tiles (n=77); r = **−0.750** over 1669 tiles. ⚠️ But the correlation is **partly
-mechanical** — `P_final = P_fused · S_pres`, so low presence forces discard by construction.
-The causal claim needs the `--no-presence` counterfactual (§9.2b). Do not let this reach a
-draft without that caveat attached.
+**Presence-head collapse: correlate, NOT cause.** Settled by counterfactual, WEEK1_RESULTS
+§9.2a/§9.2b. The observation is real — catastrophic tiles (n=198) have median `spres_max`
+**0.273** vs **0.918** healthy (n=77), r = **−0.750** over 1669 tiles. But `--no-presence`
+refuted causation: recovery is **uncorrelated** with baseline presence (**+0.018**), and the
+same intervention pushes healthy, barely-gated tiles from 0.46% to 54.11% discard, costing
+**−11.97 mIoU**. **Do not put a causal claim about presence gating in the paper.** Tile 3487
+shows the mechanism can occur; it does not generalise.
+
+Three blunt interventions are now measured and all three fail — τ→0.1 (−5.54 mIoU, 1.73 wrong
+per right), presence removal (−11.97, no net recovery), do nothing (29.68% discarded). **That is
+the motivation section**: every global knob that reaches the residual costs more than it returns,
+so recovery must be selective and semantic.
 
 Next, in order:
 
-1. **§9.2b counterfactual** — `--no-presence` at τ=0.5, compare on the 198 catastrophic tiles
-   (not on aggregate mIoU, which answers a different question). Highest value remaining.
+1. Cheap check (seconds, no GPU): is `spres_background` systematically lower than the real
+   classes in `per_image_presence.csv`? `background` is itself a gated query and can win by
+   argmax as well as by threshold, which would explain why discard *rose*. If confirmed, it
+   inverts SegEarth-OV3's stated motivation for gating — a mechanism their paper doesn't report.
 2. Fill the last `_TBD_`s in WEEK1_RESULTS §7.2/§7.3 from the CSVs.
 3. Two cheap CPU-only validations, both on claims that are currently load-bearing and
    unvalidated (WEEK1_RESULTS §9.1a and §10):

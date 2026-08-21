@@ -141,43 +141,81 @@ def main():
            '`new FP` = true-background pixels newly claimed by this class.\n',
            '| Class | recovered | of which correct | precision | new FP | wrong per right |',
            '|---|---|---|---|---|---|']
+    # NB signs are NOT clamped. A negative "recovered" means the intervention sent
+    # MORE real-class pixels to background, which is a real and important outcome --
+    # an earlier version clamped at zero and produced an incoherent total row.
     tot_rec = tot_cor = tot_fp = 0
     for k in range(1, N):
         recovered = int(cm_b[k, BG] - cm_c[k, BG])
         correct = int(cm_c[k, k] - cm_b[k, k])
         new_fp = int(cm_c[BG, k] - cm_b[BG, k])
-        tot_rec += max(recovered, 0); tot_cor += max(correct, 0); tot_fp += max(new_fp, 0)
-        prec = f'{100*correct/recovered:.1f}%' if recovered > 0 else '-'
-        wpr = f'{new_fp/correct:.2f}' if correct > 0 else '-'
+        tot_rec += recovered; tot_cor += correct; tot_fp += new_fp
+        prec = f'{100*correct/recovered:.1f}%' if recovered > 0 else 'n/a'
+        wpr = f'{new_fp/correct:.2f}' if correct > 0 else 'n/a'
         md.append(f'| {CLASSES[k]} | {recovered:,} | {correct:,} | {prec} | '
                   f'{new_fp:,} | {wpr} |')
-    prec = f'{100*tot_cor/tot_rec:.1f}%' if tot_rec else '-'
-    wpr = f'{tot_fp/tot_cor:.2f}' if tot_cor else '-'
+    prec = f'{100*tot_cor/tot_rec:.1f}%' if tot_rec > 0 else 'n/a'
+    wpr = f'{tot_fp/tot_cor:.2f}' if tot_cor > 0 else 'n/a'
     md.append(f'| **total** | **{tot_rec:,}** | **{tot_cor:,}** | **{prec}** | '
               f'**{tot_fp:,}** | **{wpr}** |')
-    md += [f'\nCompare against 8.2: threshold relaxation (tau 0.5->0.1) bought 1 correct '
-           f'pixel per **1.73** wrong. Removing presence gating buys 1 per **{wpr}**.\n']
+    if tot_rec > 0 and tot_cor > 0:
+        md += [f'\nCompare against 8.2: threshold relaxation (tau 0.5->0.1) bought 1 correct '
+               f'pixel per **1.73** wrong. This intervention buys 1 per **{wpr}**.\n']
+    else:
+        md += ['\n> **`n/a` is the result, not a formatting failure.** A negative `recovered`',
+               '> means the intervention sent MORE real-class pixels to background, and a',
+               '> negative `correct` means it produced FEWER correct pixels. There is no',
+               '> recovery to price, so "wrong per right" is undefined. Compare the totals',
+               '> against zero, not against 8.2\'s 1.73:1.\n']
 
     # ---------------- verdict ----------------
     md += ['## Verdict\n']
     if cat:
         drop = np.mean([b[n]['pct'] for n in cat]) - np.mean([c[n]['pct'] for n in cat])
-        if drop > 30:
-            md.append(f'Catastrophic-tile discard falls by **{drop:.1f} points** with gating off. '
-                      'Leg (b) established at scale: the dense evidence was there and presence '
-                      'gating was suppressing it. 9.2 is a causal claim, and it argues FOR the '
-                      'method -- a local co-occurrence prior is the natural correction for a '
-                      'wrong GLOBAL scalar (ANALYSIS 3.5).')
-        elif drop > 10:
-            md.append(f'Catastrophic-tile discard falls **{drop:.1f} points** — real but partial. '
-                      'Presence gating is one cause among others. State it as contributory, '
-                      'not sole.')
+        harm = 0.0
+        if hea:
+            harm = np.mean([c[n]['pct'] for n in hea]) - np.mean([b[n]['pct'] for n in hea])
+        selective = np.nan
+        sp = np.array([pres.get(n, np.nan) for n in cat])
+        d = np.array([b[n]['pct'] - c[n]['pct'] for n in cat])
+        ok = np.isfinite(sp)
+        if ok.sum() > 2 and np.std(sp[ok]) > 0:
+            selective = float(np.corrcoef(sp[ok], d[ok])[0, 1])
+
+        # A causal claim needs the drop AND selectivity: it must help the tiles
+        # presence was suppressing, and not wreck the ones it was not.
+        md.append(f'- catastrophic discard change: **{-drop:+.1f}** points')
+        md.append(f'- healthy discard change: **{harm:+.1f}** points')
+        md.append(f'- correlation(baseline `spres_max`, recovery): **{selective:+.3f}**\n')
+
+        if np.isfinite(selective) and selective > -0.2 and harm > 10:
+            md.append(
+                '**Presence gating is a CORRELATE, not a cause.** Two disqualifying facts. '
+                f'(1) Recovery is uncorrelated with baseline presence ({selective:+.3f}) -- if '
+                'gating were suppressing recoverable evidence, the lowest-presence tiles would '
+                'recover most, and that correlation would be strongly negative. (2) The same '
+                f'intervention makes healthy, barely-gated tiles worse by {harm:.1f} points, so '
+                'whatever it is doing is not "releasing suppressed evidence".\n\n'
+                'Scope 9.2 down: tile 3487 illustrates that the mechanism CAN occur, but it does '
+                'not generalise to a causal claim. Finding this now costs one run; finding it in '
+                'week 11 costs a results section.\n\n'
+                'Note the likely mechanism: `background` is itself a gated query, and in '
+                'predict() it can win by argmax as well as by threshold. Removing gating lifts '
+                'background too, so it wins outright on tiles it previously lost. Check '
+                '`spres_background` against the real classes in per_image_presence.csv.')
+        elif drop > 30 and np.isfinite(selective) and selective < -0.3 and harm < 5:
+            md.append(
+                f'**Leg (b) established.** Catastrophic discard falls {drop:.1f} points, recovery '
+                f'tracks baseline presence ({selective:+.3f}), and healthy tiles are not harmed '
+                f'({harm:+.1f}). The dense evidence was there and gating was suppressing it. '
+                '9.2 becomes a causal claim, and it argues FOR the method -- a local '
+                'co-occurrence prior is the natural correction for a wrong GLOBAL scalar.')
         else:
-            md.append(f'Catastrophic-tile discard barely moves (**{drop:.1f} points**). Those '
-                      'tiles are genuinely hard; low S_pres was a symptom, not a cause. Scope '
-                      '9.2 down to an illustrative failure case and drop the causal claim. '
-                      'Finding this now costs one run; finding it in week 11 costs a results '
-                      'section.')
+            md.append(
+                f'**Mixed.** Catastrophic discard moves {-drop:+.1f} points, healthy {harm:+.1f}, '
+                f'selectivity {selective:+.3f}. Not a clean causal result. Report presence '
+                'collapse as an observed correlate and do not claim causation without a '
+                'sharper intervention.')
     text = '\n'.join(md)
     print(text)
     out = Path(args.counterfactual) / 'counterfactual_summary.md'
