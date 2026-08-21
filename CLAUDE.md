@@ -122,11 +122,19 @@ so recovery must be selective and semantic.
 
 **Presence gating's real job is suppressing `background`** (WEEK1_RESULTS §9.2b). Median
 `S_pres` is **0.022** for background against 0.45–0.91 for every real class — SAM 3 has nothing
-to detect, background being LoveDA's catch-all rather than a visual concept. Two uses: it
-inverts SegEarth-OV3's stated motivation for gating (measured, unlike the causal claim), and
-since `P_final(bg) ≤ S_pres ≪ τ`, background can never clear τ — so **at τ=0.5 "assigned to
-background" and "discarded by τ" are the same set**, which closes §7.6's hedge. Does not
-generalise to arbitrary τ.
+to detect, background being LoveDA's catch-all rather than a visual concept. This inverts
+SegEarth-OV3's stated motivation for gating, and unlike the §9.2b causal claim it is measured.
+
+**Two discard mechanisms, not one** (WEEK1_RESULTS §7.7). Of the 323M background-assigned
+pixels: **94.0% (A)** fell below τ, **6.0% (B)** had `conf ≥ τ` and background won the *argmax*.
+All of (B) is **water**, 19,378,177 px in **24 tiles**. Two things follow:
+
+- **(B) is unreachable by any τ** — lowering a threshold cannot change an argmax. Part of the
+  residual lies outside what threshold tuning can address at all.
+- **(B) is arbitration, not recovery** — exactly what signed PMI is for; (A) is recovery.
+
+Say **"assigned to background"**, not "discarded by τ". ⚠️ Cached `conf` is **float16**, so
+τ-boundary comparisons are off by ~0.03% (100,493 px). Use float32 before any fine τ sweep.
 
 Next, in order:
 

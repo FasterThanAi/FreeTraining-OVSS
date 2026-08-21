@@ -400,13 +400,63 @@ across both mechanisms. It is also one of the six sign-flipping pairs in `ANALYS
 positives — would move building 78.6% → 97.3% and forest 44.7% → 79.3%. Large, but bounded.
 State this in the paper before a reviewer computes it.
 
-> **Terminology — ✅ resolved 21 Aug (§9.2b).** `→ background` counts every real-class pixel
-> predicted as background, which is in general a superset of "fell below τ". **At τ = 0.5 the two
-> are the same set.** Measured median `S_pres(background)` is **0.0220**, and since `P_fused ≤ 1`,
-> `P_final(background) ≤ S_pres ≈ 0.022 ≪ τ`. Background can never clear the threshold, so even
-> where it wins the argmax the τ rule assigns it anyway. "Discarded by τ" is therefore accurate
-> at this operating point. It is **not** accurate for arbitrary τ — the argument needs
-> `S_pres(background) < τ`, which fails as τ approaches 0.02.
+> **Terminology — measured 21 Aug, and the hedge STANDS. See §7.7.** `→ background` is a
+> superset of "fell below τ", and the gap is **not** negligible: 6.00% of background-assigned
+> pixels are cases where background *won the argmax* at `conf ≥ τ`. Write **"assigned to
+> background"**, not "discarded by τ", and quote §7.7 if precision is needed. (An earlier
+> argument from `S_pres(background) ≈ 0.022 ≪ τ` predicted this would be <0.1%. It was wrong —
+> 26/1669 tiles carry `S_pres(background) ≥ 0.5`, max 0.8750, and that tail is where all of it
+> lives.)
+
+### 7.7 The two discard mechanisms, separated ⭐ — *21 Aug*
+
+`scripts/verify_discard_mechanism.py`, run over the `.npz` cache (seconds, CPU, no
+re-inference). A real-class pixel can be labelled background two ways in `predict()`:
+
+```python
+seg_pred = torch.argmax(seg_logits, dim=0)      # (B) background wins outright
+seg_pred[max_vals < self.prob_thd] = self.bg_idx  # (A) the τ rule forces it
+```
+
+| Mechanism | pixels | share |
+|---|---|---|
+| assigned to background | 323,084,415 | 29.67% of real-class |
+| **(A) threshold** — `conf < τ` | 303,706,238 | **94.00%** |
+| **(B) argmax** — background won at `conf ≥ τ` | **19,378,177** | **6.00%** |
+| tiles containing any (B) pixel | **24 / 1669** | |
+
+**Every (B) pixel is `water`.** All 19,378,177, concentrated in 24 tiles — ~807K pixels each,
+about **77% of a 1024×1024 tile**. These are mostly-water scenes where background out-competes
+water across nearly the whole image, with a confident score.
+
+**Three consequences.**
+
+**1. ⭐ Mechanism (B) is unreachable by *any* τ.** Those pixels have `conf ≥ τ`; background won
+the argmax, and lowering τ does not change an argmax. §7.2 shows τ→0.1 recovers ⅔ of the
+residual; **6% of it was never reachable at any threshold**. This sharpens the motivation from
+"threshold relaxation costs more than it returns" to "and part of the residual lies outside what
+a threshold can address at all."
+
+**2. It is confusion, not silence — and it revises water's error budget.** Water loses
+64,309,668 px to background (§7.3); **19,378,177 of those (30.1%) are background out-competing
+water**, not water falling silent. §7.6 lists water at 2.5 : 1 discard-to-confusion; against
+background specifically, nearly a third of that "discard" is competition. Water is
+9.71% of its own GT total lost this way.
+
+**3. It is an arbitration problem, which is precisely the method's target.** Deciding "this
+confident region is water, not background" is a semantic call. Signed PMI conditioned on
+neighbours can make it; a scalar threshold cannot. Contrast with mechanism (A), which the method
+must *recover* rather than *arbitrate* (§8.1).
+
+> ⚠️ **Cache precision caveat.** This script counts 323,084,415 against the confusion matrix's
+> 323,184,908 — a gap of **100,493 px (0.031%)**. Cause: `conf` is cached as **float16**, so
+> values at the τ boundary can round across it. Immaterial here, but **the cache is not
+> bit-exact for threshold comparisons at the boundary.** Use float32 before any τ sweep at 0.01
+> granularity. Flagged in advance by `INSTRUMENTATION_PATCH.md`.
+
+> **Open, cheap:** which 24 tiles? Are they the same tiles as the §9.2a catastrophic set, or a
+> distinct failure population? One pass over the cache answers it, and if they are distinct that
+> is a third failure mode to name.
 
 ## 8. Confusion Matrix Analysis ✅
 
