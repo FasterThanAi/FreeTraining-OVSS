@@ -120,13 +120,17 @@ per right), presence removal (−11.97, no net recovery), do nothing (29.68% dis
 the motivation section**: every global knob that reaches the residual costs more than it returns,
 so recovery must be selective and semantic.
 
+**Presence gating's real job is suppressing `background`** (WEEK1_RESULTS §9.2b). Median
+`S_pres` is **0.022** for background against 0.45–0.91 for every real class — SAM 3 has nothing
+to detect, background being LoveDA's catch-all rather than a visual concept. Two uses: it
+inverts SegEarth-OV3's stated motivation for gating (measured, unlike the causal claim), and
+since `P_final(bg) ≤ S_pres ≪ τ`, background can never clear τ — so **at τ=0.5 "assigned to
+background" and "discarded by τ" are the same set**, which closes §7.6's hedge. Does not
+generalise to arbitrary τ.
+
 Next, in order:
 
-1. Cheap check (seconds, no GPU): is `spres_background` systematically lower than the real
-   classes in `per_image_presence.csv`? `background` is itself a gated query and can win by
-   argmax as well as by threshold, which would explain why discard *rose*. If confirmed, it
-   inverts SegEarth-OV3's stated motivation for gating — a mechanism their paper doesn't report.
-2. Fill the last `_TBD_`s in WEEK1_RESULTS §7.2/§7.3 from the CSVs.
+1. Fill the last `_TBD_`s in WEEK1_RESULTS §7.2/§7.3 from the CSVs.
 3. Two cheap CPU-only validations, both on claims that are currently load-bearing and
    unvalidated (WEEK1_RESULTS §9.1a and §10):
    - **boundary-vs-interior decomposition** of the 323M residual → the *addressable* number.

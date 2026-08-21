@@ -400,11 +400,13 @@ across both mechanisms. It is also one of the six sign-flipping pairs in `ANALYS
 positives — would move building 78.6% → 97.3% and forest 44.7% → 79.3%. Large, but bounded.
 State this in the paper before a reviewer computes it.
 
-> **Terminology caution:** `→ background` here counts every real-class pixel predicted as
-> background, which is a superset of "fell below τ". The two coincide numerically for the three
-> classes cross-checked against `discard_per_class.csv` (water 32.22%, forest 34.60%,
-> agricultural 31.91%), but write "assigned to background" rather than "discarded by τ" unless
-> the identity has been verified for every class.
+> **Terminology — ✅ resolved 21 Aug (§9.2b).** `→ background` counts every real-class pixel
+> predicted as background, which is in general a superset of "fell below τ". **At τ = 0.5 the two
+> are the same set.** Measured median `S_pres(background)` is **0.0220**, and since `P_fused ≤ 1`,
+> `P_final(background) ≤ S_pres ≈ 0.022 ≪ τ`. Background can never clear the threshold, so even
+> where it wins the argmax the τ rule assigns it anyway. "Discarded by τ" is therefore accurate
+> at this operating point. It is **not** accurate for arbitrary τ — the argument needs
+> `S_pres(background) < τ`, which fails as τ approaches 0.02.
 
 ## 8. Confusion Matrix Analysis ✅
 
@@ -645,7 +647,53 @@ systematically lower on catastrophic tiles (median 0.273 vs 0.918, r = −0.750)
 the mechanism *can* occur. Neither supports the claim that gating *causes* the collapse. Write it
 as a correlate. **Do not put a causal claim about presence gating in the paper.**
 
-#### Why discard went *up* — the likely mechanism, and a cheap test
+#### Why discard went *up* — ✅ **mechanism confirmed 21 Aug**
+
+Median `S_pres` across all 1669 tiles, from `per_image_presence.csv`:
+
+| Class | median `S_pres` | mean |
+|---|---|---|
+| **background** | **0.0220** | **0.0447** |
+| road | 0.9102 | 0.7281 |
+| building | 0.8398 | 0.6204 |
+| water | 0.7656 | 0.6341 |
+| agricultural | 0.6016 | 0.5000 |
+| barren | 0.5547 | 0.5190 |
+| forest | 0.4531 | 0.4765 |
+
+**SAM 3 essentially never detects `background`** — 20–40× below every real class. Expected in
+hindsight: background is not a visual concept, it is LoveDA's catch-all for unlabelled area, so
+the presence head has nothing to fire on.
+
+**Three consequences.**
+
+**(a) This is why removing gating made things worse.** In the baseline, background's score is
+capped at ~0.022, so it almost never wins the argmax. Remove the gate and background's raw
+`P_fused` competes on equal terms and wins outright — healthy tiles go 0.46% → 54.11% discard.
+The intervention's dominant effect was never "releasing suppressed real classes"; it was
+"releasing suppressed background".
+
+**(b) It inverts SegEarth-OV3's stated motivation.** Their Figure 3 presents presence-guided
+filtering as preventing hallucination of *absent* classes with a large vocabulary. Measured on
+LoveDA, its single largest effect is suppressing the **background** class so that τ — not the
+argmax — governs background assignment. Their paper does not report this. Worth a sentence in
+related work; it is measured, unlike the causal claim in §9.2b.
+
+**(c) ⭐ It closes §7.6's terminology hedge.** Because `P_fused ≤ 1`:
+
+```
+P_final(background) = P_fused · S_pres  ≤  S_pres  ≈ 0.022  ≪  τ = 0.5
+```
+
+background **cannot clear τ**. Even where it wins the argmax, `max_vals < τ` fires and assigns
+background regardless. **At τ = 0.5 the two paths coincide — every "assigned to background"
+pixel is a τ discard.** §7.6 previously hedged that "assigned to background" is a superset of
+"fell below τ" and asked for per-class verification; that verification is this table, and the
+hedge can be dropped *at τ = 0.5*. It does **not** transfer to arbitrary τ: the argument needs
+`S_pres(background) < τ`, which fails as τ approaches 0.02.
+
+<details>
+<summary>Original hypothesis, before the measurement</summary>
 
 Counter-intuitive: `P_final = P_fused · S_pres`, so dropping `S_pres` makes every score larger,
 and thresholding should discard *fewer* pixels. But in `predict()` background wins **two** ways:
@@ -664,6 +712,8 @@ suppressing *background*.
 Testable in seconds from `per_image_presence.csv` (compare `spres_background` against the real
 classes). Worth doing: if confirmed, it is a mechanism the SegEarth-OV3 paper does not report,
 and unlike the causal claim above it is directly measurable.
+
+</details>
 
 #### Why this strengthens the paper
 
