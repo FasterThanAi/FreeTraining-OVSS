@@ -454,9 +454,52 @@ must *recover* rather than *arbitrate* (§8.1).
 > bit-exact for threshold comparisons at the boundary.** Use float32 before any τ sweep at 0.01
 > granularity. Flagged in advance by `INSTRUMENTATION_PATCH.md`.
 
-> **Open, cheap:** which 24 tiles? Are they the same tiles as the §9.2a catastrophic set, or a
-> distinct failure population? One pass over the cache answers it, and if they are distinct that
-> is a third failure mode to name.
+#### 7.7a Which 24 tiles — ✅ *21 Aug*
+
+**20 of the 24 are catastrophic tiles (≥99% discard).** Not a separate population — a **distinct
+mechanism inside** the §9.2a catastrophic set.
+
+| tile | (B) px | discard % |
+|---|---|---|
+| 3717 | 1,047,431 | 100.00 |
+| 2794 | 1,046,846 | 100.00 |
+| 3900 | 1,045,776 | 100.00 |
+| 4081 | 1,044,300 | 100.00 |
+| … (12 more at ~1.03–1.04M) | | 100.00 |
+| 3452 | 743,785 | 89.76 |
+| 2916 | 677,717 | 100.00 |
+| 3735 | 453,159 | 45.75 |
+| 3063 | 361,280 | 100.00 |
+| 3461 | 296,663 | 100.00 |
+| 2875 | 224,365 | 100.00 |
+| 4087 | 1,760 | 3.67 |
+| 3905 | 947 | 1.55 |
+
+A tile is 1,048,576 px, so the top 16 have background winning the argmax across **essentially the
+entire image**.
+
+**The mechanism, stated.** These 24 are (near enough) the same 26 tiles carrying
+`S_pres(background) ≥ 0.5` — against a corpus median of 0.0220. So: on a small set of **large
+homogeneous water scenes**, SAM 3's presence head fires for `background`, and background then
+out-competes `water` everywhere, *confidently*. Every (B) pixel in the split being water is not a
+coincidence; it is this.
+
+**The 198 catastrophic tiles therefore split by mechanism:**
+
+| | tiles | failure |
+|---|---|---|
+| ~20 (10%) | background **wins** at `conf ≥ τ` | confident wrong answer |
+| ~178 (90%) | everything falls **below** τ | silence |
+
+**Consequence for the method — these are the hardest tiles in the dataset.** No confident correct
+regions to seed from, an empty `M_image`, *and* the wrong answer is confident rather than absent,
+so neither threshold relaxation nor local-confidence weighting touches it. This is the concrete
+form of the seeding problem in `ANALYSIS.md` §3.5. If the co-occurrence prior flips them, that is
+a striking result; if it cannot, name them in limitations. Decide before Week 8.
+
+> **Next, cheap:** render image/GT/prediction triptychs for `3717`, `2794`, `3900` with the
+> §9.1a script. If they are visibly open water, the hypothesis — SAM 3's `background` concept
+> responding to texture-less regions — is confirmed visually and becomes a paper figure.
 
 ## 8. Confusion Matrix Analysis ✅
 
