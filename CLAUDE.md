@@ -76,10 +76,20 @@ that is the floor.
 These were decided by measurement, not preference. Rationale in the cited sections.
 
 - **Adjacency = shared boundary length**, not centroid distance. ANALYSIS §4.
-- **Signed PMI, not raw counts.** Exclusion carries the largest magnitudes (building–water at
-  0.02× chance). Additive-positive scoring cannot represent it. ANALYSIS §4.2.
-- **Hierarchical M is required**: `M_eff = λ·M_global + (1−λ)·M_image`. Six of fifteen class
-  pairs flip sign between urban and rural. ANALYSIS §4.4.
+- **PMI uses BOUNDARY marginals, not area.** ⚠️ *Corrected 21 Aug.* `cooccurrence_gt.py`
+  divides a boundary-frequency observation by an area-based expectation, which inflates
+  high-perimeter classes. Correcting it moves per-pair values ~0.9 bits and flips 5 signs.
+  **Quote `PMI_bnd` from `scripts/pmi_permutation_null.py`, never §4's area figures.**
+  Premise restated: **0.574 bits vs a 0.003 permutation floor (216×)**, not 1.3–1.7.
+- **Signed PMI, not raw counts.** ✅ Survives the correction — exclusion still carries the
+  largest magnitudes (building–water −2.83, road–water −1.88). ANALYSIS §4.2.
+- **Hierarchical M is required**: `M_eff = λ·M_global + (1−λ)·M_image`. ✅ Re-tested on the
+  corrected marginal: 10/15 pairs flip sign urban vs rural (~6 substantively), mean |diff|
+  0.664 bits. λ-sweep stays a mandatory ablation. ANALYSIS §4.4.
+- ⛔ **"Road is a hub" is REFUTED** — it was measuring road's perimeter. Road's row collapses
+  to ~0 under `PMI_bnd`. Discriminability weighting is still worth doing, but recompute
+  `w(n) ∝ Var_c[PMI_bnd]` and note the real hub is **agriculture** (row var 0.04), matching
+  WEEK1_RESULTS §8.1(c). ANALYSIS §4.3.
 - **M is directed, not symmetric.** water→agricultural is 19.3M with no reverse in any top-8.
   WEEK1_RESULTS §8.1(b).
 - **Presence gating is inherited from SegEarth-OV3 but is not free** — it vetoes whole tiles.

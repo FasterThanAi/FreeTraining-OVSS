@@ -329,6 +329,24 @@ PMI > 0 means the two classes border each other more than chance; < 0 means they
 
 **Control.** On synthetic masks with classes scattered uniformly at random, the pipeline reports **0.004 bits**. That is the noise floor, and it is what "no signal" looks like.
 
+> ## ⚠️ §4 IS PARTLY SUPERSEDED — measured 21 Aug, read this first
+>
+> The null model below is mismatched, and correcting it changes per-pair values by
+> **~0.9 bits on average**. `scripts/pmi_permutation_null.py` reproduces every published §4.4
+> figure exactly (max 3.064 / 2.791, 6/15 sign flips) and then recomputes on the corrected
+> statistic. Outcome:
+>
+> | Claim | Status |
+> |---|---|
+> | **The premise** — land cover has adjacency structure | ✅ **survives.** mean \|PMI\| **0.574** bits (not 1.3–1.7) against a **0.003** permutation floor — **216×**. |
+> | **§4.2** — exclusion-dominated → use signed PMI | ✅ **survives.** Largest magnitudes still negative (building–water −2.83, road–water −1.88). |
+> | **§4.4** — domain-specific → hierarchical M required | ✅ **survives.** 10/15 sign flips urban vs rural, mean \|diff\| 0.664 bits. |
+> | **§4.1's specific values** | ⛔ **restated below.** 5 pairs change sign. |
+> | **§4.3** — "road is a hub" | ⛔ **REFUTED.** It was measuring road's perimeter. |
+>
+> **Quote `PMI_bnd`, not the area figures, anywhere the numbers matter.**
+> Full outputs: `~/outputs/pmi_null{,_nobg}.md`, `~/outputs/pmi_domains{,_nobg}.md`.
+>
 > ⚠️ **Caveat on the null model — added 21 Aug, affects per-pair values only.**
 > `P_obs` is a **boundary**-frequency distribution, but `P_exp = outer(p, p)` is built from
 > **area** marginals (`scripts/cooccurrence_gt.py:118-131`). These are different measures. A
@@ -375,6 +393,26 @@ Once background is excluded, the attractions become semantically interpretable r
 | forest – agriculture | +1.17 (2.3×) | −1.62 | field margins vs. cleared blocks |
 | **building – water** | **−4.45 (0.05×)** | **−5.38 (0.02×)** | near-hard constraint |
 
+> ### ⛔ RESTATED on the corrected marginal — 21 Aug
+>
+> The table above uses `PMI_area`. Corrected values over the whole val split
+> (`--drop background`), from `~/outputs/pmi_null_nobg.md`:
+>
+> | Pair | `PMI_area` (above) | **`PMI_bnd`** | |
+> |---|---|---|---|
+> | road – barren | +2.32 | **+0.17** | ⛔ collapses — it was road's perimeter |
+> | road – forest | +1.96 | **+0.06** | ⛔ collapses |
+> | building – agriculture | −2.31 | −0.25 | ⛔ collapses |
+> | barren – forest | +0.72 | **−1.11** | ⛔ **flips sign** |
+> | water – agriculture | −0.87 | **+0.25** | ⛔ **flips sign** |
+> | **building – water** | −4.66 | **−2.83** | ✅ **survives** — still the strongest constraint |
+> | road – water | −1.23 | **−1.88** | ✅ survives, strengthens |
+>
+> **What to keep from §4.1.** The headline conclusion — land cover has strong adjacency
+> structure, decisively above chance — stands: **0.574 bits against a 0.003 permutation
+> floor, 216×.** The *ranking of pairs* does not. `building–water` remains the near-hard
+> constraint and is the safest single fact in §4. The road attractions were an artefact.
+
 ### 4.2 The signal is exclusion-dominated → use signed PMI, not raw counts
 
 The largest magnitudes are negative. Building–water sits at −5.38 (0.02× chance) in rural, against a best attraction of +3.40. Buildings essentially never border water in either domain.
@@ -389,7 +427,36 @@ Raw row-normalised counts can only ever *add* evidence. The most reliable inform
 
 **Use signed PMI as the co-occurrence term** so negative evidence actively suppresses candidate classes. This is a stronger method than originally proposed, and now has a measured justification rather than an intuition behind it.
 
-### 4.3 Neighbours are not equally informative — weight by discriminative power
+### 4.3 ⛔ REFUTED — "road is a hub" was a perimeter artefact
+
+> **Measured 21 Aug. This section's finding does not survive the corrected marginal.**
+>
+> The claim below rests on rural `road` attracting everything (+3.40, +2.44, +1.34, +1.13).
+> Under `PMI_bnd`, road's row collapses:
+>
+> | | road–barren | road–forest | road–agri | road–building | road–water |
+> |---|---|---|---|---|---|
+> | `PMI_area` | +2.32 | +1.96 | +0.58 | −0.08 | −1.23 |
+> | **`PMI_bnd`** | **+0.17** | **+0.06** | **+0.15** | **+0.21** | **−1.88** |
+>
+> Road is **not** a hub. It is near-neutral with one real exclusion (water). The apparent
+> attraction was the formula rewarding road for having the most boundary per unit area in
+> LoveDA — exactly the confound the caveat box at the top of §4 describes.
+>
+> **And the weighting rule inverts.** Row variance, `PMI_area` → `PMI_bnd`:
+> road 1.71 → 0.66 (**0.39×**), building 2.82 → 1.30, water 3.84 → 1.69,
+> **agriculture 1.24 → 0.04 (0.03×)**. Under the corrected statistic the least discriminative
+> class — the real "hub" — is **agriculture**, not road. Which is consistent with
+> `WEEK1_RESULTS.md` §8.1(c), where agriculture is the prediction-side attractor.
+>
+> **What to do.** Discriminability weighting is still a reasonable idea; the *evidence and the
+> calibration below are wrong*. Recompute `w(n) ∝ Var_c[PMI_bnd(label(n), c)]` from the
+> corrected matrix before using it, and do not cite road as the motivating example. Verified
+> on synthetic data: a corpus where one class is a thin ribbon by construction gives that class
+> `PMI_area` +3.00 and `PMI_bnd` +0.23.
+
+<details>
+<summary>Original §4.3 as written (retained for the record — the reasoning was sound, the statistic was not)</summary>
 
 *(New finding — not anticipated in §3.)*
 
@@ -403,7 +470,32 @@ w(n) ∝ Var_c[ PMI(label(n), c) ]        # or negative entropy of the row
 
 Hub classes contribute little, exclusive classes contribute a lot. Small change, clear justification, and a natural ablation row.
 
-### 4.4 The prior is domain-specific → the hierarchical M in §3.1 is required
+</details>
+
+### 4.4 The prior is domain-specific → the hierarchical M in §3.1 is required — ✅ **CONFIRMED 21 Aug**
+
+> **Re-tested on the corrected marginal. It survives, and this is the settled decision in
+> `CLAUDE.md` that most needed checking before Week 3.**
+>
+> | Marginal | mean \|PMI diff\| urban vs rural | max | pairs flipping sign |
+> |---|---|---|---|
+> | area (as published below) | 1.572 | 2.791 | 6 / 15 |
+> | **boundary (corrected)** | **0.664** | 1.467 | **10 / 15** |
+>
+> Magnitudes shrink, but domain-specificity does **not** — the flip count rises. Of the 10,
+> roughly six are substantive (`building–forest` +0.25/−0.65, `road–barren` +0.75/−0.30,
+> `barren–agriculture` −0.85/+0.33, `forest–agriculture` +0.39/−0.52,
+> `building–agriculture` −0.60/+0.18, `water–agriculture` +0.37/−0.02); the rest are
+> near-zero crossings (`water–forest` −0.04/+0.08) and should not be cited. **Six substantive
+> flips out of fifteen is the same strength as the original claim.**
+>
+> ✅ **`M_eff = λ·M_global + (1−λ)·M_image` remains a requirement, and the λ-sweep remains a
+> mandatory ablation.**
+>
+> *Validation:* the script reproduces this section's published figures exactly — max 3.064
+> (with background) and 2.791 (without), 6/15 sign flips. The means differ only because
+> `cooccurrence_gt.py` averages over the whole matrix including its zero diagonal:
+> 1.572 × 30/36 = 1.310 and 1.326 × 42/49 = 1.137, matching to three decimals.
 
 | | With background | Without |
 |---|---|---|
