@@ -1,3 +1,22 @@
+# =============================================================================
+# INSTRUMENTED COPY of SegEarth-OV-3's segearthov3_segmentor.py
+#
+# Upstream: https://github.com/earth-insights/SegEarth-OV-3
+# Vendored here to pin the exact code that produced our 47.38 mIoU baseline.
+#
+# Local changes are marked  # <<< INSTRUMENTATION  and are OBSERVE-ONLY:
+# they record `presence_score` (S_pres) per query per view, and change no
+# tensor that feeds a prediction. Search that marker to see every edit.
+#
+# Why: P_final = P_fused * S_pres (line ~95). S_pres is a hard per-class,
+# per-view ceiling, but it is a local variable consumed and discarded, so the
+# eval path cannot observe it. WEEK1_RESULTS.md 9.2 needs it across all 1669
+# tiles to decide whether presence collapse is systematic or a single anecdote.
+#
+# VALIDATION GATE: an instrumented run must still produce mIoU 47.37 and
+# 29.68% discard at tau=0.5. If either moves, these edits changed behaviour.
+# =============================================================================
+import numpy as np                                    # <<< INSTRUMENTATION
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -48,10 +67,22 @@ class SegEarthOV3Segmentation(BaseSegmentor):
         self.use_presence_score = use_presence_score
         self.use_transformer_decoder = use_transformer_decoder
 
+        # <<< INSTRUMENTATION: presence-score capture.
+        # presence_log accumulates one row per *view* (a whole image, or one
+        # sliding-window crop). predict() resets it per image and stacks it
+        # into last_presence with shape (n_views, num_queries).
+        # NOTE queries != classes: cls_loveda.txt has 7 classes but 11 queries
+        # (building,house / barren,bareland,soil / forest,tree). Collapse to
+        # classes with max-over-synonyms, mirroring the .max(1) on line ~183.
+        self.presence_log = []
+        self.last_presence = np.zeros((0, self.num_queries), dtype=np.float32)
+
     def _inference_single_view(self, image):
         """Inference on a single PIL image or crop patch."""
         w, h = image.size
         seg_logits = torch.zeros((self.num_queries, h, w), device=self.device)
+        # <<< INSTRUMENTATION: NaN = "not recorded" (distinct from a real 0.0)
+        view_presence = np.full(self.num_queries, np.nan, dtype=np.float32)
 
         with torch.no_grad(), torch.autocast(device_type="cuda", dtype=torch.bfloat16):
             inference_state = self.processor.set_image(image)
@@ -92,8 +123,14 @@ class SegEarthOV3Segmentation(BaseSegmentor):
                     seg_logits[query_idx] = torch.max(seg_logits[query_idx], semantic_logits)
                 
                 if self.use_presence_score:
-                    seg_logits[query_idx] = seg_logits[query_idx] * inference_state["presence_score"]
-                
+                    presence = inference_state["presence_score"]        # <<< INSTRUMENTATION
+                    try:                                                # <<< INSTRUMENTATION
+                        view_presence[query_idx] = float(presence)      # <<< INSTRUMENTATION
+                    except Exception:                                   # <<< INSTRUMENTATION
+                        pass       # never let bookkeeping break a 25-min run
+                    seg_logits[query_idx] = seg_logits[query_idx] * presence
+
+        self.presence_log.append(view_presence)                         # <<< INSTRUMENTATION
         return seg_logits
 
     def slide_inference(self, image, stride, crop_size):
@@ -160,11 +197,18 @@ class SegEarthOV3Segmentation(BaseSegmentor):
             image = Image.open(image_path).convert('RGB')
             ori_shape = meta['ori_shape']
 
+            self.presence_log = []       # <<< INSTRUMENTATION: reset per image
+
             # Determine inference mode
             if self.slide_crop > 0 and (self.slide_crop < image.size[0] or self.slide_crop < image.size[1]):
                 seg_logits = self.slide_inference(image, self.slide_stride, self.slide_crop)
             else:
                 seg_logits = self._inference_single_view(image)
+
+            # <<< INSTRUMENTATION: (n_views, num_queries). One row if this image
+            # was a single forward pass, one row per crop under sliding window.
+            self.last_presence = (np.stack(self.presence_log) if self.presence_log
+                                  else np.zeros((0, self.num_queries), dtype=np.float32))
 
             # Resize to original shape if necessary (e.g. padding effects)
             if seg_logits.shape[-2:] != ori_shape:

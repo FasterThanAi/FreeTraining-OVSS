@@ -13,13 +13,41 @@ Outputs to  outputs/week2/  :
   discard_summary.md              paste-ready summary
   confusion_matrix.png            figure
   discard_by_class.png            figure
+  per_image_presence.csv          per-class S_pres per image        [instrumented]
+  cache/<image>.npz               (conf, pred, conf2, pred2, gt, spres)  [instrumented]
 
 MUST be run from inside the SegEarth-OV-3 clone (it imports their custom classes):
 
     conda activate segov3
     cd ~/SegEarth-OV-3
-    python ~/"final year pro/Final_year_project"/scripts/measure_discard_rate.py --limit 20
-    python ~/"final year pro/Final_year_project"/scripts/measure_discard_rate.py
+    python ~/FreeTraining-OVSS/scripts/measure_discard_rate.py --limit 20
+    python ~/FreeTraining-OVSS/scripts/measure_discard_rate.py
+
+Instrumentation (added 21 Aug) — see INSTRUMENTATION_PATCH.md
+------------------------------------------------------------
+1. per-class S_pres.  P_final = P_fused * S_pres, so the presence score is a
+   hard ceiling on every pixel of a tile for that class. It is a local variable
+   inside the segmentor, so capturing it needs the observe-only patch in
+   reference/segearthov3_segmentor.py (marked "<<< INSTRUMENTATION").
+   Copy that file over ~/SegEarth-OV-3/segearthov3_segmentor.py first, or this
+   script falls back to writing NaNs and warns once.
+
+   NOTE queries != classes. cls_loveda.txt declares 7 classes but 11 queries
+   (building,house / barren,bareland,soil / forest,tree). We collapse queries
+   to classes with max-over-synonyms, mirroring the .max(1) the segmentor does
+   in predict(). And under sliding-window inference there is one S_pres per
+   *crop*, not per image -- the CSV reports max and mean across crops, and the
+   .npz keeps the full (n_views, n_cls) array.
+
+2. .npz cache.  tau is only ever compared against the max of seg_logits, so
+   caching (conf, pred) makes every future threshold, confusion matrix and
+   ablation a sub-minute numpy pass instead of a 25-minute encoder run.
+   conf2/pred2 (runner-up) are included so margin-based analysis and the Week 8
+   scoring function do not force a third full re-run.
+
+VALIDATION GATE: an instrumented run at tau=0.5 must still report
+mIoU 47.37 and 29.68% discard. Neither is computed from anything added here --
+the confusion-matrix path is untouched -- so a move means something broke.
 
 Label convention (LoveDA):
     GT files hold 0..7 where 0 = no-data (ignored), 1 = background, 2..7 = real classes.
@@ -30,11 +58,19 @@ Label convention (LoveDA):
 """
 import argparse
 import os
+import shutil
 import sys
+import warnings
 from pathlib import Path
 
 import numpy as np
+import torch
 from PIL import Image
+
+# An uninstrumented segmentor, or a class absent from a crop, yields all-NaN
+# slices. That is expected and handled; without this the log gets 1669 copies.
+warnings.filterwarnings('ignore', message='All-NaN slice encountered')
+warnings.filterwarnings('ignore', message='Mean of empty slice')
 
 # --- register the authors' custom segmentor/dataset with mmseg's registry ---
 sys.path.insert(0, os.getcwd())
@@ -62,6 +98,10 @@ def main():
     ap.add_argument('--limit', type=int, default=0, help='0 = all images')
     ap.add_argument('--tau', type=float, default=None,
                     help='override prob_thd, e.g. 0.3 or 0.1 for the sweep')
+    ap.add_argument('--no-cache', action='store_true',
+                    help='skip the per-image .npz cache (~2.5-4 GB for 1669 tiles)')
+    ap.add_argument('--cache-dir', default=None,
+                    help='where .npz files go (default: <out>/cache)')
     args = ap.parse_args()
 
     out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
@@ -70,22 +110,42 @@ def main():
         names = names[:args.limit]
     print(f'{len(names)} images | config {args.config} | out {out}')
 
-    cfg_opts = {}
     if args.tau is not None:
-        cfg_opts['model.prob_thd'] = args.tau
         print(f'  overriding prob_thd -> {args.tau}')
 
     model = init_model(args.config, device='cuda')
     if args.tau is not None:
         model.prob_thd = args.tau   # segmentor reads this attribute at inference
 
+    # ---- instrumentation setup -------------------------------------------
+    cache_dir = None
+    if not args.no_cache:
+        cache_dir = Path(args.cache_dir) if args.cache_dir else out / 'cache'
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        free_gb = shutil.disk_usage(cache_dir).free / 2**30
+        need_gb = 0.0025 * len(names)          # ~2.5 MB/image compressed
+        print(f'  cache -> {cache_dir}  (need ~{need_gb:.1f} GB, free {free_gb:.1f} GB)')
+        if free_gb < need_gb * 1.2:
+            sys.exit(f'ERROR: not enough disk for the cache. Use --no-cache, or '
+                     f'--cache-dir on a bigger volume.')
+
+    # query -> class map, for collapsing the 11 queries onto 7 classes
+    qidx = model.query_idx.cpu().numpy() if hasattr(model, 'query_idx') else None
+    has_presence = hasattr(model, 'last_presence')
+    if not has_presence:
+        print('  !! segmentor is NOT instrumented -- S_pres will be NaN.\n'
+              '     Copy reference/segearthov3_segmentor.py over\n'
+              '     ~/SegEarth-OV-3/segearthov3_segmentor.py and re-run.')
+
     conf = np.zeros((N, N), dtype=np.int64)      # conf[true, pred], 0-indexed
     per_image = []
+    pres_rows = []
 
     for i, name in enumerate(names, 1):
         img_p = f'{args.img_dir}/{name}.png'
         gt = np.array(Image.open(f'{args.ann_dir}/{name}.png'))
-        pred = inference_model(model, img_p).pred_sem_seg.data.cpu().numpy().squeeze()
+        result = inference_model(model, img_p)
+        pred = result.pred_sem_seg.data.cpu().numpy().squeeze()
         pred = pred.astype(np.int64) + 1          # 0-indexed -> 1..7
 
         valid = gt > 0                            # drop no-data
@@ -101,6 +161,52 @@ def main():
             'discarded_px': int(discarded.sum()),
             'discard_pct_of_real': round(100 * discarded.sum() / max(real.sum(), 1), 2),
         })
+
+        # ---- instrumentation: S_pres, collapsed queries -> classes --------
+        # pres_views: (n_views, N). n_views = 1 for whole-image inference, or
+        # one row per crop under sliding window.
+        pres_views = np.full((1, N), np.nan, dtype=np.float32)
+        if has_presence and qidx is not None:
+            raw = model.last_presence                      # (n_views, num_queries)
+            if raw.size:
+                pres_views = np.full((raw.shape[0], N), np.nan, dtype=np.float32)
+                with np.errstate(all='ignore'):
+                    for c in range(N):                     # max over synonyms
+                        cols = raw[:, qidx == c]
+                        if cols.size:
+                            pres_views[:, c] = np.nanmax(cols, axis=1)
+
+        with np.errstate(all='ignore'):
+            pres_max = np.nanmax(pres_views, axis=0)       # across views, per class
+            pres_mean = np.nanmean(pres_views, axis=0)
+        row = {'image': name, 'n_views': int(pres_views.shape[0])}
+        row.update({f'spres_{c}': float(pres_max[k]) for k, c in enumerate(CLASSES)})
+        row.update({f'spresmean_{c}': float(pres_mean[k]) for k, c in enumerate(CLASSES)})
+        # over REAL classes only -- background presence is not informative here
+        row['spres_max'] = float(np.nanmax(pres_max[1:])) if N > 1 else float('nan')
+        row['spres_mean'] = float(np.nanmean(pres_max[1:])) if N > 1 else float('nan')
+        pres_rows.append(row)
+
+        # ---- instrumentation: .npz cache ----------------------------------
+        # tau is only ever compared against seg_logits.max(0), so caching the
+        # top-2 makes any future threshold / ablation a numpy pass.
+        if cache_dir is not None:
+            lg = result.seg_logits.data.float()             # (N, H, W)
+            k = min(2, lg.shape[0])
+            top = torch.topk(lg, k=k, dim=0)
+            vals = top.values.cpu().numpy()
+            idxs = top.indices.cpu().numpy().astype(np.uint8)
+            np.savez_compressed(
+                cache_dir / f'{name}.npz',
+                conf=vals[0].astype(np.float16),            # best score  (== max_vals)
+                pred=idxs[0],                               # argmax, 0-indexed, PRE-threshold
+                conf2=(vals[1] if k > 1 else vals[0]).astype(np.float16),
+                pred2=(idxs[1] if k > 1 else idxs[0]),
+                gt=gt.astype(np.uint8),
+                spres=pres_views,                           # (n_views, N) full fidelity
+                classes=np.array(CLASSES),
+            )
+
         if i % 100 == 0 or i == len(names):
             print(f'  {i}/{len(names)}')
 
@@ -143,6 +249,15 @@ def main():
             f.write(f"{r['image']},{r['valid_px']},{r['real_px']},"
                     f"{r['discarded_px']},{r['discard_pct_of_real']}\n")
 
+    # instrumentation: per-image presence table
+    if pres_rows:
+        cols = list(pres_rows[0].keys())
+        with open(out / 'per_image_presence.csv', 'w') as f:
+            f.write(','.join(cols) + '\n')
+            for r in pres_rows:
+                f.write(','.join(
+                    r[c] if isinstance(r[c], str) else f'{r[c]}' for c in cols) + '\n')
+
     pcts = np.array([r['discard_pct_of_real'] for r in per_image])
     tau_str = args.tau if args.tau is not None else 'config default (0.5)'
     summary = [
@@ -165,6 +280,38 @@ def main():
     for r in rows:
         summary.append(f"| {r['class']} | {r['gt_pixels']:,} | "
                        f"{r['lost_to_background']:,} | **{r['pct_lost']}%** |")
+    # ---- instrumentation: does presence collapse explain the bad tiles? ----
+    # WEEK1_RESULTS 9.2 rests on ONE tile (3487). This generalises it.
+    if pres_rows and has_presence:
+        sp = np.array([r['spres_max'] for r in pres_rows], dtype=float)
+        dp = np.array([r['discard_pct_of_real'] for r in per_image], dtype=float)
+        ok = np.isfinite(sp)
+        cat, hea = ok & (dp >= 99.0), ok & (dp < 1.0)
+        summary += [
+            '\n## Presence-head collapse — catastrophic vs healthy tiles\n',
+            '`spres_max` = highest presence score over the six real classes '
+            '(max across sliding-window crops).\n',
+            '| Tile set | n | mean spres_max | median | p90 |',
+            '|---|---|---|---|---|',
+        ]
+        for lbl, m in (('catastrophic (>=99% discard)', cat), ('healthy (<1% discard)', hea)):
+            if m.sum():
+                summary.append(f'| {lbl} | {int(m.sum())} | {sp[m].mean():.4f} | '
+                               f'{np.median(sp[m]):.4f} | {np.percentile(sp[m], 90):.4f} |')
+            else:
+                summary.append(f'| {lbl} | 0 | - | - | - |')
+        if ok.sum() > 2:
+            r = float(np.corrcoef(sp[ok], dp[ok])[0, 1])
+            summary.append(f'\n- Correlation(spres_max, discard%) = **{r:+.3f}** '
+                           f'over {int(ok.sum())} tiles.')
+        summary += [
+            '\n**How to read it.** If the catastrophic set clusters low (~<0.2) while the '
+            'healthy set sits high, presence collapse is a systematic failure mode and '
+            'WEEK1_RESULTS 9.2 generalises from n=1 — a figure, and a claim SegEarth-OV3 '
+            'does not make. If the two distributions overlap, tile 3487 was an anecdote '
+            'and must be dropped from the writeup.\n',
+        ]
+
     summary += [
         '\n## Read this\n',
         '- **> 15% of real-class pixels lost** → premise confirmed, proceed with the '
