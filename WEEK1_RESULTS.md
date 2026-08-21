@@ -309,13 +309,24 @@ Against the pivot rule below (`<5% → premise weak`), this clears the bar by a 
 | τ | mIoU | Real-class px discarded | Per-image mean | Per-image median |
 |---|---|---|---|---|
 | **0.5** (baseline) | **47.37** | **29.68%** (323,184,908) | 33.79% | 18.51% |
-| 0.3 | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
-| 0.1 | **41.83** | **10.88%** (118,477,557) | 12.06% | 0.39% |
-
-> Fill the τ=0.3 row: `head -20 ~/outputs/week2_tau0.3/discard_summary.md`
+| **0.3** | **46.64** | **20.55%** (223,826,505) | 23.53% | 8.39% |
+| **0.1** | **41.83** | **10.88%** (118,477,557) | 12.06% | 0.39% |
 
 **This table is the argumentative core of the project.** Lowering τ from 0.5 to 0.1 recovers
 roughly two-thirds of the discarded pixels — and costs **5.54 mIoU** (47.37 → 41.83).
+
+**⭐ The cost is strongly non-linear — the τ=0.3 row changes the story.** Splitting the sweep:
+
+| segment | real-class px recovered | mIoU cost | cost per 100M px |
+|---|---|---|---|
+| 0.5 → 0.3 | 99,358,403 | **−0.73** | 0.73 |
+| 0.3 → 0.1 | 105,348,948 | **−4.81** | 4.57 |
+
+Nearly identical pixel counts; **the second half costs 6.2× more mIoU than the first.** The
+residual is not a uniform mass of low-confidence pixels — there is a shallow band sitting just
+under τ=0.5 that is cheap to reach, and a deep tail that is not. Any claim of the form
+"threshold relaxation is expensive" must specify *which part of the range*, or a reviewer with
+the τ=0.3 row will object. State the sweep at three points, not two.
 
 §8.2 itemises exactly where that loss comes from. The short version: τ is a scalar with no
 semantics, so it cannot distinguish a correct recovery from a hallucination. **The residual is
@@ -324,22 +335,39 @@ plausibly is — which is exactly what a semantic co-occurrence prior supplies.*
 
 ### 7.3 Loss by class
 
-| Class | GT pixels | Lost @ τ=0.5 | Lost @ τ=0.3 | Lost @ τ=0.1 |
-|---|---|---|---|---|
-| forest | 125,615,647 | 43,462,196 (**34.60%**) | 24,343,686 (19.38%) | 9,001,259 (7.17%) |
-| water | 199,567,816 | 64,309,668 (**32.22%**) | 44,809,675 (22.45%) | 28,739,040 (14.40%) |
-| agricultural | 487,082,702 | 155,414,274 (**31.91%**) | 117,814,134 (24.19%) | 70,119,725 (14.40%) |
-| barren | 74,383,133 | ~18,595,783 (**25.0%**) † | _TBD_ | _TBD_ |
-| road | 79,590,500 | ~18,464,996 (**23.2%**) † | _TBD_ | _TBD_ |
-| building | 122,805,791 | 22,987,367 (**18.7%**) | _TBD_ | _TBD_ |
+Complete, exact counts from `results/week2/tau*/discard_per_class.csv` (no estimates).
 
-† derived from the §7.6 error budget (percentage rounded to 1 dp); exact counts in
-`~/outputs/week2_tau0.5/discard_per_class.csv`.
+| Class | GT pixels | Lost @ τ=0.5 | Lost @ τ=0.3 | Lost @ τ=0.1 | **0.5 ÷ 0.1** |
+|---|---|---|---|---|---|
+| forest | 125,615,647 | 43,462,196 (**34.60%**) | 24,343,686 (19.38%) | 9,001,259 (7.17%) | 4.8× |
+| water | 199,567,816 | 64,309,668 (**32.22%**) | 44,809,675 (22.45%) | 28,739,040 (14.40%) | **2.2×** |
+| agricultural | 487,082,702 | 155,414,274 (**31.91%**) | 117,814,134 (24.19%) | 70,119,725 (14.40%) | **2.2×** |
+| barren | 74,383,133 | 18,578,671 (**24.98%**) | 7,396,369 (9.94%) | 1,358,227 (1.83%) | **13.7×** |
+| road | 79,590,500 | 18,432,732 (**23.16%**) | 13,497,374 (16.96%) | 3,710,022 (4.66%) | 5.0× |
+| building | 122,805,791 | 22,987,367 (**18.72%**) | 15,965,267 (13.00%) | 5,549,284 (4.52%) | 4.1× |
+
+*(The earlier estimates for barren and road, back-derived from §7.6's rounded percentages, were
+18,595,783 and 18,464,996 — both within 0.1% of the exact values. The † footnote is retired.)*
 
 Agricultural alone loses **155 million pixels** at τ=0.5 — the largest absolute contributor, and
 the most abundant real class in the dataset. The three worst classes by rate (forest, water,
 agricultural) are precisely the three with the largest positive P−R gaps in §5, closing the loop
 between the two measurements.
+
+**⭐ New: τ-sensitivity differs 6× across classes, and it splits them into two groups.**
+The last column is how much of a class's discard survives dropping τ from 0.5 to 0.1:
+
+- **Shallow — `barren` (13.7×), `road` (5.0×), `forest` (4.8×), `building` (4.1×).** Their
+  discarded pixels sit *just under* the threshold. Barren is extreme: 24.98% → 1.83%, so
+  effectively all of barren's discard is a near-miss. A small confidence correction reaches it.
+- **Deep — `water` (2.2×) and `agricultural` (2.2×).** Even at τ=0.1 they retain 14.4% discard
+  each. Their loss is genuinely low-confidence mass, not a near-miss, and **no threshold reaches
+  it.**
+
+These two groups need different treatment, and they cut *across* §7.6's discard-vs-confusion
+split. Note barren in particular: §7.6 flags it as "both-limited" (1.2 : 1), and now its discard
+turns out to be shallow — so **barren's real problem is confusion, not silence.** Water and
+agricultural are the classes where the co-occurrence prior has to do genuine work.
 
 ### 7.4 The distribution is bimodal, not a smooth tail
 
@@ -903,9 +931,9 @@ presence-corrected evidence.
 
 - [ ] **§9.2b counterfactual** — `--no-presence` run. Converts the −0.750 correlation into a
       causal claim, or scopes §9.2 down honestly. One 25-min run. **Highest value remaining.**
-- [ ] τ=0.3 mIoU and headline discard % not yet transcribed into §7.2 (values in the CSVs).
-- [ ] Exact per-class discard counts for road / barren at all τ, and building at τ=0.3/0.1
-      (§7.3) — values in the CSVs, not yet transcribed.
+
+
+
 - [ ] **§9.1a boundary-vs-interior decomposition** — the addressable-residual number. Do before
       Week 8.
 - [ ] **`ANALYSIS.md` §4 PMI uses a mismatched null model.** `P_obs` is a *boundary*-frequency
@@ -943,7 +971,9 @@ then validate the two shaky claims, then build.*
 1. 🔴 **Commit `measure_discard_rate.py`, `cfg_loveda.py` and the summary CSVs.** No GPU, ~15 min.
    Until this is done the project's empirical core exists on one untracked filesystem. Everything
    below is lower priority than this.
-2. Fill the last `_TBD_` fields in §7.2 and §7.3 from those CSVs — **no re-running required.**
+2. ~~Fill the last `_TBD_` fields in §7.2 and §7.3~~ ✅ **done 21 Aug** — §7.2 and §7.3 are now
+   complete and exact at all three τ. The per-class τ=0.5 counts sum to exactly 323,184,908,
+   matching the headline: a fourth independent consistency check.
 3. **Instrument `measure_discard_rate.py` to dump per-class `S_pres` per image, and add an
    `.npz` cache of `(conf, pred, gt, S_pres)` in the same edit** (`INSTRUMENTATION_PATCH.md`).
    One re-run at τ=0.5 then yields: the presence distribution over all 1669 tiles, the
