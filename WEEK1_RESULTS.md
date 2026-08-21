@@ -4,9 +4,10 @@
 then measure how much real land cover the baseline discards to "background".
 
 **Status:** 🟢 **REPRODUCED — 47.38 mIoU vs paper's 47.4** · 🟢 **PREMISE CONFIRMED — 29.68% of
-real-class pixels discarded at τ = 0.5** · 🟢 **Confusion analysis complete**
+real-class pixels discarded at τ = 0.5** · 🟢 **Confusion analysis complete** ·
+🔴 **`measure_discard_rate.py` not in version control — §7–§9 unreproducible from this repo (§10)**
 **Date started:** 2026-08-17
-**Last updated:** 2026-08-20
+**Last updated:** 2026-08-21
 
 ---
 
@@ -497,8 +498,30 @@ Tile 3031 has **every pixel** in the tile carrying a real class, and every one d
 are genuine total failures, not small-denominator artefacts — only tile 3480 (`real_px` = 1048)
 is small enough to dismiss as noise.
 
-> **TODO:** attach image / GT / prediction triptychs for 3 of these once the mmseg registry error
-> (§10) is fixed. Reviewers look at figures before tables (`ROADMAP.md` Phase 4).
+### 9.1a Qualitative panels ✅
+
+The mmseg registry error is fixed (`import segearthov3_segmentor` before `init_model`). Six
+four-panel figures — image / GT / SegEarth-OV3 @ τ=0.5 / discard mask — are committed at
+`docs/25{22,23,24,25,26,27}.png`.
+
+**They show something the aggregate numbers do not: the discard has two distinct morphologies.**
+
+| Tile | Discard | Shape of the discard |
+|---|---|---|
+| `2525` | **0.9%** | healthy tile; one small barren region missed wholesale |
+| `2524` | **19.0%** | **whole contiguous regions** dropped — large water blocks |
+| `2522` | **21.0%** | **thin seams along class boundaries** + building outlines; region interiors intact |
+
+This distinction is load-bearing and is **not yet quantified**. A region-level co-occurrence
+prior assigns labels to *regions*; boundary-seam pixels are the seams *between* regions and have
+no atom to be assigned to. So the 323,184,908-pixel residual is an **upper bound** on what this
+method can address, not an estimate of it.
+
+> **Open — do before Week 8.** Erode each GT class region by k pixels and re-measure the discard
+> rate split into interior vs. boundary band, as a function of k. That converts "29.68%
+> discarded" into "X% addressable by a region-level method" — the number the paper actually
+> needs. If the interior fraction is high, this is a *stronger* claim than 29.68%, because it is
+> the fraction the method can genuinely reach. Cheap: pure numpy once the §11 `.npz` cache exists.
 
 ### 9.2 Root cause — presence-head collapse
 
@@ -549,22 +572,43 @@ presence-corrected evidence.
 - [x] ~~Peak VRAM not measured~~ — **6115 MB peak** (baseline), 8534 MiB (diagnostic)
 - [x] ~~Discard rate unmeasured~~ — **29.68% at τ=0.5**, §7
 - [x] ~~Confusion matrix unanalysed~~ — §8, all three τ
-- [ ] mmseg `MMCV_MAX` patch is a site-packages edit — will not survive an env rebuild.
-      Capture it in `scripts/setup_env.sh`.
-- [ ] **`KeyError: SegEarthOV3Segmentation is not in the mmseg registry`** in the visualisation
-      script. Fix: `import segearthov3_segmentor` before `init_model`. Blocks §9.1 figures.
-- [ ] **Scripts stranded outside the working tree.** `sam3_smoke_test.py` exists only at
-      `~/.gemini/antigravity/scratch/FreeTraining-OVSS/scripts/`. Verify whether
-      `scripts/cooccurrence_gt.py` is tracked — `ANALYSIS.md` §4 claims its PMI measurements are
-      "reproducible from this repo", and if that script is also only in a cache directory, the
-      claim is false and the entire §4 empirical foundation is one purge away from being lost.
-- [ ] **`ANALYSIS.md` §3.5 is contradicted by measurement** (§9.2). It states that inheriting
-      presence gating "costs you nothing"; tile 3487 shows it costs whole tiles. Correction
-      pending.
-- [ ] **`ROADMAP.md` Week 7 "directed or symmetric?" should be closed as directed** — §8.1(b).
-- [ ] τ=0.3 mIoU and headline discard % not yet transcribed into §7.2.
+- [x] ~~mmseg `MMCV_MAX` patch is a site-packages edit~~ — **captured** in
+      `scripts/setup_env.sh:40-43`; survives an env rebuild via that script.
+- [x] ~~`KeyError: SegEarthOV3Segmentation is not in the mmseg registry`~~ — **fixed**
+      (`import segearthov3_segmentor` before `init_model`). §9.1a figures produced and committed.
+- [x] ~~`sam3_smoke_test.py` stranded in a scratch directory~~ — **tracked** at
+      `scripts/sam3_smoke_test.py` (commit `e43a49b` added the `--raw` flag).
+      `scripts/cooccurrence_gt.py` is also tracked (`c1bac57`), so `ANALYSIS.md` §4's
+      "reproducible from this repo" claim holds for §4.
+- [x] ~~`ANALYSIS.md` §3.5 contradicted by measurement~~ — **corrected 21 Aug**; §3.5 now
+      documents presence-head collapse as a second failure mode.
+- [x] ~~`ROADMAP.md` Week 7 "directed or symmetric?"~~ — **closed as directed**, 21 Aug.
+
+### Still open
+
+- [ ] 🔴 **`measure_discard_rate.py` is not in version control and never has been.**
+      `git log --all --diff-filter=A --name-only | grep -i discard` returns nothing. Every number
+      in §7, §8 and §9 came from this script; its outputs live only in `~/outputs/week2_tau*` on
+      the workstation, and `outputs/` is gitignored. **§7–§9 are currently unreproducible from
+      this repository.** Commit the script, `cfg_loveda.py`, and the summary CSVs (small — only
+      the `.npz` cache is large). Highest priority, no GPU required.
+- [ ] τ=0.3 mIoU and headline discard % not yet transcribed into §7.2 (values in the CSVs).
 - [ ] Exact per-class discard counts for road / barren at all τ, and building at τ=0.3/0.1
       (§7.3) — values in the CSVs, not yet transcribed.
+- [ ] **§9.1a boundary-vs-interior decomposition** — the addressable-residual number. Do before
+      Week 8.
+- [ ] **`ANALYSIS.md` §4 PMI uses a mismatched null model.** `P_obs` is a *boundary*-frequency
+      distribution; `P_exp = outer(p, p)` is built from *area* marginals
+      (`scripts/cooccurrence_gt.py:118-131`). High-perimeter classes are systematically inflated,
+      low-perimeter ones deflated, independent of semantics. The premise (1.3–1.7 bits vs a 0.004
+      floor) is far too large to be at risk, but the **per-pair** values are — and §4.3's
+      "road is a hub" finding is derived from precisely the thinnest, highest-perimeter class,
+      then used to justify the discriminability weighting. The existing random control does not
+      catch this: scattering classes uniformly destroys blob geometry, so it tests "is there
+      signal", not "is this pair's signal geometric or semantic". **Fix:** structure-preserving
+      permutation null — keep each image's mask geometry, permute class labels across regions,
+      ~100 draws → per-pair z-scores with confidence intervals. Cheap, CPU-only, and strictly
+      better for the paper than raw bits.
 
 ## 11. Next Steps
 
@@ -579,18 +623,28 @@ presence-corrected evidence.
 9. ~~Week 2: τ-sweep (0.3, 0.1)~~ ✅ **−5.54 mIoU to recover ⅔ of the residual**
 10. ~~Week 2: confusion matrix analysis~~ ✅ **§8 — directional confusions, 1.73:1 recovery cost**
 
-**Remaining, in order:**
+11. ~~Correct `ANALYSIS.md` §3.5; close directed/symmetric in `ROADMAP.md`; produce §9.1
+    figures~~ ✅ **done 21 Aug** (commit below)
 
-1. Fill the last `_TBD_` fields in §7.2 and §7.3 from existing CSVs — **no re-running required.**
-2. Correct `ANALYSIS.md` §3.5; close the directed/symmetric question in `ROADMAP.md` Week 7;
-   recover the stranded scripts into the tracked tree; commit.
+**Remaining, in order.** Rationale for the ordering: *save the work, then make experiments cheap,
+then validate the two shaky claims, then build.*
+
+1. 🔴 **Commit `measure_discard_rate.py`, `cfg_loveda.py` and the summary CSVs.** No GPU, ~15 min.
+   Until this is done the project's empirical core exists on one untracked filesystem. Everything
+   below is lower priority than this.
+2. Fill the last `_TBD_` fields in §7.2 and §7.3 from those CSVs — **no re-running required.**
 3. **Instrument `measure_discard_rate.py` to dump per-class `S_pres` per image, and add an
-   `.npz` cache of `(conf, pred, gt, S_pres)` in the same edit.** One re-run at τ=0.5 then yields:
-   the presence distribution over all 1669 tiles, the catastrophic-vs-healthy comparison that
-   generalises §9.2, and a cache making every future τ value and ablation a sub-minute numpy pass
-   (~2.5 GB for the split). **Validation gate: the instrumented run must still reproduce 47.37 and
-   29.68%** — if either moves, the patch changed behaviour.
-4. Resolve the mmseg registry error; produce §9.1 qualitative figures.
+   `.npz` cache of `(conf, pred, gt, S_pres)` in the same edit** (`INSTRUMENTATION_PATCH.md`).
+   One re-run at τ=0.5 then yields: the presence distribution over all 1669 tiles, the
+   catastrophic-vs-healthy comparison that generalises §9.2 from n=1, and a cache making every
+   future τ value and ablation a sub-minute numpy pass (~2.5 GB for the split).
+   **Validation gate: the instrumented run must still reproduce 47.37 and 29.68%** — if either
+   moves, the patch changed behaviour. ~25 min, one GPU run.
+4. **Two validation experiments, CPU-only once the cache exists** — both target claims that are
+   currently load-bearing and unvalidated, and both are expensive to unwind after the method is
+   built on top of them:
+   - §9.1a boundary-vs-interior decomposition → the addressable-residual number.
+   - §10 permutation null for PMI → per-pair z-scores instead of raw bits.
 5. Begin Week 3: `M_global` construction against the GT co-occurrence reference
    (`ANALYSIS.md` §4), with §8.1's confusion ranking as the validation target — a useful M should
    assign low compatibility to exactly the pairs the baseline confuses.

@@ -75,7 +75,7 @@ This is the part no course teaches, because it's your contribution. Mostly proba
 | **Pointwise mutual information** | `ANALYSIS.md §4.2` — already in your code | **Jurafsky & Martin, [Appendix J: PPMI](https://web.stanford.edu/~jurafsky/slp3/J.pdf)** — a whole appendix on exactly this. Context in [Ch 5: Embeddings](https://web.stanford.edu/~jurafsky/slp3/5.pdf) | 2h |
 | Add-α / Dirichlet smoothing | Sparse M from few patches — `ANALYSIS.md §3.1` | Jurafsky & Martin, [Ch 3: N-gram Language Models](https://web.stanford.edu/~jurafsky/slp3/3.pdf) (smoothing sections); [Appendix C: Kneser-Ney](https://web.stanford.edu/~jurafsky/slp3/C.pdf) if you want the sophisticated version | 1.5h |
 | Hierarchical / shrinkage estimation | Your `λ·M_global + (1−λ)·M_image` | Search "James–Stein estimator" and "empirical Bayes shrinkage" | 2h |
-| Connected components, region adjacency graph | Step 3 agglomeration; fixes the IoU-merge bug in `src/step3_preprocessing/` | `skimage.measure.label`, `skimage.graph.RAG` docs — read the source | 3h |
+| Connected components, region adjacency graph | Step 3 agglomeration — the correct replacement for the disjoint-mask IoU-merge bug described in `ANALYSIS.md §3.7` | `skimage.measure.label`, `skimage.graph.RAG` docs — read the source | 3h |
 | Superpixels: SLIC, Felzenszwalb | Step 3 atomisation (test against SAM 3 masks) | SLIC paper (2012) + `skimage.segmentation.slic` | 2h |
 | Label propagation on graphs | Your iterative confidence-ordered labelling | Zhu & Ghahramani 2002 label propagation | 3h |
 | CRFs and why they fell out of favour | You **must** position against these — a reviewer will ask why you didn't just use a CRF | DeepLab paper (CRF post-processing section) + CRF-as-RNN | 3h |

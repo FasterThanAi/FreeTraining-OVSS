@@ -43,6 +43,15 @@ that is the floor.
 
 ## Repo conventions
 
+- **Work spans two machines.** The Linux workstation (`~/final year pro/Final_year_project`)
+  has the GPU, the LoveDA data, the `SegEarth-OV-3/` clone and `~/outputs/`. The Mac
+  (`~/FreeTraining-OVSS`) is docs-only — no dataset, no outputs, no GPU. Same git remote.
+  Anything measured is measured on the Linux box.
+- **No pipeline code lives here.** The SAM 1 + CLIP scaffold (`src/`, `pipeline.py`,
+  `configs/config.yaml`, `tests/`, `requirements.txt`) was removed on 21 Aug — every design
+  decision it encoded had been overturned by ANALYSIS §4, and its `requirements.txt` would have
+  wrecked the pinned env. It is in git history if ever needed. The method will be built by
+  forking `segearthov3_segmentor.py` in the SegEarth-OV-3 clone, per ROADMAP Phase 3.
 - `SegEarth-OV-3/` ships a **vendored `sam3/`** that shadows the editable `~/sam3` install
   when running from inside it. Edits to `~/sam3` have no effect there.
 - Datasets, checkpoints and venvs are gitignored. Never commit them. Checkpoint is symlinked
@@ -76,8 +85,30 @@ Weeks 1–2 complete. Baseline reproduced; premise confirmed and quantified:
 - Discard outnumbers real-class confusion **3:1** — the baseline's dominant error is silence,
   not error.
 
-Next: instrument `measure_discard_rate.py` for per-class `S_pres` + an `.npz` cache, re-run
-once at τ=0.5. Then Week 3, `M_global` construction.
+Roadmap phase gates 1, 3 and 5 are all cleared — roughly **three roadmap-weeks ahead of
+schedule**. Phase 3 (Build) has not begun: no `M_global`, no RAG, no scoring function.
+
+### 🔴 Known gap — fix before anything else
+
+`measure_discard_rate.py` **has never been committed on any branch.** Everything in
+WEEK1_RESULTS §7–§9 came from it, and its outputs live only in untracked `~/outputs/week2_tau*`
+on the Linux workstation. Run `scripts/recover_week2_artifacts.sh` there. No GPU needed.
+
+Next, in order:
+
+1. Recover the above into git; fill the last `_TBD_`s in WEEK1_RESULTS §7.2/§7.3 from the CSVs.
+2. Apply `INSTRUMENTATION_PATCH.md` — per-class `S_pres` + `.npz` cache — and re-run once at
+   τ=0.5. Gate: must still give 47.37 mIoU / 29.68%. This generalises §9.2 from n=1 and makes
+   every later τ or ablation a sub-minute numpy pass instead of a 24-min GPU run.
+3. Two cheap CPU-only validations, both on claims that are currently load-bearing and
+   unvalidated (WEEK1_RESULTS §9.1a and §10):
+   - **boundary-vs-interior decomposition** of the 323M residual → the *addressable* number.
+     Tile 2522 shows discard as thin boundary seams; 2524 shows whole regions. A region-level
+     prior can only reach the latter, so 29.68% is an upper bound, not an estimate.
+   - **permutation null for PMI** — `cooccurrence_gt.py` compares a *boundary* distribution
+     against *area* marginals, which inflates high-perimeter classes. §4.3's "road is a hub"
+     is derived from the thinnest class and then used to justify discriminability weighting.
+4. Then Week 3, `M_global` construction.
 
 ## How to work on this
 

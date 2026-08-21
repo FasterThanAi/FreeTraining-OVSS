@@ -213,9 +213,69 @@ Stage 2 is what fixes over-segmentation. Stage 1 just gives you clean atoms to w
 
 **Also consider skipping SLIC entirely.** SAM 3's instance head already gives you class-agnostic mask proposals with far better boundary quality than any classical superpixel algorithm. Using SAM 3's own low-confidence masks as your patch proposals is likely both simpler and stronger. Test both — it's a cheap experiment and a good ablation row.
 
-### 3.5 Use the presence head in Step 1
+### 3.5 Use the presence head in Step 1 — but do not inherit it uncritically
 
-Your Step 1 thresholds raw prediction confidence. SegEarth-OV3's Figure 3 demonstrates that with a large vocabulary this produces severe noise. Gate by `S_pres` *before* thresholding, exactly as they do. Inheriting their fix costs you nothing and removes a whole class of failure.
+Your Step 1 thresholds raw prediction confidence. SegEarth-OV3's Figure 3 demonstrates that with
+a large vocabulary this produces severe noise. Gate by `S_pres` *before* thresholding, exactly as
+they do — that part stands.
+
+**But the earlier claim in this section, that inheriting their fix "costs you nothing", was
+wrong, and measurement has now disproved it.**
+
+Because `P_final = P_fused · S_pres`, the presence score is a hard ceiling on every pixel in the
+tile for that class. When the presence head is miscalibrated low, it destroys dense evidence
+that is otherwise confident. Probed on LoveDA val tile `3487` (`WEEK1_RESULTS.md` §9.2):
+
+| Class | S_pres | `semantic_seg` max logit | → sigmoid | Ceiling on P_final |
+|---|---|---|---|---|
+| road | **0.0757** | **+10.13** | 1.000 | **0.076** |
+| building | 0.1309 | +6.44 | 0.998 | 0.131 |
+| forest | 0.0094 | +5.03 | 0.993 | 0.009 |
+| agricultural | 0.0200 | +5.44 | 0.996 | 0.020 |
+| barren | 0.0481 | +2.77 | 0.941 | 0.045 |
+| water | 0.0298 | +2.28 | 0.907 | 0.027 |
+
+The semantic head is effectively certain road is present (+10.13). The presence gate reduces the
+tile's best achievable score to 0.076 — below τ=0.1, let alone τ=0.5. Zero instance masks are
+returned for all six classes. The tile reports **100% discard**, and 54 other tiles behave the
+same way.
+
+**This is a second, distinct failure mode.** The low-confidence residual (§2, §4) is one problem;
+presence-head collapse is another, and it accounts specifically for the catastrophic tail
+identified in `WEEK1_RESULTS.md` §7.4 — the 55 tiles at 100% discard against 958 tiles below 1%.
+
+Three implications for the method:
+
+1. **It is favourable, not fatal.** Had these tiles failed because `P_sem` was genuinely
+   uncertain, there would be no signal left to recover. Instead the dense evidence is intact and
+   being suppressed by a single global scalar. Recoverable information is the precondition for
+   this entire project.
+
+2. **A local prior is the natural correction for a bad global scalar.** `S_pres` is one number
+   per class per image. The co-occurrence prior aggregates evidence from *neighbouring regions*.
+   These are different information sources, so the prior can in principle override a presence
+   veto that the dense heads already contradict. That is a stronger argument for the method than
+   the residual-recovery framing alone, and it is worth stating explicitly in the paper.
+
+3. **But the seeding problem is real, and must be resolved before Week 8.** The method labels
+   unidentified regions by conditioning on the labels of *identified* neighbours. On a
+   100%-discard tile there are no identified patches at all — no seeds, an empty `M_image`, no
+   neighbour labels to condition on. `M_global` alone cannot place a label without an anchor.
+   Options, to be decided by measurement:
+   - Bootstrap from `P_fused` *before* presence gating on tiles where all classes are suppressed
+     (a presence-bypass fallback, triggered by a detectable condition rather than a hand-tuned
+     rule).
+   - Use per-class relative ordering of `S_pres` rather than its absolute value — on 3487 the
+     ranking (road < forest < agricultural < water < barren < building) may still be informative
+     even where the magnitudes are useless.
+   - Accept the 55 tiles as out of scope and report them as an inherited baseline limitation.
+     Honest, but it forfeits the most dramatic gains available.
+
+**Caveat: n = 1 tile.** This is currently a single well-characterised anecdote. Before it appears
+in the paper, dump per-class `S_pres` across all 1669 val tiles and compare the distribution on
+the catastrophic set against the healthy set. If catastrophic tiles are systematically
+presence-suppressed, this is a figure and a finding that SegEarth-OV3's paper does not report.
+If not, it is a curiosity about one tile and must be dropped. See `INSTRUMENTATION_PATCH.md`.
 
 ### 3.6 Terminology: "unsupervised" is the wrong word
 
@@ -223,13 +283,33 @@ Your title says *Unsupervised*, but your input includes "a list of all the class
 
 Get this right in your writeup. Examiners notice. Recommended phrasing: *"training-free, annotation-free open-vocabulary semantic segmentation."*
 
-### 3.7 Your existing repo is built on SAM 1 + CLIP, not SAM 3
+### 3.7 The original repo was built on SAM 1 + CLIP, not SAM 3 — ✅ removed 21 Aug
 
-The code currently in this folder implements the pipeline against SAM 1's `SamAutomaticMaskGenerator` plus CLIP crop-and-classify. That architecture has no presence head, no semantic head, and no text conditioning inside the segmenter — the three things your method depends on. It also carries a live bug directly relevant to Step 3:
+*(Retained for the record; the code it describes no longer exists in the working tree.)*
 
-> `Preprocessor._greedy_merge` merges patches by mask **IoU ≥ 0.25**, but over-segmented fragments are *disjoint*, so IoU ≈ 0 and nothing ever merges. Adjacency-based merging (dilate one mask, test boundary overlap) is what you need — and it is exactly the Region Adjacency Graph from §3.4.
+The original scaffold (`src/`, `pipeline.py`, `configs/config.yaml`, `tests/`) implemented the
+pipeline against SAM 1's `SamAutomaticMaskGenerator` plus CLIP crop-and-classify. That
+architecture has no presence head, no semantic head, and no text conditioning inside the
+segmenter — the three things your method depends on. It also carried a live bug directly relevant
+to Step 3:
 
-Treat the current repo as a **scaffold and a learning artefact**, not the foundation. Phase 2 of the roadmap replaces the backbone.
+> `Preprocessor._greedy_merge` merged patches by mask **IoU ≥ 0.25**, but over-segmented fragments
+> are *disjoint*, so IoU ≈ 0 and nothing ever merged. Adjacency-based merging (dilate one mask,
+> test boundary overlap) is what you need — and it is exactly the Region Adjacency Graph from §3.4.
+
+Two further defects worth remembering, because the *concepts* migrate into Phase 3 even though
+the code does not:
+
+- Morphological opening could erode a small patch to **zero area** without dropping it; the
+  centroid helper then returned `(0,0)`, silently anchoring the patch at the image origin and
+  poisoning every nearest-neighbour lookup downstream. Silent corruption, not a crash.
+- `_find_k_nearest` recomputed centroids with `np.where` over the full mask for every identified
+  patch, for every unidentified patch — O(U × I × H × W). Unusable at 1024².
+
+Every design decision the scaffold encoded (centroid-distance adjacency, raw symmetric counts,
+additive-positive scoring, per-image M) has since been overturned by §4. It was **removed on
+21 Aug** — it is in git history, and its `requirements.txt` was an active hazard to the pinned
+environment. Phase 3 builds by forking `segearthov3_segmentor.py` instead.
 
 ---
 
@@ -248,6 +328,28 @@ PMI(i,j) = log2( P_observed(i,j) / (P(i) · P(j)) )
 PMI > 0 means the two classes border each other more than chance; < 0 means they avoid each other; ≈ 0 means adjacency is indistinguishable from random. Mean |PMI| over off-diagonal pairs is the headline statistic.
 
 **Control.** On synthetic masks with classes scattered uniformly at random, the pipeline reports **0.004 bits**. That is the noise floor, and it is what "no signal" looks like.
+
+> ⚠️ **Caveat on the null model — added 21 Aug, affects per-pair values only.**
+> `P_obs` is a **boundary**-frequency distribution, but `P_exp = outer(p, p)` is built from
+> **area** marginals (`scripts/cooccurrence_gt.py:118-131`). These are different measures. A
+> class fragmented into thin ribbons has far more boundary per unit area than one in large
+> contiguous blocks, so **PMI is systematically inflated for high-perimeter classes and deflated
+> for compact ones, independent of any semantic affinity.**
+>
+> The control above does *not* catch this: scattering classes uniformly destroys blob geometry
+> altogether, so it tests "is there any signal at all", not "is this pair's signal geometric or
+> semantic".
+>
+> **What is and is not at risk.** The headline premise is not — 1.3–1.7 bits against a 0.004
+> floor is far too large a margin to be a geometric artefact, and §4.1's conclusion stands. What
+> *is* at risk is the **per-pair** structure, and specifically §4.3: `road` is the thinnest,
+> highest-perimeter class in LoveDA, its entire PMI row is uniformly elevated, and that row is
+> exactly what the "roads are hubs" finding and the discriminability weighting are derived from.
+>
+> **Fix, before §4.3 is relied on:** a structure-preserving permutation null — keep each image's
+> mask geometry, permute the class labels across regions, ~100 draws. That yields per-pair
+> z-scores with confidence intervals instead of raw bits, which is strictly better for the paper.
+> CPU-only and cheap. Tracked in `WEEK1_RESULTS.md` §10.
 
 ### 4.1 The co-occurrence prior carries strong signal — and it is not an artefact
 
@@ -348,7 +450,15 @@ Two implementation notes: SAM 3 resizes all input to 1008×1008, so **tiles must
 | Centroid-distance adjacency | **Shared boundary length** — already used throughout this analysis |
 | "Does the premise hold?" — open | **Settled.** 1.3–1.7 bits vs a 0.004 noise floor |
 
-Still open, and the next thing to measure: **does the embedding-similarity term earn its place?** (§3.3). Run that ablation in week 8.
+Still open, and the next things to measure:
+
+1. **Does the embedding-similarity term earn its place?** (§3.3). Run that ablation in week 8.
+2. **Is §4.3's "road is a hub" semantic or geometric?** Run the permutation null in the §4
+   caveat box. It is cheap, and it is the only measured finding here whose null model has not
+   itself been checked.
+3. **How much of the 29.68% residual is region-shaped rather than boundary-shaped?**
+   `WEEK1_RESULTS.md` §9.1a. A region-level prior can only address the former, so this converts
+   the headline into an *addressable* number.
 
 ---
 

@@ -269,11 +269,11 @@ Three of these decisions are already **settled by measurement** — see `ANALYSI
 - **Adjacency = shared boundary length.** Not centroid distance (what your old repo used). Already implemented in `scripts/cooccurrence_gt.py`.
 - **Store signed PMI, not raw counts.** §4.2 — exclusion carries the largest magnitudes (building–water at 0.02× chance), and additive-positive scoring cannot represent it.
 - **λ blend is required, not optional.** §4.4 — six of fifteen class pairs flip sign between urban and rural.
+- **M is directed, not symmetric.** ✅ **Closed 21 Aug** — `WEEK1_RESULTS.md` §8.1(b). `water → agricultural` is 19.3M at τ=0.5 with no reverse in any top-8; `forest → agricultural` (23.8M) runs 3× its reverse (7.9M). A symmetric M cannot express "a low-confidence region bordering water is probably not agricultural" independently of the converse. Note `scripts/cooccurrence_gt.py` symmetrises (`M += c + c.T`) — that script is the **GT reference**, and building `M_global` directed means it is no longer directly comparable cell-for-cell. Symmetrise your directed M before the validation-gate comparison below.
 
 Still open, decide and defend:
 
-- **Directed or symmetric?** Current script symmetrises. Land-cover adjacency may genuinely be asymmetric — worth testing.
-- **Discriminability weighting** — §4.3. Weight each neighbour by the variance of its PMI row so hub classes like `road` don't drown out exclusive ones like `building`.
+- **Discriminability weighting** — §4.3. Weight each neighbour by the variance of its PMI row so hub classes like `road` don't drown out exclusive ones like `building`. ⚠️ Note the null-model caveat: §4.3's PMI is computed against an *area*-based independence baseline while the observation is a *boundary* distribution, which systematically inflates high-perimeter classes like `road`. Run a structure-preserving permutation null before relying on this row.
 - **Scale sensitivity** — co-occurrence changes with GSD. A GSD-conditioned M is your stretch contribution.
 
 **Validation gate:** compare `M_global` (estimated from SAM 3's confident predictions) against the ground-truth matrices already in `outputs/cooccurrence/`. Large divergence means §3.2's circularity problem is real. You have the reference numbers, so this is a direct comparison, not a guess.

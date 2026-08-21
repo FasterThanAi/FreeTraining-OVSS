@@ -16,8 +16,14 @@ segmentation masks — with no training data and no fine-tuning.
 ## Motivation
 
 `SegEarth-OV3` assigns every pixel whose maximum class probability falls below a threshold
-τ to the **background** class. On LoveDA (τ = 0.5) this discards a substantial number of
-pixels that carry real land-cover labels.
+τ to the **background** class. On LoveDA at the paper's own operating point (τ = 0.5) this
+discards **29.68% of all real land-cover pixels — 323,184,908 of them.**
+
+That residual is *not* reachable by simply relaxing the threshold. Dropping τ to 0.1 recovers
+roughly two-thirds of it and costs **5.54 mIoU** (47.37 → 41.83), because a scalar threshold
+carries no information about *which* class a region plausibly is: it buys 1 correct pixel per
+**1.73** wrong ones. Discard also outnumbers real-class confusion **3 : 1** — the baseline's
+dominant error mode is silence, not error.
 
 Our reproduction of the baseline makes this measurable:
 
@@ -46,9 +52,14 @@ See [`WEEK1_RESULTS.md`](WEEK1_RESULTS.md) for the full baseline reproduction.
 |---|---|
 | Environment + SAM 3 running | ✅ |
 | LoveDA val prepared (1669 images) | ✅ |
+| GT co-occurrence premise validated | ✅ **1.3–1.7 bits** vs a 0.004 noise floor ([`ANALYSIS.md` §4](ANALYSIS.md)) |
 | **SegEarth-OV3 baseline reproduced** | ✅ **47.38 mIoU** (paper: 47.4) |
-| Discard-rate diagnostic | 🔜 |
-| Co-occurrence prior | 🔜 |
+| Discard-rate diagnostic | ✅ **29.68%** of real-class pixels discarded at τ=0.5 |
+| τ-sweep (0.5 / 0.3 / 0.1) | ✅ recovering ⅔ of the residual costs **−5.54 mIoU** |
+| Confusion + error-budget analysis | ✅ discard outnumbers confusion **3:1** |
+| Qualitative panels | ✅ `docs/25*.png` |
+| Per-class `S_pres` + `.npz` cache | 🔜 next ([`INSTRUMENTATION_PATCH.md`](INSTRUMENTATION_PATCH.md)) |
+| `M_global` construction (Week 3) | 🔜 |
 | Region-level label assignment | 🔜 |
 
 ---
@@ -214,17 +225,29 @@ region-level granularity**, versus ConInfer's purely visual patch-level context.
 
 ```
 FreeTraining-OVSS/
-├── WEEK1_RESULTS.md        # baseline reproduction — start here
-├── README.md
+├── WEEK1_RESULTS.md        # all measurements to date — start here
+├── ANALYSIS.md             # problem framing + measured PMI findings (§4)
+├── ROADMAP.md              # 12-week plan and phase gates
+├── CLAUDE.md               # working conventions; settled design decisions
 ├── SETUP_SAM3.md           # detailed environment notes
-├── ROADMAP.md
-├── ANALYSIS.md
-├── configs/
-├── scripts/
-│   └── setup_env.sh
-├── src/
-└── tests/
+├── INSTRUMENTATION_PATCH.md
+├── docs/                   # qualitative panels (25*.png)
+├── papers/
+└── scripts/
+    ├── setup_env.sh              # rebuilds the pinned env — do not install by hand
+    ├── cooccurrence_gt.py        # GT co-occurrence + PMI (ANALYSIS §4)
+    ├── sam3_smoke_test.py        # --raw dumps forward_grounding tensors
+    └── recover_week2_artifacts.sh
 ```
+
+> **This repo holds analysis, scripts and results — not the pipeline.** Method code is built by
+> forking `segearthov3_segmentor.py` inside a separate `SegEarth-OV-3/` clone, which is
+> deliberately not vendored here. The original SAM 1 + CLIP scaffold was removed on 21 Aug
+> (`ANALYSIS.md` §3.7); it remains in git history.
+>
+> **Environment is defined by [`scripts/setup_env.sh`](scripts/setup_env.sh), not by a
+> `requirements.txt`.** The torch/mmcv/mmseg versions are a three-way deadlock with exactly one
+> working solution — see the Environment section above. Never `pip install -U` into `segov3`.
 
 ## Citation
 
