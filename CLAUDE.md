@@ -98,18 +98,27 @@ Weeks 1–2 complete. Baseline reproduced; premise confirmed and quantified:
 Roadmap phase gates 1, 3 and 5 are all cleared — roughly **three roadmap-weeks ahead of
 schedule**. Phase 3 (Build) has not begun: no `M_global`, no RAG, no scoring function.
 
-### 🔴 Known gap — fix before anything else
+### Instrumentation complete — 21 Aug
 
-`measure_discard_rate.py` **has never been committed on any branch.** Everything in
-WEEK1_RESULTS §7–§9 came from it, and its outputs live only in untracked `~/outputs/week2_tau*`
-on the Linux workstation. Run `scripts/recover_week2_artifacts.sh` there. No GPU needed.
+`measure_discard_rate.py` is now in git (it never had been), alongside `reference/` which pins
+the exact baseline code behind 47.38. The instrumented τ=0.5 run **passed the gate exactly**
+(47.37 mIoU, 29.68% discard, every per-image statistic identical), so:
+
+- per-class `S_pres` recorded for all 1669 tiles
+- `.npz` cache written → any future τ or ablation is a numpy pass, not a 25-min GPU run
+
+**New finding, WEEK1_RESULTS §9.2a.** Presence-head collapse generalises from n=1:
+catastrophic tiles (≥99% discard, n=198) have median `spres_max` **0.273** against **0.918**
+for healthy tiles (n=77); r = **−0.750** over 1669 tiles. ⚠️ But the correlation is **partly
+mechanical** — `P_final = P_fused · S_pres`, so low presence forces discard by construction.
+The causal claim needs the `--no-presence` counterfactual (§9.2b). Do not let this reach a
+draft without that caveat attached.
 
 Next, in order:
 
-1. Recover the above into git; fill the last `_TBD_`s in WEEK1_RESULTS §7.2/§7.3 from the CSVs.
-2. Apply `INSTRUMENTATION_PATCH.md` — per-class `S_pres` + `.npz` cache — and re-run once at
-   τ=0.5. Gate: must still give 47.37 mIoU / 29.68%. This generalises §9.2 from n=1 and makes
-   every later τ or ablation a sub-minute numpy pass instead of a 24-min GPU run.
+1. **§9.2b counterfactual** — `--no-presence` at τ=0.5, compare on the 198 catastrophic tiles
+   (not on aggregate mIoU, which answers a different question). Highest value remaining.
+2. Fill the last `_TBD_`s in WEEK1_RESULTS §7.2/§7.3 from the CSVs.
 3. Two cheap CPU-only validations, both on claims that are currently load-bearing and
    unvalidated (WEEK1_RESULTS §9.1a and §10):
    - **boundary-vs-interior decomposition** of the 323M residual → the *addressable* number.

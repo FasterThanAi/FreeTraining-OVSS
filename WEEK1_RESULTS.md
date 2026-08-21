@@ -554,8 +554,78 @@ Two consequences:
    and a co-occurrence prior, which aggregates *local neighbour* evidence, is a natural mechanism
    for overriding a *global* scalar that is wrong.
 
-⚠️ **Caveat: n = 1.** One tile is an anecdote. §11 item 3 generalises this across all 1669 tiles
-before it goes anywhere near the paper.
+### 9.2a Generalised to all 1669 tiles ✅ — *21 Aug*
+
+The n=1 caveat is resolved. The instrumented run
+(`~/outputs/week2_tau0.5_instrumented`, τ=0.5) records per-class `S_pres` for every tile.
+`spres_max` = highest presence score over the six real classes, max across sliding-window crops.
+
+| Tile set (τ=0.5) | n | mean `spres_max` | median | p90 |
+|---|---|---|---|---|
+| **catastrophic** (≥99% discard) | 198 | 0.3125 | **0.2734** | 0.5699 |
+| **healthy** (<1% discard) | 77 | 0.8886 | **0.9180** | 0.9672 |
+
+**Correlation(`spres_max`, discard %) = −0.750 over all 1669 tiles.**
+
+The separation is decisive: the **p90 of the catastrophic set (0.5699) lies below the median of
+the healthy set (0.9180)** — even the best-presence catastrophic tiles score worse than a typical
+healthy one. Tile 3487 was not a fluke.
+
+Two refinements to how §9.2 must be described:
+
+1. **It is a gradient, not a switch.** Catastrophic tiles average 0.31, not the ≲0.2 originally
+   guessed. Tile 3487 (`S_pres` 0.0094–0.1309) sits at the *extreme* end. Present it as an
+   illustrative worst case, never as the typical one.
+2. **Quote the threshold.** 198 catastrophic / 77 healthy are **τ=0.5** counts. §7.4's 55 / 958
+   are **τ=0.1**. Both correct; neither is meaningful without its τ.
+3. **Two different code paths — say so.** `sam3_smoke_test.py`, which produced the §9.2 table,
+   does a **single whole-image forward**. The eval path runs **sliding-window** inference, so
+   `_inference_single_view` is called once per *crop* and there is one `S_pres` per crop, not
+   per tile. The figures above take max-over-crops; `per_image_presence.csv` also carries the
+   mean, and the `.npz` cache keeps the full `(n_views, n_cls)` array. Tile 3487's numbers and
+   the 1669-tile distribution are therefore *not* measurements of the same object. Do not
+   present them as one series.
+
+> ### ⚠️ The correlation is partly mechanical — do not over-claim it
+>
+> `P_final = P_fused · S_pres`, and a pixel is discarded iff `P_final < τ`. **Low `S_pres`
+> mechanically forces discard.** So `spres_max` and discard % would correlate even if the
+> presence head were perfectly calibrated and those tiles were simply hard.
+>
+> The claim "presence gating destroys recoverable tiles" needs two legs:
+>
+> | | Claim | Status |
+> |---|---|---|
+> | (a) | `S_pres` is low on catastrophic tiles | ✅ **proved, n=1669** (this section) |
+> | (b) | `P_fused` was *good* on those tiles anyway | ⚠️ **proved only for tile 3487, n=1** (§9.2) |
+>
+> Without (b), the competing reading survives: *hard tiles are hard, and low presence is a
+> symptom rather than a cause.* **A reviewer will raise this.** State it before they do.
+
+### 9.2b The counterfactual — pending
+
+`measure_discard_rate.py --no-presence` disables the `S_pres` multiply (`P_final = P_fused`) and
+re-measures. One 25-min run converts the correlation above into a causal claim:
+
+| Outcome on the 198 catastrophic tiles | Reading |
+|---|---|
+| discard collapses, IoU jumps | **Presence gating caused it.** Leg (b) established at scale. This is the strongest result available in the project — and it argues *for* the method, since a local co-occurrence prior is the natural correction for a wrong *global* scalar (`ANALYSIS.md` §3.5). |
+| they stay bad | Those tiles are genuinely hard; `S_pres` was a symptom. §9.2 scopes down to "an illustrative failure case", and a claim that would not have survived review is avoided. |
+
+Expect **overall mIoU to fall** — presence gating exists because it helps on average
+(SegEarth-OV3 Fig. 3). That is not a refutation. The question is not whether gating is net
+positive, but what it costs on the tail.
+
+```bash
+cd ~/SegEarth-OV-3
+nohup python ~/FreeTraining-OVSS/scripts/measure_discard_rate.py \
+  --tau 0.5 --no-presence --no-cache \
+  --out ~/outputs/week2_tau0.5_nopresence \
+  > ~/logs/week2_tau0.5_nopresence.log 2>&1 &
+```
+
+Compare per-tile against `~/outputs/week2_tau0.5_instrumented/per_image_discard.csv`, restricted
+to the 198 catastrophic tiles — **not** on aggregate mIoU, which answers a different question.
 
 ⚠️ **Scope risk, decide before Week 8.** The method labels unidentified regions by conditioning on
 the labels of *identified* neighbours. On a 100%-discard tile there are **no identified patches** —
@@ -566,9 +636,13 @@ presence-corrected evidence.
 ## 10. Open Issues / Blockers
 
 - [x] ~~mmcv not installed~~ — resolved via torch 2.4.1 + prebuilt mmcv 2.2.0 wheel
-- [x] ~~`forest` IoU = 0.00 on the mini run~~ — **resolved: subset composition.** Forest
-      reaches **33.78 IoU** on the full 1669 images. The 20-image subset simply contained no
-      class-6 pixels. The `forest,tree` prompt works correctly.
+- [x] ~~`forest` IoU = 0.00 on the mini run~~ — resolved, but **the stated reason was wrong and
+      is corrected here (21 Aug).** The old explanation — "the 20-image subset simply contained
+      no class-6 pixels" — generalised from a single mask (`2522.png`, values `[1 2 3 4 5 7]`)
+      to the whole subset. The instrumented smoke run shows the subset holds **1,258,983 forest
+      pixels**, of which **96.46% are discarded to background**. Forest was present all along
+      and almost entirely thrown away. The `forest,tree` prompt works; forest reaches **33.78
+      IoU** on the full 1669 images. *Lesson: one mask is not a subset.*
 - [x] ~~Peak VRAM not measured~~ — **6115 MB peak** (baseline), 8534 MiB (diagnostic)
 - [x] ~~Discard rate unmeasured~~ — **29.68% at τ=0.5**, §7
 - [x] ~~Confusion matrix unanalysed~~ — §8, all three τ
@@ -584,14 +658,19 @@ presence-corrected evidence.
       documents presence-head collapse as a second failure mode.
 - [x] ~~`ROADMAP.md` Week 7 "directed or symmetric?"~~ — **closed as directed**, 21 Aug.
 
+- [x] ~~`measure_discard_rate.py` is not in version control~~ — **committed 21 Aug**, together
+      with `reference/{segearthov3_segmentor.py, cfg_loveda.py, cls_loveda.txt}`, which also
+      pins the exact baseline code that produced 47.38. §7–§9 are now reproducible from the repo.
+- [x] ~~Instrument for per-class `S_pres` + `.npz` cache~~ — **done 21 Aug.**
+      **Validation gate passed exactly:** mIoU **47.37**, discard **323,184,908 (29.68%)**,
+      per-image mean/median/max **33.79 / 18.51 / 100.00** — every figure identical to the
+      pre-instrumentation run. The patch is observation-only. Cache written for all 1669 tiles,
+      so every future τ and ablation is now a numpy pass, not a 25-min encoder run.
+
 ### Still open
 
-- [ ] 🔴 **`measure_discard_rate.py` is not in version control and never has been.**
-      `git log --all --diff-filter=A --name-only | grep -i discard` returns nothing. Every number
-      in §7, §8 and §9 came from this script; its outputs live only in `~/outputs/week2_tau*` on
-      the workstation, and `outputs/` is gitignored. **§7–§9 are currently unreproducible from
-      this repository.** Commit the script, `cfg_loveda.py`, and the summary CSVs (small — only
-      the `.npz` cache is large). Highest priority, no GPU required.
+- [ ] **§9.2b counterfactual** — `--no-presence` run. Converts the −0.750 correlation into a
+      causal claim, or scopes §9.2 down honestly. One 25-min run. **Highest value remaining.**
 - [ ] τ=0.3 mIoU and headline discard % not yet transcribed into §7.2 (values in the CSVs).
 - [ ] Exact per-class discard counts for road / barren at all τ, and building at τ=0.3/0.1
       (§7.3) — values in the CSVs, not yet transcribed.

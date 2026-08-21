@@ -98,6 +98,12 @@ def main():
     ap.add_argument('--limit', type=int, default=0, help='0 = all images')
     ap.add_argument('--tau', type=float, default=None,
                     help='override prob_thd, e.g. 0.3 or 0.1 for the sweep')
+    ap.add_argument('--no-presence', action='store_true',
+                    help='disable presence gating (P_final = P_fused, no S_pres multiply). '
+                         'The counterfactual for WEEK1_RESULTS 9.2: if the catastrophic '
+                         'tiles recover with this off, presence gating CAUSED their collapse; '
+                         'if they stay bad, low S_pres was a symptom of genuinely hard tiles. '
+                         'Expect overall mIoU to DROP -- gating helps on average.')
     ap.add_argument('--no-cache', action='store_true',
                     help='skip the per-image .npz cache (~2.5-4 GB for 1669 tiles)')
     ap.add_argument('--cache-dir', default=None,
@@ -116,6 +122,10 @@ def main():
     model = init_model(args.config, device='cuda')
     if args.tau is not None:
         model.prob_thd = args.tau   # segmentor reads this attribute at inference
+    if args.no_presence:
+        model.use_presence_score = False   # same trick: read at inference, not init
+        print('  PRESENCE GATING DISABLED -- P_final = P_fused. '
+              'Counterfactual run; S_pres will be NaN because it is never applied.')
 
     # ---- instrumentation setup -------------------------------------------
     cache_dir = None
@@ -263,6 +273,7 @@ def main():
     summary = [
         '# Week 2 — Discard-Rate Diagnostic\n',
         f'- Images: **{len(names)}**  |  τ: **{tau_str}**',
+        f'- Presence gating: **{"DISABLED (counterfactual)" if args.no_presence else "on (baseline)"}**',
         f'- mIoU recomputed from confusion matrix: **{miou:.2f}** '
         f'(baseline reference: 47.38 — if these disagree, the label alignment is wrong)\n',
         '## Headline\n',
