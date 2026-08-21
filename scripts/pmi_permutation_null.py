@@ -99,28 +99,19 @@ def pmi_from(M, pix, valid, marginal='area'):
     return PMI
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument('--masks', required=True, help='directory of LoveDA mask PNGs (recursive)')
-    ap.add_argument('--trials', type=int, default=1000)
-    ap.add_argument('--drop', nargs='*', default=[], metavar='CLASS')
-    ap.add_argument('--seed', type=int, default=0)
-    ap.add_argument('--limit', type=int, default=0)
-    ap.add_argument('--out', default=None)
-    args = ap.parse_args()
+def find_masks(root):
+    """PNGs under root. LoveDA's Val/<domain>/ holds BOTH images_png/ and
+    masks_png/, so prefer directories whose name mentions masks -- reading an
+    RGB image as a label map would be silently wrong (the label-range check
+    below would catch it, but this is cleaner)."""
+    root = Path(root).expanduser()
+    m = sorted(p for p in root.rglob('*.png') if 'mask' in p.parent.name.lower())
+    return m if m else sorted(root.rglob('*.png'))
 
+
+def read_group(files, quiet=False):
+    """Pass 1: read each mask ONCE, cache its NCxNC adjacency matrix."""
     from PIL import Image
-    root = Path(args.masks).expanduser()
-    files = sorted(root.rglob('*.png'))
-    if args.limit:
-        files = files[:args.limit]
-    if not files:
-        raise SystemExit(f'no PNGs under {root}')
-    print(f'{len(files)} masks | {args.trials} permutations | seed {args.seed}')
-    if args.drop:
-        print(f'dropping: {", ".join(args.drop)}')
-
-    # ---- pass 1: read each mask ONCE, cache its 7x7 matrix ------------------
     Ms, Ps = [], []
     for i, f in enumerate(files, 1):
         lbl = np.array(Image.open(f))
@@ -128,12 +119,100 @@ def main():
             lbl = lbl[..., 0]
         lbl = lbl.astype(np.int64)
         if lbl.max() >= NC:
-            raise SystemExit(f'{f} has label {lbl.max()}, expected < {NC}')
+            raise SystemExit(f'{f} has label {lbl.max()}, expected < {NC}. '
+                             'Is this an image rather than a mask?')
         M, pix = accumulate_one(lbl)
         Ms.append(M); Ps.append(pix)
-        if i % 250 == 0 or i == len(files):
+        if not quiet and (i % 250 == 0 or i == len(files)):
             print(f'  {i}/{len(files)}')
-    Ms = np.stack(Ms); Ps = np.stack(Ps)
+    return np.stack(Ms), np.stack(Ps)
+
+
+def domain_section(res, names_cls, drop):
+    """§4.4 — is the prior domain-specific? Reported under BOTH marginals,
+    because §4.4's 'six of fifteen pairs flip sign' was computed with the area
+    marginal, and that is what makes hierarchical M a settled requirement."""
+    (na, ra), (nb, rb) = list(res.items())
+    n = len(names_cls)
+    off = ~np.eye(n, dtype=bool)
+    md = [f'\n## §4.4 — domain transfer: {na} vs {nb} ⭐\n',
+          '`ANALYSIS.md` §4.4 reports **mean |PMI difference| 1.137** with background / '
+          '**1.310** without, **max 3.064 / 2.791**, and **six of fifteen pairs flipping '
+          'sign**. Those were computed with the AREA marginal. The `hierarchical M is '
+          'required` decision in `CLAUDE.md` rests on them, so both marginals are shown.\n',
+          '| Marginal | mean \\|PMI diff\\| | max \\|PMI diff\\| | pairs flipping sign |',
+          '|---|---|---|---|']
+    flips_by = {}
+    for key, lbl in (('area', 'area (as §4.4)'), ('bnd', 'boundary (corrected)')):
+        A, B = ra[key], rb[key]
+        D = np.abs(A - B)
+        fl = [(names_cls[i], names_cls[j], A[i, j], B[i, j])
+              for i in range(n) for j in range(i + 1, n)
+              if np.sign(A[i, j]) != np.sign(B[i, j])]
+        flips_by[key] = fl
+        md.append(f'| {lbl} | **{D[off].mean():.3f}** | {D[off].max():.3f} | '
+                  f'**{len(fl)} / {n*(n-1)//2}** |')
+    for key, lbl in (('area', 'area'), ('bnd', 'boundary')):
+        if flips_by[key]:
+            md.append(f'\n*{lbl} sign flips:* ' + ', '.join(
+                f'`{a}–{b}` ({x:+.2f}/{y:+.2f})' for a, b, x, y in flips_by[key]))
+    fa, fb = len(flips_by['area']), len(flips_by['bnd'])
+    da = np.abs(ra['area'] - rb['area'])[off].mean()
+    db = np.abs(ra['bnd'] - rb['bnd'])[off].mean()
+    md += ['\n**Reading.**\n']
+    if fb >= 4 and db >= 0.3:
+        md.append(f'The prior stays domain-specific under the corrected marginal '
+                  f'({fb} sign flips, mean |diff| {db:.2f} bits). **§4.4 survives and '
+                  '`M_eff = λ·M_global + (1−λ)·M_image` remains a requirement.** The λ-sweep '
+                  'stays a mandatory ablation.')
+    elif fb >= 2 or db >= 0.2:
+        md.append(f'Domain differences shrink under the corrected marginal '
+                  f'({fa} → {fb} sign flips, {da:.2f} → {db:.2f} bits) but do not vanish. '
+                  'Hierarchical M is still defensible; restate §4.4 with these numbers and '
+                  'expect λ to matter less than the area-marginal figures implied.')
+    else:
+        md.append(f'⛔ **Domain differences largely disappear** under the corrected marginal '
+                  f'({fa} → {fb} sign flips, {da:.2f} → {db:.2f} bits). §4.4 was substantially '
+                  'a formula artefact, and `hierarchical M is required` — a settled decision in '
+                  '`CLAUDE.md` — is no longer supported by it. Either find another '
+                  'justification for the λ blend or drop it to a tested option. Decide before '
+                  'Week 3 builds on it.')
+    return md
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--masks', required=True, nargs='+',
+                    help='one directory, or two for a domain comparison (§4.4)')
+    ap.add_argument('--names', nargs='+', default=None,
+                    help='labels for the groups (default: directory basenames)')
+    ap.add_argument('--trials', type=int, default=1000, help='0 skips the permutation null')
+    ap.add_argument('--drop', nargs='*', default=[], metavar='CLASS')
+    ap.add_argument('--seed', type=int, default=0)
+    ap.add_argument('--limit', type=int, default=0)
+    ap.add_argument('--out', default=None)
+    args = ap.parse_args()
+
+    groups = {}
+    gnames = args.names or [Path(m).name for m in args.masks]
+    if len(gnames) != len(args.masks):
+        raise SystemExit('--names must match the number of --masks directories')
+    for nm, d in zip(gnames, args.masks):
+        f = find_masks(d)
+        if args.limit:
+            f = f[:args.limit]
+        if not f:
+            raise SystemExit(f'no mask PNGs under {d}')
+        groups[nm] = f
+        print(f'[{nm}] {len(f)} masks')
+
+    # combined corpus drives the main table; groups drive the §4.4 section
+    files = [f for fs in groups.values() for f in fs]
+    print(f'{len(files)} masks total | {args.trials} permutations | seed {args.seed}')
+    if args.drop:
+        print(f'dropping: {", ".join(args.drop)}')
+
+    Ms, Ps = read_group(files)
 
     drop = {d.lower() for d in args.drop}
     valid = [i for i in range(1, NC)
@@ -144,34 +223,58 @@ def main():
     if obs is None or obs_b is None:
         raise SystemExit('no boundaries found')
 
+    # ---- per-group PMI, for the §4.4 domain comparison ----------------------
+    per_group = {}
+    if len(groups) >= 2:
+        off_g = 0
+        for nm, fs in groups.items():
+            gM, gP = Ms[off_g:off_g + len(fs)], Ps[off_g:off_g + len(fs)]
+            off_g += len(fs)
+            a = pmi_from(gM.sum(0), gP.sum(0), valid, 'area')
+            b = pmi_from(gM.sum(0), gP.sum(0), valid, 'boundary')
+            if a is None or b is None:
+                raise SystemExit(f'no boundaries in group {nm}')
+            per_group[nm] = {'area': a, 'bnd': b}
+
     # ---- permutation trials: pure index shuffling, no re-reading ------------
     rng = np.random.default_rng(args.seed)
-    real = np.arange(1, NC)               # permute among the real class labels only
-    null = np.empty((args.trials, len(valid), len(valid)), np.float32)
-    for t in range(args.trials):
-        Msum = np.zeros((NC, NC), np.int64)
-        Psum = np.zeros(NC, np.int64)
-        for n in range(len(Ms)):
-            perm = rng.permutation(real)
-            idx = np.arange(NC); idx[1:] = perm      # label 0 (no-data) fixed
-            Msum += Ms[n][np.ix_(idx, idx)]
-            Psum += Ps[n][idx]
-        p = pmi_from(Msum, Psum, valid, 'area')
-        null[t] = p if p is not None else np.nan
-        if (t + 1) % max(args.trials // 10, 1) == 0:
-            print(f'  trial {t+1}/{args.trials}')
+    if args.trials == 0:
+        mu = np.zeros_like(obs)
+        sd = np.zeros_like(obs)
+        z = np.zeros_like(obs)
+    else:
+        real = np.arange(1, NC)           # permute among the real class labels only
+        null = np.empty((args.trials, len(valid), len(valid)), np.float32)
+        for t in range(args.trials):
+            Msum = np.zeros((NC, NC), np.int64)
+            Psum = np.zeros(NC, np.int64)
+            for n in range(len(Ms)):
+                perm = rng.permutation(real)
+                idx = np.arange(NC); idx[1:] = perm      # label 0 (no-data) fixed
+                Msum += Ms[n][np.ix_(idx, idx)]
+                Psum += Ps[n][idx]
+            p = pmi_from(Msum, Psum, valid, 'area')
+            null[t] = p if p is not None else np.nan
+            if (t + 1) % max(args.trials // 10, 1) == 0:
+                print(f'  trial {t+1}/{args.trials}')
 
-    mu, sd = np.nanmean(null, 0), np.nanstd(null, 0)
-    with np.errstate(divide='ignore', invalid='ignore'):
-        z = np.where(sd > 0, (obs - mu) / sd, 0.0)
+        mu, sd = np.nanmean(null, 0), np.nanstd(null, 0)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            z = np.where(sd > 0, (obs - mu) / sd, 0.0)
 
     off = ~np.eye(len(valid), dtype=bool)
     md = ['# PMI vs a structure-preserving permutation null\n',
           f'- masks: **{len(files)}**  |  permutations: **{args.trials}**  |  seed {args.seed}',
           f'- classes: {", ".join(names)}' + (f'  (dropped: {", ".join(args.drop)})'
                                               if args.drop else ''),
-          f'- mean |PMI| observed: **{np.abs(obs[off]).mean():.3f}** bits',
-          f'- mean |PMI| under the null: **{np.abs(mu[off]).mean():.3f}** bits\n',
+          f'- mean |PMI| **area** marginal (the §4 figure): **{np.abs(obs[off]).mean():.3f}** bits',
+          f'- mean |PMI| **boundary** marginal (corrected): '
+          f'**{np.abs(obs_b[off]).mean():.3f}** bits  ← quote this one',
+          f'- mean |PMI| under the permutation null: **{np.abs(mu[off]).mean():.3f}** bits'
+          + ('  *(matches the 0.004 random control of §4)*'
+             if args.trials and np.abs(mu[off]).mean() < 0.02 else ''),
+          f'- **premise margin: {np.abs(obs_b[off]).mean() / max(np.abs(mu[off]).mean(), 1e-9):.0f}×'
+          f' the noise floor**\n' if args.trials else '\n',
           'TWO INDEPENDENT CHECKS, and they answer different questions.\n',
           '**`PMI_bnd`** replaces the area marginals with each class\'s own total BOUNDARY',
           'length, so both sides of the ratio are the same measure and a class earns nothing',
@@ -244,6 +347,9 @@ def main():
                   'The qualitative claims in §4.1 survive; the numeric values should be quoted '
                   'from `PMI_bnd`, and §4.3\'s row variances recomputed from the table above '
                   'before the discriminability weighting is fixed.')
+    if per_group:
+        md += domain_section(per_group, names, args.drop)
+
     md += ['\n> Neither check threatens the premise: 1.3–1.7 bits against a 0.004 noise floor is '
            'far too large a margin to be geometric. What is under test is the PER-PAIR '
            'structure, which is what the method actually consumes.\n',
