@@ -30,3 +30,6 @@ logs/
 
 # os
 .DS_Store
+
+# editor / backup copies
+*.bak

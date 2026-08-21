@@ -1,11 +1,18 @@
 #!/usr/bin/env bash
 # ============================================================
+# ⚠️ SUPERSEDED (21 Aug) — use scripts/recover_week2_artifacts.sh instead.
+#    A3 and A5 are done: sam3_smoke_test.py and cooccurrence_gt.py are both
+#    tracked, and the doc reconciliation landed in commit 16c04c4. Only the A2
+#    _TBD_ transcription remains, and the newer script prints those values too.
+#    Kept for the record. Paths below were corrected from the dead
+#    ~/final year pro/Final_year_project to ~/FreeTraining-OVSS.
+# ============================================================
 # Week 2 wrap-up — A2 to A5. No GPU needed.
 # Run each block, read the output, act. Not fully automated on
 # purpose: A3 and A5 need your eyes before anything is committed.
 # ============================================================
 set -u
-REPO=~/"final year pro/Final_year_project"
+REPO=~/FreeTraining-OVSS
 OUT=~/outputs
 SCRATCH=~/.gemini/antigravity/scratch/FreeTraining-OVSS/scripts
 

@@ -17,7 +17,7 @@ Run the following commands in your terminal:
 
 ```bash
 # Navigate to your project directory
-cd "/home/priyanshu/final year pro/Final_year_project"
+cd ~/FreeTraining-OVSS
 
 # 1. Initialize git repository
 git init

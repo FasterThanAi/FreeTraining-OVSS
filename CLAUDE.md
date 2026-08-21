@@ -43,10 +43,20 @@ that is the floor.
 
 ## Repo conventions
 
-- **Work spans two machines.** The Linux workstation (`~/final year pro/Final_year_project`)
-  has the GPU, the LoveDA data, the `SegEarth-OV-3/` clone and `~/outputs/`. The Mac
-  (`~/FreeTraining-OVSS`) is docs-only — no dataset, no outputs, no GPU. Same git remote.
-  Anything measured is measured on the Linux box.
+- **Work spans two machines**, same repo name on both, same git remote
+  (`github.com/FasterThanAi/FreeTraining-OVSS`). Nothing syncs without push/pull.
+
+  | | Linux workstation (lab) | Mac |
+  |---|---|---|
+  | repo | `~/FreeTraining-OVSS` | `~/FreeTraining-OVSS` |
+  | GPU / LoveDA data | ✅ | ❌ |
+  | `~/outputs/week2_tau{0.5,0.3,0.1}` | ✅ | ❌ |
+  | `~/SegEarth-OV-3` (baseline clone), `~/sam3` | ✅ | ❌ |
+  | role | **all measurement** | docs, analysis, planning |
+
+  ⚠️ `~/final year pro/Final_year_project` on the workstation is a **dead folder** — no `.git`,
+  abandoned. Older docs pointed at it; corrected 21 Aug. Do not use it.
+  Push from HTTPS on the workstation needs a **GitHub Personal Access Token**, not a password.
 - **No pipeline code lives here.** The SAM 1 + CLIP scaffold (`src/`, `pipeline.py`,
   `configs/config.yaml`, `tests/`, `requirements.txt`) was removed on 21 Aug — every design
   decision it encoded had been overturned by ANALYSIS §4, and its `requirements.txt` would have

@@ -12,7 +12,7 @@ Both changes go in **one edit, one re-run at τ=0.5** (~25 min).
 ## 0. Before you start
 
 ```bash
-cd ~/"final year pro/Final_year_project"
+cd ~/FreeTraining-OVSS
 git add -A && git commit -m "chore: checkpoint before instrumentation patch"
 cp scripts/measure_discard_rate.py scripts/measure_discard_rate.py.bak
 ```
@@ -111,7 +111,7 @@ top-2 class indices and scores — cheap, and saves a third full re-run.
 
 ```bash
 cd ~/SegEarth-OV-3
-nohup python ~/"final year pro/Final_year_project"/scripts/measure_discard_rate.py \
+nohup python ~/FreeTraining-OVSS/scripts/measure_discard_rate.py \
   --tau 0.5 --out ~/outputs/week2_tau0.5_instrumented \
   > ~/logs/week2_tau0.5_instrumented.log 2>&1 &
 ```
