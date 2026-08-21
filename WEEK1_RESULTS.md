@@ -927,15 +927,18 @@ presence-corrected evidence.
       pre-instrumentation run. The patch is observation-only. Cache written for all 1669 tiles,
       so every future τ and ablation is now a numpy pass, not a 25-min encoder run.
 
+- [x] ~~§9.2b counterfactual~~ — **run 21 Aug. The causal claim is refuted.** Presence gating is
+      a correlate, not a cause: recovery is uncorrelated with baseline presence (+0.018) and the
+      same intervention costs −11.97 mIoU while wrecking healthy tiles. §9.2b.
+- [x] ~~§7.2 / §7.3 `_TBD_` fields~~ — **filled 21 Aug**, exact at all three τ.
+- [x] ~~Is "assigned to background" the same set as "discarded by τ"?~~ — **measured, and no**:
+      6.00% of background assignments are argmax wins at `conf ≥ τ`, all water, 24 tiles. §7.7.
+      The hedge stands; write "assigned to background".
+
 ### Still open
 
-- [ ] **§9.2b counterfactual** — `--no-presence` run. Converts the −0.750 correlation into a
-      causal claim, or scopes §9.2 down honestly. One 25-min run. **Highest value remaining.**
-
-
-
-- [ ] **§9.1a boundary-vs-interior decomposition** — the addressable-residual number. Do before
-      Week 8.
+- [ ] **§9.1a boundary-vs-interior decomposition** — the addressable-residual number. CPU-only
+      now that the cache exists. Do before Week 8.
 - [ ] **`ANALYSIS.md` §4 PMI uses a mismatched null model.** `P_obs` is a *boundary*-frequency
       distribution; `P_exp = outer(p, p)` is built from *area* marginals
       (`scripts/cooccurrence_gt.py:118-131`). High-perimeter classes are systematically inflated,
