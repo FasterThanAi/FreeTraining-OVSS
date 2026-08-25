@@ -199,6 +199,23 @@ def main():
     hit = {m: 0 for m in methods}
     hit_c = {m: 0 for m in methods}
     per_cls = {m: np.zeros((NC, 2), np.int64) for m in methods}
+    # An aggregate can hide a real effect on the subset where the choice is
+    # actually hard. A component touching ONE class has nothing to arbitrate --
+    # the vote is trivially right or trivially wrong and M cannot help. The
+    # decision only exists when two or more classes border the region, and large
+    # components are where the pixels are (component accuracy 79% vs pixel 48%
+    # says the big ones are the failures). So stratify by both.
+    strata_hit = {}
+    strata_tot = {}
+
+    def strat_keys(cnt, npx):
+        k = [f'{int((cnt[REAL] > 0).sum())} neighbour class'
+             + ('' if int((cnt[REAL] > 0).sum()) == 1 else 'es')]
+        for lo, hi, nm in [(0, 1000, '64–1k px'), (1000, 10000, '1k–10k px'),
+                           (10000, 100000, '10k–100k px'), (100000, 1 << 60, '>100k px')]:
+            if lo <= npx < hi:
+                k.append(nm)
+        return k
 
     files = sorted(Path(args.cache).expanduser().glob('*.npz'))
     if args.limit:
@@ -258,10 +275,16 @@ def main():
                     sc = (1.0 - b) * vote + b * co
                     preds[f'{k} β={b:.2f}'] = REAL[int(np.argmax(sc))]
 
+            keys = strat_keys(cnt, npx)
             for m, p in preds.items():
                 per_cls[m][t, 1] += npx
-                if p == t:
+                ok = (p == t)
+                if ok:
                     hit[m] += npx; hit_c[m] += 1; per_cls[m][t, 0] += npx
+                for kk in keys:
+                    strata_tot[(kk, m)] = strata_tot.get((kk, m), 0) + npx
+                    if ok:
+                        strata_hit[(kk, m)] = strata_hit.get((kk, m), 0) + npx
 
         if (fi + 1) % 250 == 0 or fi + 1 == len(files):
             print(f'  {fi + 1}/{len(files)}')
@@ -309,6 +332,37 @@ def main():
               'β=0.00 — the same procedure with M switched off. **Read the two '
               'rightmost columns against each other: that difference is what the '
               "entire co-occurrence contribution is worth.**\n")
+
+    order = ['1 neighbour class', '2 neighbour classes', '3 neighbour classes',
+             '4 neighbour classes', '5 neighbour classes', '6 neighbour classes',
+             '64–1k px', '1k–10k px', '10k–100k px', '>100k px']
+    md += ['\n## Where the decision is actually hard\n',
+           'A region touching one class has nothing to arbitrate. `Δ` is the '
+           'co-occurrence contribution **on that stratum** — best mined β minus '
+           'β=0. If M has a real effect it must show up here.\n',
+           '| stratum | reachable px | β=0 (vote) | best mined β | **Δ** | oracle GT β | Δ oracle |',
+           '|---|---|---|---|---|---|---|']
+    gt_key = [m for m in methods if m.startswith(list(Ps)[-1])] if len(Ps) > 1 else []
+    for kk in order:
+        tot = strata_tot.get((kk, vote_key), 0)
+        if tot == 0:
+            continue
+        v = strata_hit.get((kk, vote_key), 0) / tot
+        cands = [m for m in methods if m.startswith(k0)]
+        bb = max(cands, key=lambda m: strata_hit.get((kk, m), 0))
+        b = strata_hit.get((kk, bb), 0) / tot
+        row = (f'| {kk} | {tot:,} | {100 * v:.1f}% | {100 * b:.1f}% '
+               f'({bb.split("β=")[-1]}) | **{100 * (b - v):+.2f}** |')
+        if gt_key:
+            gb = max(gt_key, key=lambda m: strata_hit.get((kk, m), 0))
+            g = strata_hit.get((kk, gb), 0) / tot
+            row += f' {100 * g:.1f}% ({gb.split("β=")[-1]}) | {100 * (g - v):+.2f} |'
+        else:
+            row += ' — | — |'
+        md.append(row)
+    md.append('\n`Δ oracle` is the ceiling on the co-occurrence term for that stratum: '
+              'what a PERFECT matrix would add. If it is small, better mining cannot '
+              'rescue it and the term does not belong in the method.\n')
 
     pv = hit[vote_key] / max(reach_px, 1)
     pp = hit[best] / max(reach_px, 1)
