@@ -114,6 +114,11 @@ def main():
                     default=[0.0, 0.5, 1.0, 1.5, 2.0, 2.5])
     ap.add_argument('--purities', type=float, nargs='+',
                     default=[0.0, 0.5, 0.7, 0.9])
+    ap.add_argument('--regions', choices=['all', 'oracle'], default='all',
+                    help="'all' considers every background-assigned pixel, which is "
+                         "what inference can actually see. 'oracle' restricts to "
+                         "pixels GT says are real classes -- a supervision leak, "
+                         "reportable only as an upper bound.")
     ap.add_argument('--limit', type=int, default=0)
     ap.add_argument('--md', default=None)
     args = ap.parse_args()
@@ -154,8 +159,19 @@ def main():
         C['none'] += np.bincount(gi * NCLS + bi,
                                  minlength=NCLS * NCLS).reshape(NCLS, NCLS)
 
-        disc = (gt >= 2) & (base == 1)
-        disc_total += int(disc.sum())
+        # EVERY pixel the baseline assigned to background, not just the ones GT
+        # says are real classes. Selecting on `gt >= 2` here would hand the method
+        # advance knowledge of which background pixels are worth touching, so it
+        # could never damage true background -- precisely the protection
+        # tau-relaxation does not get (section 8.2: at tau=0.1 over 70% of true
+        # background is misassigned). That is a supervision leak and it inflated
+        # an earlier version of this script by +3.47 mIoU. --regions oracle
+        # reproduces it deliberately, as an upper bound, never as a result.
+        if args.regions == 'oracle':
+            disc = (gt >= 2) & (base == 1)
+        else:
+            disc = (base == 1) & (gt > 0)
+        disc_total += int(((gt >= 2) & (base == 1)).sum())
         if not disc.any():
             for s in settings:
                 C[s] += np.bincount(gi * NCLS + bi,
@@ -195,6 +211,8 @@ def main():
                                              minlength=NCLS * NCLS).reshape(NCLS, NCLS)
                 got = sel & disc
                 rec[(mth, pth)][0] += int(got.sum())
+                # correct against GT -- a relabelled TRUE-background pixel counts
+                # as wrong, which is the whole point of scoping to `all`
                 rec[(mth, pth)][1] += int((newp[got] == gt[got]).sum())
             else:
                 C[(mth, pth)] += np.bincount(gi * NCLS + bi,
@@ -207,7 +225,11 @@ def main():
     md = ['# Week 3 — does selective recovery move mIoU?\n',
           f'- tiles: **{len(files)}**  |  τ: **{args.tau}**  |  β: **{args.beta}**  |  '
           f'min component: **{args.min_size}px**',
-          f'- background-assigned real-class pixels: **{disc_total:,}**\n',
+          f'- background-assigned real-class pixels: **{disc_total:,}**',
+          f'- region scope: **`{args.regions}`**'
+          + ('  ⚠️ **ORACLE — uses GT to choose which pixels to touch. Upper bound '
+             'only, never a result.**' if args.regions == 'oracle'
+             else '  (every background-assigned pixel, as at inference)') + '\n',
           '## Validation gate\n',
           f'| | this run | expected |', '|---|---|---|',
           f'| mIoU, recover nothing | **{base_miou:.2f}** | 47.37 |',
