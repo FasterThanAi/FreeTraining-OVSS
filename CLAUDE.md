@@ -90,8 +90,20 @@ These were decided by measurement, not preference. Rationale in the cited sectio
   to ~0 under `PMI_bnd`. Discriminability weighting is still worth doing, but recompute
   `w(n) ∝ Var_c[PMI_bnd]` and note the real hub is **agriculture** (row var 0.04), matching
   WEEK1_RESULTS §8.1(c). ANALYSIS §4.3.
-- **M is directed, not symmetric.** water→agricultural is 19.3M with no reverse in any top-8.
-  WEEK1_RESULTS §8.1(b).
+- **M is directed, not symmetric** — but *where* the direction lives was resolved on 25 Aug and
+  the earlier phrasing was misleading. **Shared-boundary counts are symmetric by construction**:
+  a water pixel touching an agricultural pixel is one boundary with no direction, so
+  `M[i,j] == M[j,i]` always and no amount of counting changes it. §8.1(b)'s evidence
+  (water→agricultural 19.3M with no reverse) comes from the **confusion** matrix, a different
+  object. Directedness is real and enters through the **row-normalised conditional**
+  `P(c | neighbour=n) = M[n,c] / Σ_c M[n,c]`, which is asymmetric because the class marginals
+  differ (agricultural 44.7% of pixels vs water 18.3%). **`cond` in `M_global_*.npz` is the
+  directed object; `counts` and `pmi_bnd` are symmetric and that is not a defect.**
+- **PMI must be Dirichlet-smoothed (α>0) before the log.** An unobserved pair gives
+  `log2(0) = −inf`; clamping that to 0.0 reports the *strongest* exclusion as
+  "indistinguishable from chance". building–water is exactly such a pair, so the clamp would
+  silently delete the most reliable fact in the matrix. Caught by a synthetic test, 25 Aug.
+  `α=0` reproduces `cooccurrence_gt.py` exactly and is for reproduction checks only.
 - **Presence gating is inherited from SegEarth-OV3 but is not free** — it vetoes whole tiles.
   WEEK1_RESULTS §9.2. (ANALYSIS §3.5 previously claimed otherwise; corrected.)
 
