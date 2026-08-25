@@ -71,7 +71,8 @@ def auc_from_hist(pos, neg):
         return float('nan')
     tpr = np.concatenate([[0.0], np.cumsum(p) / P])
     fpr = np.concatenate([[0.0], np.cumsum(n) / N])
-    return float(np.trapz(tpr, fpr))
+    return float(np.trapezoid(tpr, fpr) if hasattr(np, 'trapezoid')
+                 else np.trapz(tpr, fpr))
 
 
 def best_operating(pos, neg, edges):
@@ -103,6 +104,16 @@ def main():
         raise SystemExit(f'no .npz under {args.cache}')
 
     names = ['conf', 'conf2', 'gap', 'spres_max', 'spres_arg']
+    # P_fused is only present if the cache was written by the patched segmentor.
+    probe = np.load(files[0])
+    has_fused = 'fconf' in probe.files
+    if has_fused:
+        names += ['fconf', 'fgap']
+        print('cache carries P_fused (pre-gating) — testing it too\n')
+    else:
+        print('cache has no `fconf`: P_fused was not recorded. Re-run '
+              'measure_discard_rate.py with the patched segmentor to test the '
+              'ungated score.\n')
     pos = {k: np.zeros(NB, np.int64) for k in names}
     neg = {k: np.zeros(NB, np.int64) for k in names}
     npos = nneg = 0
@@ -132,6 +143,10 @@ def main():
         sig = {'conf': conf, 'conf2': conf2, 'gap': conf - conf2,
                'spres_max': np.full(gt.shape, float(spmax), np.float32),
                'spres_arg': sparg_lut[np.clip(pred, 0, 6)].astype(np.float32)}
+        if has_fused:
+            fc = z['fconf'].astype(np.float32)
+            sig['fconf'] = fc                     # ungated max(P_sem, P_inst_agg)
+            sig['fgap'] = np.clip(fc - conf, 0, 1)   # how much gating removed here
 
         for k, v in sig.items():
             b = np.clip((v * NB).astype(np.int32), 0, NB - 1)

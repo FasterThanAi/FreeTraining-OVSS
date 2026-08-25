@@ -76,11 +76,21 @@ class SegEarthOV3Segmentation(BaseSegmentor):
         # classes with max-over-synonyms, mirroring the .max(1) on line ~183.
         self.presence_log = []
         self.last_presence = np.zeros((0, self.num_queries), dtype=np.float32)
+        self.last_fused = None       # <<< INSTRUMENTATION: P_fused, pre-gating
 
     def _inference_single_view(self, image):
         """Inference on a single PIL image or crop patch."""
         w, h = image.size
         seg_logits = torch.zeros((self.num_queries, h, w), device=self.device)
+        # <<< INSTRUMENTATION: P_fused, i.e. max(P_sem, P_inst_agg) BEFORE the
+        # presence multiply. conf in the cache is P_final = P_fused * S_pres, so
+        # the two factors are entangled and cannot be separated after the fact.
+        # WEEK1_RESULTS 9.2 tile 3487 is the reason this matters: P_sem was
+        # effectively certain road was present (+10.13 logit) while S_pres = 0.076
+        # crushed P_final below any tau. If P_fused separates recoverable pixels
+        # from true background where P_final cannot (AUC 0.582), tau_low exists
+        # after all -- just not in the gated score.
+        fused_logits = torch.zeros((self.num_queries, h, w), device=self.device)
         # <<< INSTRUMENTATION: NaN = "not recorded" (distinct from a real 0.0)
         view_presence = np.full(self.num_queries, np.nan, dtype=np.float32)
 
@@ -122,6 +132,10 @@ class SegEarthOV3Segmentation(BaseSegmentor):
                     
                     seg_logits[query_idx] = torch.max(seg_logits[query_idx], semantic_logits)
                 
+                # <<< INSTRUMENTATION: snapshot AFTER dual-head fusion, BEFORE
+                # gating. Unconditional, so --no-presence still records it.
+                fused_logits[query_idx] = seg_logits[query_idx]
+
                 if self.use_presence_score:
                     presence = inference_state["presence_score"]        # <<< INSTRUMENTATION
                     try:                                                # <<< INSTRUMENTATION
@@ -131,7 +145,7 @@ class SegEarthOV3Segmentation(BaseSegmentor):
                     seg_logits[query_idx] = seg_logits[query_idx] * presence
 
         self.presence_log.append(view_presence)                         # <<< INSTRUMENTATION
-        return seg_logits
+        return seg_logits, fused_logits                                 # <<< INSTRUMENTATION
 
     def slide_inference(self, image, stride, crop_size):
         """Inference by sliding-window with overlap using PIL cropping."""
@@ -147,6 +161,7 @@ class SegEarthOV3Segmentation(BaseSegmentor):
         
         # Initialize accumulators
         preds = torch.zeros((self.num_queries, h_img, w_img), device=self.device)
+        fused = torch.zeros((self.num_queries, h_img, w_img), device=self.device)  # <<< INSTRUMENTATION
         count_mat = torch.zeros((1, h_img, w_img), device=self.device)
         
         h_grids = max(h_img - h_crop + h_stride - 1, 0) // h_stride + 1
@@ -167,16 +182,18 @@ class SegEarthOV3Segmentation(BaseSegmentor):
                 crop_img = image.crop((x1, y1, x2, y2))
                 
                 # Inference on crop
-                crop_seg_logit = self._inference_single_view(crop_img)
+                crop_seg_logit, crop_fused = self._inference_single_view(crop_img)
                 
                 # Accumulate results
                 preds[:, y1:y2, x1:x2] += crop_seg_logit
+                fused[:, y1:y2, x1:x2] += crop_fused                    # <<< INSTRUMENTATION
                 count_mat[:, y1:y2, x1:x2] += 1
 
         assert (count_mat == 0).sum() == 0, "Error: Sparse sliding window coverage."
         
         preds = preds / count_mat
-        return preds
+        fused = fused / count_mat                                       # <<< INSTRUMENTATION
+        return preds, fused                                             # <<< INSTRUMENTATION
 
     def predict(self, inputs, data_samples):
         if data_samples is not None:
@@ -201,9 +218,10 @@ class SegEarthOV3Segmentation(BaseSegmentor):
 
             # Determine inference mode
             if self.slide_crop > 0 and (self.slide_crop < image.size[0] or self.slide_crop < image.size[1]):
-                seg_logits = self.slide_inference(image, self.slide_stride, self.slide_crop)
+                seg_logits, fused_logits = self.slide_inference(image, self.slide_stride, self.slide_crop)
             else:
-                seg_logits = self._inference_single_view(image)
+                seg_logits, fused_logits = self._inference_single_view(image)
+            self.last_fused = fused_logits                              # <<< INSTRUMENTATION
 
             # <<< INSTRUMENTATION: (n_views, num_queries). One row if this image
             # was a single forward pass, one row per crop under sliding window.

@@ -202,6 +202,28 @@ def main():
         # top-2 makes any future threshold / ablation a numpy pass.
         if cache_dir is not None:
             lg = result.seg_logits.data.float()             # (N, H, W)
+            # <<< INSTRUMENTATION: P_fused = max(P_sem, P_inst_agg), captured
+            # BEFORE the presence multiply. `conf` is P_final = P_fused * S_pres,
+            # so the two factors are entangled in it and cannot be recovered
+            # afterwards. Recorded as its own top-1 so the recoverability AUC can
+            # be re-run on the ungated score. Absent on an unpatched segmentor,
+            # in which case the keys are simply omitted and readers fall back.
+            fused_arrays = {}
+            fl = getattr(model, 'last_fused', None)
+            if fl is not None:
+                try:
+                    fl = fl.float()
+                    if fl.shape[-2:] != lg.shape[-2:]:
+                        fl = torch.nn.functional.interpolate(
+                            fl[None], size=lg.shape[-2:], mode='bilinear',
+                            align_corners=False)[0]
+                    ftop = torch.topk(fl, k=min(2, fl.shape[0]), dim=0)
+                    fv = ftop.values.cpu().numpy()
+                    fi = ftop.indices.cpu().numpy().astype(np.uint8)
+                    fused_arrays = dict(fconf=fv[0].astype(np.float16), fpred=fi[0])
+                except Exception as e:
+                    print(f'    (P_fused capture failed on {name}: {e})')
+
             k = min(2, lg.shape[0])
             top = torch.topk(lg, k=k, dim=0)
             vals = top.values.cpu().numpy()
@@ -215,6 +237,7 @@ def main():
                 gt=gt.astype(np.uint8),
                 spres=pres_views,                           # (n_views, N) full fidelity
                 classes=np.array(CLASSES),
+                **fused_arrays,                             # <<< P_fused, pre-gating
             )
 
         if i % 100 == 0 or i == len(names):
