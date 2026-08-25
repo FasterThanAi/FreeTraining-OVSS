@@ -46,9 +46,12 @@ is void.
         --md ~/outputs/week3/selective_recovery.md
 """
 import argparse
+import sys
 from pathlib import Path
 
 import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 LOVEDA = ['unknown', 'background', 'building', 'road',
           'water', 'barren', 'forest', 'agriculture']
@@ -57,10 +60,7 @@ REAL = list(range(2, NC))
 NCLS = 7                                   # background + 6 real, for the metric
 
 
-def connected(mask):
-    from scipy.ndimage import label
-    lab, n = label(mask)
-    return lab.astype(np.int32), n
+from atoms import get_atomiser, load_image      # noqa: E402
 
 
 def neighbour_counts(comp, ncomp, committed):
@@ -114,6 +114,12 @@ def main():
                     default=[0.0, 0.5, 1.0, 1.5, 2.0, 2.5])
     ap.add_argument('--purities', type=float, nargs='+',
                     default=[0.0, 0.5, 0.7, 0.9])
+    ap.add_argument('--atoms', choices=['slic', 'cc'], default='slic',
+                    help="'slic' -- oracle ceiling 92.8%%, settled by atom_quality.py. "
+                         "'cc' is the ablation row: ceiling 72.8%%, atoms sprawl to a "
+                         "whole tile.")
+    ap.add_argument('--img-dir', default=None, help='required for --atoms slic')
+    ap.add_argument('--n-segments', type=int, default=600)
     ap.add_argument('--regions', choices=['all', 'oracle'], default='all',
                     help="'all' considers every background-assigned pixel, which is "
                          "what inference can actually see. 'oracle' restricts to "
@@ -122,6 +128,9 @@ def main():
     ap.add_argument('--limit', type=int, default=0)
     ap.add_argument('--md', default=None)
     args = ap.parse_args()
+    if args.atoms == 'slic' and not args.img_dir:
+        raise SystemExit('--atoms slic needs --img-dir (e.g. ~/data/loveda/img_dir/val)')
+    atomise = get_atomiser(args.atoms)
 
     Z = np.load(Path(args.m_pred).expanduser(), allow_pickle=True)
     v = list(Z['valid']); src = np.asarray(Z['pmi_bnd'])
@@ -178,7 +187,13 @@ def main():
                                     minlength=NCLS * NCLS).reshape(NCLS, NCLS)
             continue
 
-        comp, n = connected(disc)
+        img = load_image(args.img_dir, f.stem) if args.atoms == 'slic' else None
+        comp, n = atomise(disc, img, args.n_segments)
+        if n == 0:
+            for s_ in settings:
+                C[s_] += np.bincount(gi * NCLS + bi,
+                                     minlength=NCLS * NCLS).reshape(NCLS, NCLS)
+            continue
         size = np.bincount(comp.ravel(), minlength=n + 1)
         nb = neighbour_counts(comp, n, L)
 
@@ -226,6 +241,9 @@ def main():
           f'- tiles: **{len(files)}**  |  τ: **{args.tau}**  |  β: **{args.beta}**  |  '
           f'min component: **{args.min_size}px**',
           f'- background-assigned real-class pixels: **{disc_total:,}**',
+          f'- atoms: **`{args.atoms}`**'
+          + ('  (oracle ceiling 92.8%)' if args.atoms == 'slic'
+             else '  ⚠️ ceiling 72.8% — ablation row only') + '',
           f'- region scope: **`{args.regions}`**'
           + ('  ⚠️ **ORACLE — uses GT to choose which pixels to touch. Upper bound '
              'only, never a result.**' if args.regions == 'oracle'
