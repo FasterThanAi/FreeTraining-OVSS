@@ -147,8 +147,27 @@ def main():
         md.append(f'| {names[k]} | {rowerr[k]:.3f} | {d} | '
                   f'{100 * bs_p[k]:.1f}% / {100 * bs_g[k]:.1f}% |')
 
+    # A targeted-bias test is only meaningful once M is accurate AT ALL. Reporting
+    # "error is not concentrated on the discarded classes" for a matrix that ranks
+    # pairs no better than chance is true and useless -- it was the first verdict
+    # this script printed on real data, and it was misleading. Overall rank
+    # agreement is therefore checked FIRST and short-circuits the gate.
+    rho_all = spearman(pmi_p[off], pmi_g[off])
     fin = np.isfinite(discard)
-    if fin.sum() >= 3:
+    if rho_all < 0.35:
+        md.append(f'\n> ⛔ **GATE 1 FAILED — accuracy, before any question of bias.** '
+                  f'Spearman(PMI_pred, PMI_gt) = **{rho_all:+.3f}**: the mined matrix '
+                  f'does not rank class pairs the way ground truth does, so the '
+                  f'targeted-bias test below is not yet meaningful. Fix fidelity '
+                  f'first, then re-run this gate. Read the per-class boundary-share '
+                  f'column — a class whose pred share is far from its gt share is not '
+                  f'being observed, and the most common cause is that it never clears '
+                  f'τ (WEEK1_RESULTS §9.2b for `background`).\n')
+        if fin.sum() >= 3:
+            md.append(f'_(For the record, Spearman(row error, discard rate) = '
+                      f'{spearman(rowerr[fin], discard[fin]):+.3f} — not interpretable '
+                      f'until the above is fixed.)_')
+    elif fin.sum() >= 3:
         r = spearman(rowerr[fin], discard[fin])
         md.append(f'\n**Spearman(row error, discard rate) = {r:+.3f}** '
                   f'over {int(fin.sum())} real classes.\n')

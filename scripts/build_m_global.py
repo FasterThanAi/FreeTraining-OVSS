@@ -186,6 +186,10 @@ def main():
     ap.add_argument('--tau', type=float, default=0.5)
     ap.add_argument('--alpha', type=float, default=1.0,
                     help='Dirichlet pseudo-count for the conditional')
+    ap.add_argument('--drop', nargs='+', default=[], metavar='CLASS',
+                    help="exclude classes entirely, e.g. --drop background. "
+                         "ANALYSIS 4's published PMI_bnd figures are computed "
+                         "with background dropped, so use this to compare.")
     ap.add_argument('--limit', type=int, default=0)
     ap.add_argument('--out', required=True)
     ap.add_argument('--md', default=None, help='also write a markdown summary')
@@ -224,7 +228,14 @@ def main():
         if (i + 1) % 250 == 0 or i + 1 == len(files):
             print(f'  {i + 1}/{len(files)}')
 
-    valid = [c for c in range(1, NC) if pix[c] > 0]
+    drop = {d.lower() for d in args.drop}
+    bad = [d for d in args.drop if d.lower() not in {x.lower() for x in LOVEDA[1:]}]
+    if bad:
+        raise SystemExit(f'unknown class(es) {bad}; known: {LOVEDA[1:]}')
+    valid = [c for c in range(1, NC)
+             if pix[c] > 0 and LOVEDA[c].lower() not in drop]
+    if len(valid) < 2:
+        raise SystemExit(f'only {len(valid)} class(es) left after --drop')
     nv = [LOVEDA[c] for c in valid]
     pmi_b = pmi_from(counts, pix, valid, 'boundary', args.alpha)
     pmi_a = pmi_from(counts, pix, valid, 'area', args.alpha)
@@ -243,7 +254,8 @@ def main():
     )
 
     w = max(len(x) for x in nv) + 1
-    md = [f'# M_global — source `{args.source}`\n',
+    md = [f'# M_global — source `{args.source}`'
+          + (f'  (without {", ".join(args.drop)})' if args.drop else '') + '\n',
           f'- tiles: **{len(files)}**'
           + (f'  |  τ: **{args.tau}**' if args.source == 'pred' else ''),
           f'- α (Dirichlet): **{args.alpha}**',
