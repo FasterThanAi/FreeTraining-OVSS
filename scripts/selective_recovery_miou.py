@@ -110,10 +110,12 @@ def main():
     ap.add_argument('--beta', type=float, default=0.25,
                     help='co-occurrence weight in the mixture; 0 = pure neighbour vote')
     ap.add_argument('--min-size', type=int, default=64)
-    ap.add_argument('--margins', type=float, nargs='+',
-                    default=[0.0, 0.5, 1.0, 1.5, 2.0, 2.5])
-    ap.add_argument('--purities', type=float, nargs='+',
-                    default=[0.0, 0.5, 0.7, 0.9])
+    ap.add_argument('--margins', type=float, nargs='+', default=[0.0, 1.0])
+    ap.add_argument('--purities', type=float, nargs='+', default=[0.0, 0.7])
+    ap.add_argument('--max-sizes', type=int, nargs='+',
+                    default=[500, 2000, 10000, 0],
+                    help='atom size CEILING in px; 0 = no limit. Small atoms are '
+                         'boundary seams and vote 81.7%% correct; >100k px atoms 33.1%%.')
     ap.add_argument('--atoms', choices=['slic', 'cc'], default='slic',
                     help="'slic' -- oracle ceiling 92.8%%, settled by atom_quality.py. "
                          "'cc' is the ablation row: ceiling 72.8%%, atoms sprawl to a "
@@ -141,7 +143,31 @@ def main():
     W = {i: float(np.var(P[i, REAL])) for i in REAL}
     Zr = rowz(P)
 
-    settings = [(m, p) for p in args.purities for m in args.margins]
+    # Two filters the earlier sweeps never applied, both justified by measurements
+    # already in hand rather than by guesswork:
+    #
+    #   SIZE CEILING. prior_ceiling.py stratified by atom size: 64-1k px atoms are
+    #   voted correctly 81.7% of the time, >100k px atoms only 33.1%. Small atoms
+    #   are the thin boundary seams of 9.1a -- genuine extensions of the confident
+    #   region beside them. Large ones are whole dropped regions where the vote is
+    #   guessing. The sweep had a min-size FLOOR and no ceiling.
+    #
+    #   CLASS SUBSET. Vote precision is wildly uneven -- building 86.8%, water
+    #   69.8%, forest 21.9%. Committing only to the classes the vote gets right is
+    #   a legitimate abstention rule, and unlike a confidence threshold it needs no
+    #   signal SAM 3 does not have. Ordered by measured reliability, never by GT
+    #   from this split.
+    CLASS_LADDER = [
+        ('building', [2]),
+        ('building+water', [2, 4]),
+        ('bld+wat+road', [2, 4, 3]),
+        ('bld+wat+road+barren', [2, 4, 3, 5]),
+        ('all classes', REAL),
+    ]
+    settings = [(m, p, ms, cn)
+                for p in args.purities for m in args.margins
+                for ms in args.max_sizes for cn, _ in CLASS_LADDER]
+    CLASS_SETS = {cn: set(cs) for cn, cs in CLASS_LADDER}
     C = {s: np.zeros((NCLS, NCLS), np.int64) for s in settings}
     C['none'] = np.zeros((NCLS, NCLS), np.int64)
     rec = {s: [0, 0] for s in settings}          # [recovered px, correct px]
@@ -215,23 +241,27 @@ def main():
             marg[c] = float(sc[o[0]] - sc[o[1]]) if len(o) > 1 else 9.9
             pur[c] = float(share.max())
 
-        for (mth, pth) in settings:
-            take = (assign > 0) & (marg >= mth) & (pur >= pth)
+        for st in settings:
+            mth, pth, mxs, cn = st
+            allowed = CLASS_SETS[cn]
+            ok_cls = np.array([a in allowed for a in assign], dtype=bool)
+            ok_sz = (size[:n + 1] <= mxs) if mxs > 0 else np.ones(n + 1, bool)
+            take = (assign > 0) & (marg >= mth) & (pur >= pth) & ok_cls & ok_sz
             if take.any():
                 newp = base.copy()
                 sel = take[comp]
                 newp[sel] = assign[comp[sel]]
                 pi = newp[valid].astype(np.int64) - 1
-                C[(mth, pth)] += np.bincount(gi * NCLS + pi,
-                                             minlength=NCLS * NCLS).reshape(NCLS, NCLS)
+                C[st] += np.bincount(gi * NCLS + pi,
+                                     minlength=NCLS * NCLS).reshape(NCLS, NCLS)
                 got = sel & disc
-                rec[(mth, pth)][0] += int(got.sum())
+                rec[st][0] += int(got.sum())
                 # correct against GT -- a relabelled TRUE-background pixel counts
                 # as wrong, which is the whole point of scoping to `all`
-                rec[(mth, pth)][1] += int((newp[got] == gt[got]).sum())
+                rec[st][1] += int((newp[got] == gt[got]).sum())
             else:
-                C[(mth, pth)] += np.bincount(gi * NCLS + bi,
-                                             minlength=NCLS * NCLS).reshape(NCLS, NCLS)
+                C[st] += np.bincount(gi * NCLS + bi,
+                                     minlength=NCLS * NCLS).reshape(NCLS, NCLS)
 
         if (fi + 1) % 250 == 0 or fi + 1 == len(files):
             print(f'  {fi + 1}/{len(files)}')
@@ -269,23 +299,29 @@ def main():
     md += ['## Operating points\n',
            'Abstain unless the region clears both thresholds. `margin` = top1−top2 of '
            'the score; `purity` = share of boundary held by the top neighbour class.\n',
-           '| margin ≥ | purity ≥ | recovered px | precision | **mIoU** | Δ vs baseline |',
-           '|---|---|---|---|---|---|']
+           'Sorted by mIoU. `max px` is the atom size ceiling; `classes` is which '
+           'labels we are willing to commit to.\n',
+           '| classes | max px | margin ≥ | purity ≥ | recovered px | precision | '
+           '**mIoU** | Δ |',
+           '|---|---|---|---|---|---|---|---|']
     best = None
-    for s in settings:
-        r, c = rec[s]
-        m = miou(C[s])
-        d = m - base_miou
-        pr = 100 * c / max(r, 1)
-        md.append(f'| {s[0]:.1f} | {s[1]:.1f} | {r:,} ({100 * r / max(disc_total, 1):.1f}%) | '
-                  f'{pr:.1f}% | **{m:.2f}** | {d:+.2f} |')
-        if r > 0 and (best is None or m > best[1]):
-            best = (s, m, r, pr)
+    rows = []
+    for st in settings:
+        r, c = rec[st]
+        m = miou(C[st])
+        rows.append((m, st, r, 100 * c / max(r, 1)))
+        if r > 0 and (best is None or m > best[0]):
+            best = (m, st, r, 100 * c / max(r, 1))
+    for m, st, r, pr in sorted(rows, reverse=True, key=lambda t: t[0])[:20]:
+        mth, pth, mxs, cn = st
+        md.append(f'| {cn} | {mxs if mxs else "∞"} | {mth:.1f} | {pth:.1f} | '
+                  f'{r:,} ({100 * r / max(disc_total, 1):.1f}%) | {pr:.1f}% | '
+                  f'**{m:.2f}** | {m - base_miou:+.2f} |')
 
     md += ['\n## Verdict\n']
     if not okgate:
         md.append('⛔ Fix the gate before reading anything above.')
-    elif best is None or best[1] <= base_miou:
+    elif best is None or best[0] <= base_miou + 1e-9:
         md.append(f'⛔ **No operating point beats the baseline** ({base_miou:.2f}). '
                   'Recovering the residual by neighbour propagation costs more in '
                   'background IoU than it returns in real-class recall, at every '
@@ -293,8 +329,9 @@ def main():
                   'alongside τ-relaxation and presence removal — a strong motivation '
                   'section, but not a method. **Re-scope before Week 4.**')
     else:
-        (mth, pth), m, r, pr = best
-        md.append(f'✅ **Best: margin ≥ {mth:.1f}, purity ≥ {pth:.1f} → mIoU '
+        m, (mth, pth, mxs, cn), r, pr = best
+        md.append(f'✅ **Best: classes `{cn}`, max atom {mxs if mxs else "∞"} px, '
+                  f'margin ≥ {mth:.1f}, purity ≥ {pth:.1f} → mIoU '
                   f'{m:.2f} ({m - base_miou:+.2f})**, recovering {r:,} pixels '
                   f'({100 * r / max(disc_total, 1):.1f}% of the residual) at '
                   f'**{pr:.1f}% precision**.\n\n'
