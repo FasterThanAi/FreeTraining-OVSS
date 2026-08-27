@@ -91,15 +91,20 @@ def zs(v):
     return (v - v.mean()) / v.std() if v.std() > 1e-9 else np.zeros_like(v)
 
 
-def miou(C):
-    """mIoU over the 7 LoveDA classes from a confusion matrix (rows=true)."""
-    ious = []
+def per_class_iou(C):
+    """Per-class IoU from a confusion matrix (rows = true)."""
+    out = np.full(NCLS, np.nan)
     for k in range(NCLS):
         tp = C[k, k]
         den = C[k].sum() + C[:, k].sum() - tp
         if den > 0:
-            ious.append(tp / den)
-    return 100.0 * float(np.mean(ious)) if ious else 0.0
+            out[k] = 100.0 * tp / den
+    return out
+
+
+def miou(C):
+    v = per_class_iou(C)
+    return float(np.nanmean(v)) if np.isfinite(v).any() else 0.0
 
 
 def _init_labels(cache):
@@ -347,6 +352,36 @@ def main():
     # printed a green tick on exactly that, which is the same failure as the
     # gate-1 verdict: a bar set where the answer already is.
     MEANINGFUL = 0.50
+    # WHERE the gain comes from decides whether it is a result or an artefact.
+    # Recovering at 27.5% precision still raises mIoU, because a background-assigned
+    # real-class pixel was ALREADY wrong: relabelling it either fixes it or leaves
+    # it wrong in a different class, while `background` stops being over-predicted
+    # either way. If the whole gain sits in the background row, the method is not
+    # recovering land cover, it is unwinding an over-prediction -- true of the
+    # metric, but a much weaker claim, and a reviewer will ask.
+    if best is not None:
+        b0 = per_class_iou(C['none'])
+        b1 = per_class_iou(C[best[1]])
+        d = b1 - b0
+        md += ['\n## Per-class IoU at the best operating point\n',
+               '| class | before | after | Δ |', '|---|---|---|---|']
+        for k in range(NCLS):
+            if not np.isfinite(b0[k]):
+                continue
+            md.append(f'| {LB.names[k]} | {b0[k]:.2f} | {b1[k]:.2f} | **{d[k]:+.2f}** |')
+        bgk = BG - 1
+        bg_share = (d[bgk] / max(np.nansum(d), 1e-9)) if np.isfinite(d[bgk]) else 0.0
+        gained = [LB.names[k] for k in range(NCLS)
+                  if k != bgk and np.isfinite(d[k]) and d[k] > 0.1]
+        md.append(f'\n`background` accounts for **{100 * bg_share:.0f}%** of the total '
+                  f'IoU gain. Real classes that improved by >0.1: '
+                  f'**{", ".join(gained) if gained else "none"}**.\n')
+        if bg_share > 0.8:
+            md.append('> ⚠️ **Nearly all of the gain is the background row.** The method '
+                      'is unwinding an over-prediction rather than recovering land '
+                      'cover. That is a real mIoU gain and a much weaker claim than it '
+                      'looks; report the per-class table beside the headline.\n')
+
     md += ['\n## Verdict\n']
     if not okgate:
         md.append('⛔ Fix the gate before reading anything above.')
@@ -367,12 +402,16 @@ def main():
                   f'{m:.2f} ({m - base_miou:+.2f})**, recovering {r:,} pixels '
                   f'({100 * r / max(disc_total, 1):.1f}% of the residual) at '
                   f'**{pr:.1f}% precision**.\n\n'
-                  'Compare against the alternatives already measured: τ→0.1 gives '
-                  '−5.54 at 36.6% precision, presence removal −11.97. **Selective '
-                  'recovery is the first intervention that reaches the residual and '
-                  'does not cost more than it returns.** The abstention rule is the '
-                  'contribution — threshold relaxation and DenseCRF both commit '
-                  'everywhere and that is exactly why they lose.')
+                  'Compare against the alternatives already measured on LoveDA: '
+                  'τ→0.1 gives −5.54 at 36.6% precision, presence removal −11.97.'
+                  + ('\n\n⚠️ **Note the best row abstains from nothing** (margin 0, '
+                     'purity 0, no size ceiling). On this dataset selectivity is not '
+                     'the contribution — recovering everything reachable wins, and any '
+                     'abstention only costs. Do not carry the "calibrated abstention" '
+                     'framing here.'
+                     if (mth == 0.0 and pth == 0.0 and mxs == 0) else
+                     '\n\nThe abstention rule is doing real work here: the best row '
+                     'commits to strictly less than everything.'))
 
     md.append('\n> Report recovery rate and precision separately (WEEK1_RESULTS §12). '
               'A headline mIoU gain without the precision column invites the objection '
