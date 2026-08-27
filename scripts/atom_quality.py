@@ -56,6 +56,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import labels  # noqa: E402
+from atoms import load_image  # noqa: E402
 
 NB = 512
 
@@ -152,9 +153,9 @@ def main():
             continue
 
         if args.atoms == 'slic':
-            from PIL import Image
-            img = np.array(Image.open(Path(args.img_dir).expanduser() /
-                                      f'{f.stem}.png').convert('RGB'))
+            # atoms.load_image tries .png then .tif/.tiff/.jpg -- LoveDA ships
+            # PNG, OpenEarthMap TIF, and the hardcoded .png here crashed on OEM.
+            img = load_image(args.img_dir, f.stem)
             lab, n = atoms_slic(cand, img, args.n_segments)
         else:
             lab, n = atoms_cc(cand)
