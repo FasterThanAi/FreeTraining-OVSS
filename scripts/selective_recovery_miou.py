@@ -57,7 +57,7 @@ import labels  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 LOVEDA = NC = REAL = BG = CLASSES = LB = None   # set by _init_labels()
-NCLS = 7                                   # background + 6 real, for the metric
+NCLS = None       # number of scored classes; set by _init_labels()
 
 
 from atoms import get_atomiser, load_image      # noqa: E402
@@ -107,8 +107,9 @@ def _init_labels(cache):
     BY NAME, never assumed to sit at index 0, because pointing these scripts at a
     dataset with a different class order would otherwise compute nonsense against
     perfectly valid array indices."""
-    global LOVEDA, NC, REAL, BG, CLASSES, LB
+    global LOVEDA, NC, REAL, BG, CLASSES, LB, NCLS
     LB = labels.from_cache(cache)
+    NCLS = LB.n            # LoveDA 7, OpenEarthMap 9 -- the confusion matrix width
     CLASSES = LB.names
     LOVEDA = ['unknown'] + LB.names
     NC = LB.nc
@@ -128,6 +129,8 @@ def main():
     ap.add_argument('--min-size', type=int, default=64)
     ap.add_argument('--margins', type=float, nargs='+', default=[0.0, 1.0])
     ap.add_argument('--purities', type=float, nargs='+', default=[0.0, 0.7])
+    ap.add_argument('--per-class', action='store_true',
+                    help='add one operating-point family per class')
     ap.add_argument('--max-sizes', type=int, nargs='+',
                     default=[500, 2000, 10000, 0],
                     help='atom size CEILING in px; 0 = no limit. Small atoms are '
@@ -174,13 +177,16 @@ def main():
     #   a legitimate abstention rule, and unlike a confidence threshold it needs no
     #   signal SAM 3 does not have. Ordered by measured reliability, never by GT
     #   from this split.
-    CLASS_LADDER = [
-        ('building', [2]),
-        ('building+water', [2, 4]),
-        ('bld+wat+road', [2, 4, 3]),
-        ('bld+wat+road+barren', [2, 4, 3, 5]),
-        ('all classes', REAL),
-    ]
+    # The original ladder hardcoded LoveDA mask values -- [2]=building,
+    # [2,4]=building+water and so on -- which silently name entirely different
+    # classes on any other dataset. It was also a hypothesis that FAILED: per-class
+    # vote reliability measured on the oracle scope did not transfer to the honest
+    # one (building 86.8% -> 34.7%), because it was a property of the oracle rather
+    # than of the class. So the default is now just "commit to everything", with
+    # --per-class expanding to one row per class when a breakdown is wanted.
+    CLASS_LADDER = [('all classes', REAL)]
+    if args.per_class:
+        CLASS_LADDER += [(f'only {LB.names[c - 1]}', [c]) for c in REAL]
     settings = [(m, p, ms, cn)
                 for p in args.purities for m in args.margins
                 for ms in args.max_sizes for cn, _ in CLASS_LADDER]
