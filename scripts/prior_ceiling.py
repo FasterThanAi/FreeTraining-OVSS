@@ -69,14 +69,15 @@ reachable fraction is the honest ceiling.
         --md ~/outputs/week3/prior_ceiling.md
 """
 import argparse
+import sys
 from pathlib import Path
 
 import numpy as np
 
-LOVEDA = ['unknown', 'background', 'building', 'road',
-          'water', 'barren', 'forest', 'agriculture']
-NC = len(LOVEDA)
-REAL = list(range(2, NC))          # 2..7, background is not a candidate
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import labels  # noqa: E402
+
+LOVEDA = NC = REAL = BG = CLASSES = LB = None   # set by _init_labels()
 
 
 def connected(mask):
@@ -133,7 +134,7 @@ def neighbour_counts(comp, ncomp, committed):
     acc = np.zeros((ncomp + 1) * NC, np.int64)
 
     def add(ca, lb):
-        m = (ca > 0) & (lb >= 2)          # component touching a confident REAL class
+        m = (ca > 0) & (lb > 0) & (lb != BG)   # touching a confident REAL class
         if m.any():
             acc[:] += np.bincount(ca[m].astype(np.int64) * NC + lb[m].astype(np.int64),
                                   minlength=(ncomp + 1) * NC)
@@ -175,6 +176,22 @@ def rowz(P):
     return Q
 
 
+def _init_labels(cache):
+    """Resolve class names from the cache. See labels.py -- background is located
+    BY NAME, never assumed to sit at index 0, because pointing these scripts at a
+    dataset with a different class order would otherwise compute nonsense against
+    perfectly valid array indices."""
+    global LOVEDA, NC, REAL, BG, CLASSES, LB
+    LB = labels.from_cache(cache)
+    CLASSES = LB.names
+    LOVEDA = ['unknown'] + LB.names
+    NC = LB.nc
+    REAL = LB.real
+    BG = LB.bg
+    print(f'  classes: {LB}')
+    return LB
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--cache', required=True)
@@ -186,6 +203,7 @@ def main():
     ap.add_argument('--limit', type=int, default=0)
     ap.add_argument('--md', default=None)
     args = ap.parse_args()
+    _init_labels(args.cache)
 
     Ps = {'prior (mined M)': load_pmi(args.m_pred)}
     if args.m_gt:
@@ -230,11 +248,11 @@ def main():
         z = np.load(f)
         gt = z['gt'].astype(np.uint8)
         conf = z['conf'].astype(np.float32)
-        L = (z['pred'].astype(np.int16) + 1).astype(np.uint8)
-        L[conf < args.tau] = 0
-        L[gt == 0] = 0
+        lbl = (z['pred'].astype(np.int16) + 1).astype(np.uint8)
+        lbl[conf < args.tau] = 0
+        lbl[gt == 0] = 0
 
-        disc = (gt >= 2) & ((L == 0) | (L == 1))     # real GT, assigned to background
+        disc = (gt > 0) & (gt != BG) & ((lbl == 0) | (lbl == BG))
         if not disc.any():
             continue
         tot_disc += int(disc.sum())
@@ -249,7 +267,7 @@ def main():
         gmaj[:, :2] = 0
         truth = gmaj.argmax(1)
 
-        nb = neighbour_counts(comp, n, L)
+        nb = neighbour_counts(comp, n, lbl)
 
         for c in range(1, n + 1):
             if size[c] < args.min_size:

@@ -49,14 +49,17 @@ Histogram-based, so it streams 1.7 billion pixels without holding them.
         --md ~/outputs/week3/recoverability_signal.md
 """
 import argparse
+import sys
 import warnings
 from pathlib import Path
 
 import numpy as np
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import labels  # noqa: E402
+
 NB = 512                       # histogram bins over [0,1]
-CLASSES = ['background', 'building', 'road', 'water',
-           'barren', 'forest', 'agricultural']
+LOVEDA = NC = REAL = BG = CLASSES = LB = None   # set by _init_labels()
 
 
 def auc_from_hist(pos, neg):
@@ -88,6 +91,22 @@ def best_operating(pos, neg, edges):
     return edges[i], prec[i], rec[i], kp[i], kn[i]
 
 
+def _init_labels(cache):
+    """Resolve class names from the cache. See labels.py -- background is located
+    BY NAME, never assumed to sit at index 0, because pointing these scripts at a
+    dataset with a different class order would otherwise compute nonsense against
+    perfectly valid array indices."""
+    global LOVEDA, NC, REAL, BG, CLASSES, LB
+    LB = labels.from_cache(cache)
+    CLASSES = LB.names
+    LOVEDA = ['unknown'] + LB.names
+    NC = LB.nc
+    REAL = LB.real
+    BG = LB.bg
+    print(f'  classes: {LB}')
+    return LB
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--cache', required=True)
@@ -95,6 +114,7 @@ def main():
     ap.add_argument('--limit', type=int, default=0)
     ap.add_argument('--md', default=None)
     args = ap.parse_args()
+    _init_labels(args.cache)
     warnings.filterwarnings('ignore', message='All-NaN slice encountered')
 
     files = sorted(Path(args.cache).expanduser().glob('*.npz'))
@@ -127,11 +147,11 @@ def main():
         conf2 = z['conf2'].astype(np.float32)
         pred = z['pred'].astype(np.int16)
 
-        assigned_bg = (gt > 0) & ((conf < args.tau) | (pred == 0))
+        assigned_bg = (gt > 0) & ((conf < args.tau) | (pred + 1 == BG))
         if not assigned_bg.any():
             continue
-        P = assigned_bg & (gt >= 2)          # recoverable
-        N = assigned_bg & (gt == 1)          # true background
+        P = assigned_bg & (gt != BG)         # recoverable
+        N = assigned_bg & (gt == BG)         # true background
         npos += int(P.sum()); nneg += int(N.sum())
 
         sp = z['spres']                       # (n_views, 7)

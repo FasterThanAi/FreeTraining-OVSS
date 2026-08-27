@@ -52,11 +52,11 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import labels  # noqa: E402
 
-LOVEDA = ['unknown', 'background', 'building', 'road',
-          'water', 'barren', 'forest', 'agriculture']
-NC = len(LOVEDA)
-REAL = list(range(2, NC))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+LOVEDA = NC = REAL = BG = CLASSES = LB = None   # set by _init_labels()
 NCLS = 7                                   # background + 6 real, for the metric
 
 
@@ -67,7 +67,7 @@ def neighbour_counts(comp, ncomp, committed):
     acc = np.zeros((ncomp + 1) * NC, np.int64)
 
     def add(ca, lb):
-        m = (ca > 0) & (lb >= 2)
+        m = (ca > 0) & (lb > 0) & (lb != BG)
         if m.any():
             acc[:] += np.bincount(ca[m].astype(np.int64) * NC + lb[m].astype(np.int64),
                                   minlength=(ncomp + 1) * NC)
@@ -102,6 +102,22 @@ def miou(C):
     return 100.0 * float(np.mean(ious)) if ious else 0.0
 
 
+def _init_labels(cache):
+    """Resolve class names from the cache. See labels.py -- background is located
+    BY NAME, never assumed to sit at index 0, because pointing these scripts at a
+    dataset with a different class order would otherwise compute nonsense against
+    perfectly valid array indices."""
+    global LOVEDA, NC, REAL, BG, CLASSES, LB
+    LB = labels.from_cache(cache)
+    CLASSES = LB.names
+    LOVEDA = ['unknown'] + LB.names
+    NC = LB.nc
+    REAL = LB.real
+    BG = LB.bg
+    print(f'  classes: {LB}')
+    return LB
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--cache', required=True)
@@ -130,6 +146,7 @@ def main():
     ap.add_argument('--limit', type=int, default=0)
     ap.add_argument('--md', default=None)
     args = ap.parse_args()
+    _init_labels(args.cache)
     if args.atoms == 'slic' and not args.img_dir:
         raise SystemExit('--atoms slic needs --img-dir (e.g. ~/data/loveda/img_dir/val)')
     atomise = get_atomiser(args.atoms)
@@ -203,10 +220,10 @@ def main():
         # an earlier version of this script by +3.47 mIoU. --regions oracle
         # reproduces it deliberately, as an upper bound, never as a result.
         if args.regions == 'oracle':
-            disc = (gt >= 2) & (base == 1)
+            disc = (gt > 0) & (gt != BG) & (base == BG)
         else:
-            disc = (base == 1) & (gt > 0)
-        disc_total += int(((gt >= 2) & (base == 1)).sum())
+            disc = (base == BG) & (gt > 0)
+        disc_total += int(((gt > 0) & (gt != BG) & (base == BG)).sum())
         if not disc.any():
             for s in settings:
                 C[s] += np.bincount(gi * NCLS + bi,

@@ -83,10 +83,15 @@ except ImportError as e:
 
 from mmseg.apis import init_model, inference_model  # noqa: E402
 
-CLASSES = ['background', 'building', 'road', 'water',
-           'barren', 'forest', 'agricultural']
-N = len(CLASSES)
-BACKGROUND = 1  # 1-indexed
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import labels  # noqa: E402
+
+# Resolved from the model/config at runtime -- see labels.py. Hardcoding LoveDA
+# here meant that pointing this at OpenEarthMap would not crash, it would compute
+# nonsense against valid-looking array indices.
+CLASSES = None
+N = None
+BACKGROUND = None
 
 
 def main():
@@ -119,6 +124,8 @@ def main():
     if args.tau is not None:
         print(f'  overriding prob_thd -> {args.tau}')
 
+    from mmengine.config import Config
+    cfg = Config.fromfile(args.config)
     model = init_model(args.config, device='cuda')
     if args.tau is not None:
         model.prob_thd = args.tau   # segmentor reads this attribute at inference
@@ -139,7 +146,13 @@ def main():
             sys.exit(f'ERROR: not enough disk for the cache. Use --no-cache, or '
                      f'--cache-dir on a bigger volume.')
 
-    # query -> class map, for collapsing the 11 queries onto 7 classes
+    global CLASSES, N, BACKGROUND
+    _lab = labels.from_model(model, cfg.get('model', cfg))
+    CLASSES, N, BACKGROUND = _lab.names, _lab.n, _lab.bg
+    print(f'  classes: {N} -- {", ".join(CLASSES)}')
+    print(f'  background is mask value {BACKGROUND} ({CLASSES[BACKGROUND - 1]})')
+
+    # query -> class map, collapsing synonym queries onto classes
     qidx = model.query_idx.cpu().numpy() if hasattr(model, 'query_idx') else None
     has_presence = hasattr(model, 'last_presence')
     if not has_presence:
@@ -298,7 +311,9 @@ def main():
         f'- Images: **{len(names)}**  |  τ: **{tau_str}**',
         f'- Presence gating: **{"DISABLED (counterfactual)" if args.no_presence else "on (baseline)"}**',
         f'- mIoU recomputed from confusion matrix: **{miou:.2f}** '
-        f'(baseline reference: 47.38 — if these disagree, the label alignment is wrong)\n',
+        (f'(baseline reference: 47.38 — if these disagree, the label alignment is '
+         f'wrong)\n' if 'loveda' in str(args.config).lower() else
+         f'(no published reference for this config — record it as the new baseline)\n'),
         '## Headline\n',
         f'- Labelled (non-no-data) pixels: **{total_valid:,}**',
         f'- Pixels with a real class (excl. background): **{total_real:,}** '
@@ -371,7 +386,7 @@ def main():
         ax.set_xticks(range(N)); ax.set_xticklabels(CLASSES, rotation=45, ha='right')
         ax.set_yticks(range(N)); ax.set_yticklabels(CLASSES)
         ax.set_xlabel('predicted'); ax.set_ylabel('true')
-        ax.set_title('Row-normalised confusion matrix (LoveDA val)')
+        ax.set_title('Row-normalised confusion matrix')
         for a in range(N):
             for b in range(N):
                 if cm[a, b] > 0.01:

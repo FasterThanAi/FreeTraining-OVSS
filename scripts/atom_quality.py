@@ -48,12 +48,15 @@ the fix and SAM 3's own mask proposals -- better still -- are the next step.
         --atoms slic --img-dir ~/data/loveda/img_dir/val
 """
 import argparse
+import sys
 import warnings
 from pathlib import Path
 
 import numpy as np
 
-NC = 8
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import labels  # noqa: E402
+
 NB = 512
 
 
@@ -91,6 +94,22 @@ def atoms_slic(mask, img, n_segments):
     return remap[seg], len(u)
 
 
+def _init_labels(cache):
+    """Resolve class names from the cache. See labels.py -- background is located
+    BY NAME, never assumed to sit at index 0, because pointing these scripts at a
+    dataset with a different class order would otherwise compute nonsense against
+    perfectly valid array indices."""
+    global LOVEDA, NC, REAL, BG, CLASSES, LB
+    LB = labels.from_cache(cache)
+    CLASSES = LB.names
+    LOVEDA = ['unknown'] + LB.names
+    NC = LB.nc
+    REAL = LB.real
+    BG = LB.bg
+    print(f'  classes: {LB}')
+    return LB
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--cache', required=True)
@@ -102,6 +121,7 @@ def main():
     ap.add_argument('--limit', type=int, default=0)
     ap.add_argument('--md', default=None)
     args = ap.parse_args()
+    _init_labels(args.cache)
     warnings.filterwarnings('ignore')
 
     if args.atoms == 'slic' and not args.img_dir:
@@ -127,7 +147,7 @@ def main():
         gt = z['gt'].astype(np.uint8)
         conf = z['conf'].astype(np.float32)
         pred = z['pred'].astype(np.int16)
-        cand = (gt > 0) & ((conf < args.tau) | (pred == 0))
+        cand = (gt > 0) & ((conf < args.tau) | (pred + 1 == BG))
         if not cand.any():
             continue
 
@@ -166,11 +186,11 @@ def main():
             b_m = int(np.clip(csum[c] / s * NB, 0, NB - 1))
             b_x = int(np.clip(cmax[c] * NB, 0, NB - 1))
             b_s = int(np.clip(np.log10(max(s, 1)) / 6 * NB, 0, NB - 1))
-            tgt = pos if maj[c] >= 2 else neg
+            tgt = pos if maj[c] != BG else neg
             tgt['mean_conf'][b_m] += s
             tgt['max_conf'][b_x] += s
             tgt['size'][b_s] += s
-            if maj[c] >= 2:
+            if maj[c] != BG:
                 npos += s
             else:
                 nneg += s

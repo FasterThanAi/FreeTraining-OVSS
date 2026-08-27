@@ -55,12 +55,12 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import labels  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from atoms import get_atomiser, load_image      # noqa: E402
 
-LOVEDA = ['unknown', 'background', 'building', 'road',
-          'water', 'barren', 'forest', 'agriculture']
-NC = 8
-REAL = list(range(2, NC))
+LOVEDA = NC = REAL = BG = CLASSES = LB = None   # set by _init_labels()
 NB = 512
 FD = 4                    # prototype dims: R, G, B, gradient energy
 
@@ -128,6 +128,22 @@ def auc_stratified(score, label, weight, size):
     return acc / tot if tot > 0 else float('nan')
 
 
+def _init_labels(cache):
+    """Resolve class names from the cache. See labels.py -- background is located
+    BY NAME, never assumed to sit at index 0, because pointing these scripts at a
+    dataset with a different class order would otherwise compute nonsense against
+    perfectly valid array indices."""
+    global LOVEDA, NC, REAL, BG, CLASSES, LB
+    LB = labels.from_cache(cache)
+    CLASSES = LB.names
+    LOVEDA = ['unknown'] + LB.names
+    NC = LB.nc
+    REAL = LB.real
+    BG = LB.bg
+    print(f'  classes: {LB}')
+    return LB
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--cache', required=True)
@@ -139,6 +155,7 @@ def main():
     ap.add_argument('--limit', type=int, default=0)
     ap.add_argument('--md', default=None)
     args = ap.parse_args()
+    _init_labels(args.cache)
     warnings.filterwarnings('ignore')
     atomise = get_atomiser(args.atoms)
 
@@ -157,7 +174,7 @@ def main():
         gt = z['gt'].astype(np.uint8)
         conf = z['conf'].astype(np.float32)
         pred = z['pred'].astype(np.int16)
-        cand = (gt > 0) & ((conf < args.tau) | (pred == 0))
+        cand = (gt > 0) & ((conf < args.tau) | (pred + 1 == BG))
         if not cand.any():
             continue
 
@@ -198,7 +215,7 @@ def main():
                 continue
             mu = fsum[c] / s
             feats.append(mu)
-            lab.append(maj[c] >= 2)
+            lab.append(maj[c] != BG)
             wt.append(s)
             if avail:
                 d = np.linalg.norm(iproto[avail] - mu, axis=1)

@@ -68,16 +68,18 @@ OUTPUT (npz)
         --out ~/outputs/week3/M_global_gt.npz
 """
 import argparse
+import sys
 import warnings
 from pathlib import Path
 
 import numpy as np
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import labels  # noqa: E402
+
 # LoveDA numbering. Index 0 is no-data in GT and "unknown" in predictions --
 # excluded from adjacency either way, which is why the two are comparable.
-LOVEDA = ['unknown', 'background', 'building', 'road',
-          'water', 'barren', 'forest', 'agriculture']
-NC = len(LOVEDA)
+LOVEDA = NC = REAL = BG = CLASSES = LB = None   # set by _init_labels()
 
 # measure_discard_rate.py's cache uses its own 0-indexed order for `pred`.
 # pred index p corresponds to LoveDA label p + 1.
@@ -176,6 +178,22 @@ def label_map_from_cache(z, source, tau):
     return lbl
 
 
+def _init_labels(cache):
+    """Resolve class names from the cache. See labels.py -- background is located
+    BY NAME, never assumed to sit at index 0, because pointing these scripts at a
+    dataset with a different class order would otherwise compute nonsense against
+    perfectly valid array indices."""
+    global LOVEDA, NC, REAL, BG, CLASSES, LB
+    LB = labels.from_cache(cache)
+    CLASSES = LB.names
+    LOVEDA = ['unknown'] + LB.names
+    NC = LB.nc
+    REAL = LB.real
+    BG = LB.bg
+    print(f'  classes: {LB}')
+    return LB
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--cache', required=True,
@@ -194,6 +212,7 @@ def main():
     ap.add_argument('--out', required=True)
     ap.add_argument('--md', default=None, help='also write a markdown summary')
     args = ap.parse_args()
+    _init_labels(args.cache)
 
     warnings.filterwarnings('ignore', message='All-NaN slice encountered')
 
