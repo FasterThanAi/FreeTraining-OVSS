@@ -101,6 +101,12 @@ def main():
     ap.add_argument('--ann-dir', default='data/LoveDA/ann_dir/val')
     ap.add_argument('--out', default=os.path.expanduser('~/outputs/week2'))
     ap.add_argument('--limit', type=int, default=0, help='0 = all images')
+    ap.add_argument('--ext', default=None,
+                    help='image extension; auto-detected (.png / .tif) if unset')
+    ap.add_argument('--reduce-zero-label', type=lambda v: v.lower() == 'true',
+                    default=None,
+                    help='override the config. True = raw 0 is no-data (LoveDA); '
+                         'False = raw 0 is a real class (OpenEarthMap).')
     ap.add_argument('--tau', type=float, default=None,
                     help='override prob_thd, e.g. 0.3 or 0.1 for the sweep')
     ap.add_argument('--no-presence', action='store_true',
@@ -116,7 +122,15 @@ def main():
     args = ap.parse_args()
 
     out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
-    names = sorted(p.stem for p in Path(args.img_dir).glob('*.png'))
+    # LoveDA ships .png, OpenEarthMap .tif. Detect rather than assume.
+    exts = [args.ext] if args.ext else ['.png', '.tif', '.tiff', '.jpg']
+    ext = next((e for e in exts if any(Path(args.img_dir).glob(f'*{e}'))), None)
+    if ext is None:
+        raise SystemExit(f'no images matching {exts} in {args.img_dir}')
+    ann_ext = next((e for e in ['.png', '.tif', '.tiff']
+                    if any(Path(args.ann_dir).glob(f'*{e}'))), ext)
+    names = sorted(p.stem for p in Path(args.img_dir).glob(f'*{ext}'))
+    print(f'  image ext {ext}, annotation ext {ann_ext}')
     if args.limit:
         names = names[:args.limit]
     print(f'{len(names)} images | config {args.config} | out {out}')
@@ -126,6 +140,33 @@ def main():
 
     from mmengine.config import Config
     cfg = Config.fromfile(args.config)
+
+    # ---- label convention. THIS IS LOAD-BEARING AND DATASET-SPECIFIC.
+    #
+    # LoveDA sets reduce_zero_label=True: raw mask 0 is no-data and the classes
+    # occupy 1..N. OpenEarthMap sets it False: raw mask 0 IS `background`, a real
+    # scored class, and the classes occupy 0..N-1.
+    #
+    # Everything downstream (labels.py, the .npz cache, every Week 3 script)
+    # assumes "0 = ignore, class i at mask value i+1". Feeding OEM in raw would
+    # make `valid = gt > 0` silently delete every background pixel -- the exact
+    # class this project is about -- and nothing would crash. So normalise here,
+    # once, at the only place that reads the raw file.
+    try:
+        rzl = cfg.test_dataloader['dataset'].get('reduce_zero_label', True)
+    except Exception:
+        rzl = True
+    if args.reduce_zero_label is not None:
+        rzl = args.reduce_zero_label
+    if rzl:
+        shift_gt = lambda g: g                      # already 0=ignore, 1..N
+    else:
+        def shift_gt(g):                            # 0..N-1  ->  1..N
+            g = g.astype(np.int32)
+            return np.where(g == 255, 0, g + 1)     # 255 is mmseg's ignore
+    print(f'  reduce_zero_label={rzl} -> '
+          + ('raw masks used as-is (0 = no-data)' if rzl
+             else 'raw masks shifted +1 (raw 0 = background, no no-data value)'))
     model = init_model(args.config, device='cuda')
     if args.tau is not None:
         model.prob_thd = args.tau   # segmentor reads this attribute at inference
@@ -165,8 +206,9 @@ def main():
     pres_rows = []
 
     for i, name in enumerate(names, 1):
-        img_p = f'{args.img_dir}/{name}.png'
-        gt = np.array(Image.open(f'{args.ann_dir}/{name}.png'))
+        img_p = f'{args.img_dir}/{name}{ext}'
+        gt = np.array(Image.open(f'{args.ann_dir}/{name}{ann_ext}'))
+        gt = shift_gt(gt)
         result = inference_model(model, img_p)
         pred = result.pred_sem_seg.data.cpu().numpy().squeeze()
         pred = pred.astype(np.int64) + 1          # 0-indexed -> 1..7
