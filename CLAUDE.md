@@ -160,7 +160,33 @@ All of (B) is **water**, 19,378,177 px in **24 tiles**. Two things follow:
 Say **"assigned to background"**, not "discarded by τ". ⚠️ Cached `conf` is **float16**, so
 τ-boundary comparisons are off by ~0.03% (100,493 px). Use float32 before any fine τ sweep.
 
-### Week 3 complete — 27 Aug. Read @WEEK3_RESULTS.md before proposing anything.
+### Weeks 3 complete + OpenEarthMap replication — 27 Aug. Read @WEEK3_RESULTS.md first.
+
+**⭐ The headline finding is now a two-dataset mechanism, not a LoveDA result.**
+
+| | LoveDA (1669, τ=0.5) | OpenEarthMap (384, τ=0.1) |
+|---|---|---|
+| `background` share of GT | **36.1%** catch-all | **0.84%** rare, genuine |
+| real-class pixels discarded | 29.68% | **3.78%** |
+| catastrophic tiles (≥99%) | 198 | **0** |
+| corr(`spres_max`, discard) | −0.750 | **+0.094** |
+| best detection AUC | 0.622 | **0.913** (`conf2`) |
+| honest recovery Δ mIoU | +0.04 | +2.28 ⚠️ |
+
+**Detectability is governed by label design, not by SAM 3.** A catch-all class gives the model a
+plausible answer everywhere, so a strong runner-up carries no information.
+
+⛔ **Recovery does not improve land-cover segmentation on either dataset.** OEM's +2.28 is **110%
+`background` ceasing to be over-predicted** (+22.67) while real classes net **−2.11**, `building`
+alone −3.75. **Never quote +2.28 without the per-class table.**
+
+⛔ **Two LoveDA claims do NOT generalise and must be labelled as such:** the presence-collapse
+correlation (§9.2/§9.2a) and the 29.68% headline itself.
+
+⛔ **Drop the DINOv3 detection plan.** Detection already works on OEM (0.913) and recovery still
+fails there, so better detection buys nothing.
+
+### Week 3 detail — LoveDA
 
 `M_global` was built, validated, and found **not to earn its place**. The headline shifted:
 
