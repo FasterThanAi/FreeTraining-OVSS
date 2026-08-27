@@ -126,7 +126,13 @@ def main():
     exts = [args.ext] if args.ext else ['.png', '.tif', '.tiff', '.jpg']
     ext = next((e for e in exts if any(Path(args.img_dir).glob(f'*{e}'))), None)
     if ext is None:
-        raise SystemExit(f'no images matching {exts} in {args.img_dir}')
+        raise SystemExit(
+            f'no images matching {exts} in {args.img_dir!r}\n'
+            f'  cwd is {Path.cwd()}\n'
+            f'  exists: {Path(args.img_dir).exists()}\n'
+            '  If this is OpenEarthMap, the config expects val/images and '
+            'val/labels; the Kaggle archive ships images/val and label/val. '
+            'Create the symlinks first.')
     ann_ext = next((e for e in ['.png', '.tif', '.tiff']
                     if any(Path(args.ann_dir).glob(f'*{e}'))), ext)
     names = sorted(p.stem for p in Path(args.img_dir).glob(f'*{ext}'))
@@ -353,9 +359,13 @@ def main():
         f'- Images: **{len(names)}**  |  τ: **{tau_str}**',
         f'- Presence gating: **{"DISABLED (counterfactual)" if args.no_presence else "on (baseline)"}**',
         f'- mIoU recomputed from confusion matrix: **{miou:.2f}** '
-        (f'(baseline reference: 47.38 — if these disagree, the label alignment is '
-         f'wrong)\n' if 'loveda' in str(args.config).lower() else
-         f'(no published reference for this config — record it as the new baseline)\n'),
+        # NOTE the leading `+`. Without it this is implicit string concatenation
+        # followed by a parenthesised expression, i.e. CALLING the string --
+        # which is exactly how this broke: TypeError, 'str' object is not callable.
+        + (f'(baseline reference: 47.38 — if these disagree, the label alignment '
+           f'is wrong)\n' if 'loveda' in str(args.config).lower() else
+           f'(no published reference for this config — record it as the new '
+           f'baseline)\n'),
         '## Headline\n',
         f'- Labelled (non-no-data) pixels: **{total_valid:,}**',
         f'- Pixels with a real class (excl. background): **{total_real:,}** '
