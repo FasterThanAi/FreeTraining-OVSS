@@ -166,6 +166,7 @@ Say **"assigned to background"**, not "discarded by τ". ⚠️ Cached `conf` is
 
 | | LoveDA (1669, τ=0.5) | OpenEarthMap (384, τ=0.1) |
 |---|---|---|
+| baseline mIoU | **47.38** (pub 47.4) | **44.19** (pub **42.9**) |
 | `background` share of GT | **36.1%** catch-all | **0.84%** rare, genuine |
 | real-class pixels discarded | 29.68% | **3.78%** |
 | catastrophic tiles (≥99%) | 198 | **0** |

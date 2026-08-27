@@ -79,7 +79,8 @@ abstract.
 ### 3. Setup
 - LoveDA val 1669 tiles @ τ=0.5; **baseline reproduced 47.38 vs published 47.4** (Δ 0.02).
 - OpenEarthMap val **384 of the official 500** (public Kaggle redistribution) @ τ=0.1, its own
-  tuned threshold; baseline **44.19**. State plainly that this is not a reproduction gate.
+  tuned threshold; baseline **44.19 against their published 42.9** (+1.29). State plainly that at
+  77% of the split this is a sanity anchor, not a reproduction gate — the tile mix differs.
 - Instrumentation and its validation gate: every instrumented LoveDA run reproduces **47.37 /
   29.68%** exactly. Say this — it is why the numbers can be trusted.
 
@@ -157,13 +158,11 @@ mIoU number here would have been misleading.
 
 ## 6. What is missing before submission
 
-1. **SegEarth-OV3's published OpenEarthMap number**, recorded beside our 44.19. Not a gate at
-   384/500 tiles, but the only sanity anchor on that dataset.
-2. **Figures 2–5.**
-3. **Optional third dataset** (Potsdam or Vaihingen). The mechanism predicts the residual's size
+1. **Figures 2–5.**
+2. **Optional third dataset** (Potsdam or Vaihingen). The mechanism predicts the residual's size
    from the `background` share alone — a third point tests that prediction directly, which is a
    better use of GPU time than another method attempt.
-4. A ConInfer comparison row if the code runs (`github.com/Dog-Yang/ConInfer`).
+3. A ConInfer comparison row if the code runs (`github.com/Dog-Yang/ConInfer`).
 
 ---
 

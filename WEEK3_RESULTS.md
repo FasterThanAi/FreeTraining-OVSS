@@ -152,7 +152,7 @@ This is the section that matters.
 | | **LoveDA** | **OpenEarthMap** |
 |---|---|---|
 | tiles / τ | 1669 / 0.5 | 384 / 0.1 |
-| baseline mIoU | 47.38 | 44.19 |
+| baseline mIoU | 47.38 *(published 47.4)* | 44.19 *(published 42.9)* |
 | **`background` share of GT** | **36.1%** (catch-all) | **0.84%** (rare, genuine) |
 | real-class pixels discarded | **29.68%** (10.88% @ τ=0.1) | **3.78%** |
 | catastrophic tiles (≥99%) | 198 | **0** |
@@ -308,8 +308,10 @@ tell was a file count of 385 where 384 was expected.
 ## 12. Next
 
 1. **Write.** See `PAPER_OUTLINE.md`.
-2. **Look up SegEarth-OV3's published OpenEarthMap mIoU** and record it beside our 44.19. With 384
-   of 500 tiles it is not a reproduction gate, but it is the only sanity anchor on this dataset.
+2. ~~Look up SegEarth-OV3's published OpenEarthMap mIoU~~ ✅ **42.9**, against our **44.19** on
+   384 of the official 500 tiles — **+1.29**. Not a reproduction gate at 77% of the split, but it
+   is the sanity anchor: a broken class-name-to-label-value mapping would have landed far off in
+   one direction, so the OEM prep is sound and §7's mechanism table rests on a correct baseline.
 3. **Drop the DINOv3 plan.** Detection already works on OEM (AUC 0.913) and recovery still fails
    there, so better detection is no longer the bottleneck and deep features have nothing to buy.
 4. **Optional third dataset** (Potsdam or Vaihingen) — the mechanism in §7 predicts the residual's
