@@ -318,11 +318,20 @@ def main():
                   f'{r:,} ({100 * r / max(disc_total, 1):.1f}%) | {pr:.1f}% | '
                   f'**{m:.2f}** | {m - base_miou:+.2f} |')
 
+    # A gain has to be big enough to survive a second dataset and a reviewer.
+    # +0.04 on one split is 0.08% relative -- reproducible, since this is
+    # deterministic numpy over a fixed cache, but meaningless. An earlier version
+    # printed a green tick on exactly that, which is the same failure as the
+    # gate-1 verdict: a bar set where the answer already is.
+    MEANINGFUL = 0.50
     md += ['\n## Verdict\n']
     if not okgate:
         md.append('⛔ Fix the gate before reading anything above.')
-    elif best is None or best[0] <= base_miou + 1e-9:
-        md.append(f'⛔ **No operating point beats the baseline** ({base_miou:.2f}). '
+    elif best is None or best[0] <= base_miou + MEANINGFUL:
+        got = (best[0] - base_miou) if best else 0.0
+        md.append(f'⛔ **No operating point meaningfully beats the baseline** '
+                  f'({base_miou:.2f}; best {base_miou + got:.2f}, {got:+.2f}, under the '
+                  f'{MEANINGFUL:+.2f} bar). '
                   'Recovering the residual by neighbour propagation costs more in '
                   'background IoU than it returns in real-class recall, at every '
                   'abstention level tested. That is a fourth refuted intervention '
