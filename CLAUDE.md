@@ -109,7 +109,9 @@ These were decided by measurement, not preference. Rationale in the cited sectio
 
 ## Where the project stands
 
-Weeks 1–2 complete. Baseline reproduced; premise confirmed and quantified:
+Weeks 1–3 complete. Baseline reproduced; premise confirmed and quantified; the proposed
+contribution measured and **refuted**, with an oracle bound naming what blocks it (see the
+Week 3 block at the end of this section):
 
 - **29.68%** of real-class pixels discarded to background at τ=0.5 (323M pixels).
 - τ-sweep: recovering ⅔ of that residual by lowering τ to 0.1 costs **5.54 mIoU**. Threshold
@@ -158,18 +160,38 @@ All of (B) is **water**, 19,378,177 px in **24 tiles**. Two things follow:
 Say **"assigned to background"**, not "discarded by τ". ⚠️ Cached `conf` is **float16**, so
 τ-boundary comparisons are off by ~0.03% (100,493 px). Use float32 before any fine τ sweep.
 
+### Week 3 complete — 27 Aug. Read @WEEK3_RESULTS.md before proposing anything.
+
+`M_global` was built, validated, and found **not to earn its place**. The headline shifted:
+
+- **Labelling is solved.** A plain neighbour vote over SLIC atoms is worth **+3.62 mIoU** given
+  an oracle that says which regions to touch.
+- **Detection is the entire problem.** Nine signals — `conf` .582, `fconf` .559, `gap` .558,
+  `spres_arg` .520, `fgap` .447, `spres_max` .434, region `mean_conf` .576, novelty .514/.528,
+  texture **.622** — all at chance against a 43.1% base rate and a ~0.53 floor.
+- **Honest recovery is +0.04 mIoU.** With an oracle detector, +3.62. Detection does not find more
+  right answers (61.3M vs 59.5M correct); it avoids wrong ones — **228M → 48M, 4.7×**.
+- ⛔ **The co-occurrence prior adds +0.2 over a neighbour vote; a *perfect* matrix adds +0.3.**
+  It works only where 4+ classes border the region (+2.03 mined, +5.44 oracle) — 10% of the
+  residual. **It is an ablation row, not the thesis.**
+- ✅ **Atomisation is settled and matters far more:** SLIC oracle ceiling **92.8%** vs connected
+  components' 72.8%. Closes ROADMAP Week 8's open question.
+- ✅ Gate 1 passes (ρ +0.757, circularity retired at −0.257); ⛔ Gate 2 fails **against ground
+  truth too** — a perfect M would *reinforce* forest→agriculture.
+
+⚠️ **Superseded numbers.** +3.47 and 48.4% were measured on connected-component atoms. Quote
+**+3.62** and **56.1%**. ⚠️ **`selective_recovery_miou.py` once leaked GT** by scoping regions to
+`gt >= 2`; fixed, and `--regions oracle` reproduces it deliberately as an upper bound only.
+
 Next, in order:
 
-1. Fill the last `_TBD_`s in WEEK1_RESULTS §7.2/§7.3 from the CSVs.
-3. Two cheap CPU-only validations, both on claims that are currently load-bearing and
-   unvalidated (WEEK1_RESULTS §9.1a and §10):
-   - **boundary-vs-interior decomposition** of the 323M residual → the *addressable* number.
-     Tile 2522 shows discard as thin boundary seams; 2524 shows whole regions. A region-level
-     prior can only reach the latter, so 29.68% is an upper bound, not an estimate.
-   - **permutation null for PMI** — `cooccurrence_gt.py` compares a *boundary* distribution
-     against *area* marginals, which inflates high-perimeter classes. §4.3's "road is a hub"
-     is derived from the thinnest class and then used to justify discriminability weighting.
-4. Then Week 3, `M_global` construction.
+1. **Write.** @PAPER_OUTLINE.md has the skeleton, the section map and the figure list.
+2. **One timeboxed DINOv3 detection attempt** — hard gate **AUC ≥ 0.70 size-controlled, or stop**.
+   `appearance_detection.py` already takes a feature array. One week, not two.
+   ⚠️ Do not cite ConInfer's +2.80 as evidence this will work; it does context modelling, not
+   residual-class detection. An earlier note in this project overstated that.
+3. **A second dataset — non-negotiable.** Every number is one split of one dataset. OpenEarthMap
+   is the cheapest second point (~25 min/pass). One dataset is a desk reject.
 
 ## How to work on this
 
