@@ -181,6 +181,14 @@ plausible answer everywhere, so a strong runner-up carries no information.
 `background` ceasing to be over-predicted** (+22.67) while real classes net **−2.11**, `building`
 alone −3.75. **Never quote +2.28 without the per-class table.**
 
+⭐ **The n=2 confound is BROKEN, and share wins.** `confound_split.py` stratifies LoveDA into
+urban/rural, where share and confusability **dissociate**: rural 42.9% share / 25.5% confusability
+/ AUC **0.524**; urban 26.0% / 43.3% / AUC **0.730**. Each hypothesis predicts a *different*
+stratum to detect worse — **share is correct, confusability is wrong.** Prevalence destroys the
+signal, not resemblance. Detection is monotone in share across four strata (OEM 0.84%→0.794,
+urban 26.0%→0.730, pooled 36.1%→0.582, rural 42.9%→0.524). ⛔ **iSAID cannot break this confound**
+— 97.11% share *and* maximally confusable; don't spend GPU time on it. ⚠️ Stratification, not
+intervention. WEEK3 §7a.
 ⛔ **Two LoveDA claims do NOT generalise and must be labelled as such:** the presence-collapse
 correlation (§9.2/§9.2a) and the 29.68% headline itself.
 

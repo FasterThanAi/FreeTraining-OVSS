@@ -543,17 +543,20 @@ it generalises to any training-free pipeline that thresholds a per-class score.
 \section{Limitations}
 \label{sec:limitations}
 
-\paragraph{Two datasets, and a confound we cannot yet resolve.} Across our two
-datasets the catch-all's \emph{share} moves together with its
-\emph{confusability} --- LoveDA's background is both common and visually similar
-to \texttt{road}, \texttt{barren} and \texttt{building}, while OpenEarthMap's is
-both rare and genuinely unlabelable. Either could be the cause, and the second is
-arguably the more plausible one. Two observational points cannot separate them.
-\todo{One further piece of evidence constrains it: LoveDA's train and val splits
-have essentially identical background share (35.8\% vs
-36.1\%) but differ $2\times$ in discard rate, which argues against
-share being the sole driver. Add the third-dataset or intervention result here
-when it exists.}
+\paragraph{Two datasets, and a stratification rather than an intervention.}
+Across our two datasets the catch-all's \emph{share} moves together with its
+\emph{confusability} --- whether it visually resembles the real classes --- and
+two observational points cannot separate variables that move together. We break
+the confound by stratifying LoveDA into its urban and rural domains, where the two
+dissociate: rural has the larger catch-all share (\SHAREr{} vs \SHAREu{} of
+ground truth) while urban's catch-all is the more confusable (\CONFu{} of it
+escapes into real classes, against \CONFr{}). Each explanation then predicts a
+different stratum to detect worse, and \best{share is right}: detection AUC is
+\AUCr{} in rural against \AUCu{} in urban. Across the two datasets and the two
+strata, detection is monotone in catch-all share. This is a stratification, not a
+randomised intervention --- urban and rural differ in class mix, object scale and
+scene density as well --- so it constrains the explanation rather than proving it,
+and a dataset whose catch-all is common but visually distinct would settle it.
 
 \paragraph{Calibration must match the evaluation distribution.} Fitting on
 LoveDA's \emph{train} split and evaluating on val gives \trainToVal{}~mIoU,

@@ -180,6 +180,63 @@ This is the section that matters.
 tiles. It is a property of LoveDA's annotation scheme, not of SAM 3. Likewise **29.68% is not a
 general figure** — the same pipeline discards 3.78% on OEM.
 
+### 7a. ⭐ The confound broken — share drives it, confusability does not — 28 Aug
+
+§7 attributed everything to the catch-all's **share** of ground truth. At n=2 that was
+confounded: across LoveDA and OpenEarthMap, share moves together with **confusability** — whether
+the catch-all *looks like* the real classes — and confusability was arguably the better
+explanation. Two observational points cannot separate two variables that move together.
+
+⛔ **A third dataset would not have fixed this.** iSAID's catch-all is **97.11%** of ground truth
+*and* maximally confusable (everything outside 15 small object classes), so both variables are
+high; it confirms the ordering and discriminates nothing. **Do not spend GPU time on it expecting
+otherwise.**
+
+`confound_split.py` breaks it two ways, CPU-only on the existing cache. First, it **measures**
+confusability instead of asserting it: the fraction of true catch-all pixels the model gives a real
+class. Second, it stratifies LoveDA into **urban and rural, where the two variables dissociate** —
+and they do, cleanly and in opposite directions:
+
+| stratum | tiles | share of GT | **confusability** | discard | AUC `conf` | AUC `conf2` |
+|---|---|---|---|---|---|---|
+| **rural** | 992 | **42.9%** ⬅ higher | 25.5% | 39.3% | **0.524** | 0.495 |
+| **urban** | 677 | 26.0% | **43.3%** ⬅ higher | 18.5% | **0.730** | 0.648 |
+| *(pooled)* | 1669 | 36.1% | 30.6% | 29.7% | 0.582 | 0.541 |
+
+Each explanation predicts which stratum detects *worse*, and because the variables dissociate they
+name **different** strata:
+
+| | predicts worse detection in | observed |
+|---|---|---|
+| **share** — more catch-all, less signal | `rural` | ✅ **correct** |
+| **confusability** — catch-all resembles land cover | `urban` | ⛔ **wrong** |
+
+> ⭐ **Share is supported; confusability is refuted as the driver.** Detection is worse in the
+> higher-share stratum *even though the lower-share stratum is the more confusable one*. A
+> catch-all that resembles land cover is not what destroys the signal — its sheer prevalence is.
+> **§7 stands as written, and now rests on a comparison where the rival explanation predicted the
+> opposite result.**
+
+⭐ **And detection is monotone in share across four strata**, the two middle ones coming from a
+split where confusability runs the other way:
+
+| stratum | catch-all share | AUC `conf` |
+|---|---|---|
+| OpenEarthMap | 0.84% | **0.794** |
+| LoveDA urban | 26.0% | 0.730 |
+| LoveDA (pooled) | 36.1% | 0.582 |
+| LoveDA rural | 42.9% | 0.524 |
+
+⚠️ **This is a stratification, not a randomised intervention.** Urban and rural differ in more than
+these two variables — class mix, object scale, scene density — so it constrains the explanation
+rather than proving it. State that beside the result. Note also that `all` is the union of the two
+strata and is not an independent point; the independent ones are OEM, urban and rural.
+
+⚠️ **The verdict was reported backwards on first run.** The script reasoned in prose about
+"higher" and "lower" and swapped both branches. It now names, for each hypothesis, the stratum it
+predicts will detect *worse*, and checks which is right — a form that cannot be phrased backwards,
+and verified to give the same answer with the strata in either order.
+
 ---
 
 ## 8. ⛔ Recovery does not improve land-cover segmentation on either dataset

@@ -255,43 +255,58 @@ def main():
 
     strata = [k for k in R if k != 'all']
     if len(strata) == 2:
-        a, b = sorted(strata, key=lambda k: -R[k]['share'])   # a = higher share
-        ra, rb = R[a], R[b]
-        best = lambda v: max(v.get('auc_conf2', 0), v.get('auc_conf', 0))
-        diss = (ra['conf_out'] < rb['conf_out'])              # do they dissociate?
+        # State each hypothesis as the stratum it predicts will detect WORSE, then
+        # check which one is right. An earlier version reasoned in prose about
+        # "higher/lower" and got the branches backwards -- naming the prediction
+        # first makes that impossible.
+        best = lambda v: max(v.get('auc_conf', 0) or 0, v.get('auc_conf2', 0) or 0)
+        a, b = strata
+        worse = a if best(R[a]) < best(R[b]) else b
+        hi_share = a if R[a]['share'] > R[b]['share'] else b
+        hi_conf = a if R[a]['conf_out'] > R[b]['conf_out'] else b
+        gap = abs(best(R[a]) - best(R[b]))
+
         md += ['## Verdict\n',
-               f'`{a}` has the **higher catch-all share** ({ra["share"]:.1f}% vs '
-               f'{rb["share"]:.1f}%) and `{b}` the **higher measured confusability** '
-               f'({rb["conf_out"]:.1f}% vs {ra["conf_out"]:.1f}%).\n'
-               if diss else
-               f'⛔ **The two strata do not dissociate.** `{a}` has both the higher '
-               f'share ({ra["share"]:.1f}%) and the higher confusability '
-               f'({ra["conf_out"]:.1f}%), so this split reproduces the same confound '
-               f'as the two datasets and cannot break it. Find a stratification where '
-               f'they move in opposite directions, or say plainly in the paper that '
-               f'the mechanism is stated at the level of label design and not '
-               f'attributed to either variable alone.\n']
-        if diss:
-            if best(rb) > best(ra) + 0.02:
-                md.append(f'⭐ **Detection is better in `{b}` — the higher-confusability, '
-                          f'lower-share stratum ({best(rb):.3f} vs {best(ra):.3f}).** That '
-                          'is the opposite of what the share explanation predicts, so '
-                          '**share is not sufficient** and §7 must be restated in terms '
-                          'of confusability.')
-            elif best(ra) > best(rb) + 0.02:
-                md.append(f'✅ **Detection is better in `{a}` — the lower-confusability, '
-                          f'higher-share stratum ({best(ra):.3f} vs {best(rb):.3f}).** '
-                          'Share and detectability move together even where confusability '
-                          'opposes them, which supports §7 as written.')
-            else:
-                md.append(f'⚠️ **Neither: the two strata detect equally well** '
-                          f'({best(ra):.3f} vs {best(rb):.3f}, difference below 0.02). '
-                          'Within one dataset the variation in both variables is too '
-                          'small to separate them. Report the confound as open and use '
-                          'a dataset whose catch-all is common but visually distinct.')
-        md.append('\n⚠️ This is a stratification, not a randomised intervention — the '
-                  'strata differ in more than these two variables — so it constrains the '
-                  'explanation rather than proving one. State that beside the result.')
+               'Each explanation predicts which stratum detects **worse**. Because the '
+               'two variables dissociate here, they name different strata, so at most '
+               'one can be right.\n',
+               '| | predicts worse detection in | observed |', '|---|---|---|',
+               f'| **share** — more catch-all, less signal | `{hi_share}` '
+               f'({R[hi_share]["share"]:.1f}% of GT) | '
+               f'{"✅ **correct**" if worse == hi_share else "⛔ wrong"} |',
+               f'| **confusability** — catch-all resembles land cover | `{hi_conf}` '
+               f'({R[hi_conf]["conf_out"]:.1f}% escapes to real classes) | '
+               f'{"✅ **correct**" if worse == hi_conf else "⛔ wrong"} |',
+               f'\nDetection is worse in `{worse}` '
+               f'({best(R[worse]):.3f} vs {best(R[a if worse == b else b]):.3f}).\n']
+
+        if hi_share == hi_conf:
+            md.append('⛔ **The strata do not dissociate** — the same one leads on both '
+                      'variables, so this split reproduces the confound rather than '
+                      'breaking it. Find a stratification where they move in opposite '
+                      'directions.')
+        elif gap < 0.02:
+            md.append(f'⚠️ **Neither: the two strata detect equally well** '
+                      f'(difference {gap:.3f} < 0.02). The variation within one dataset '
+                      'is too small to separate them. Report the confound as open.')
+        elif worse == hi_share:
+            md.append('⭐ **SHARE is supported; CONFUSABILITY is refuted as the driver.** '
+                      'Detection is worse in the higher-share stratum even though the '
+                      '*lower*-share stratum is the more confusable one — so a catch-all '
+                      'that resembles land cover is not what destroys the signal, its '
+                      'sheer prevalence is. §7 stands as written, and now rests on a '
+                      'comparison where the rival explanation predicted the opposite.')
+        else:
+            md.append('⭐ **CONFUSABILITY is supported; SHARE is refuted as the driver.** '
+                      'Detection is worse in the more confusable stratum even though it '
+                      'has the *smaller* catch-all — so §7 must be restated: what '
+                      'destroys the signal is that the catch-all looks like land cover, '
+                      'not that there is a lot of it.')
+
+        md.append('\n⚠️ This is a stratification, not a randomised intervention — urban '
+                  'and rural differ in more than these two variables (class mix, object '
+                  'scale, scene density) — so it constrains the explanation rather than '
+                  'proving it. State that beside the result.')
 
     text = '\n'.join(md)
     print('\n' + text)
