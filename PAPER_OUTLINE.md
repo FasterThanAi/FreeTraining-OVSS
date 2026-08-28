@@ -138,10 +138,12 @@ mIoU number here would have been misleading.
 |---|---|---|
 | 1 | image / GT / baseline / discard mask, 4 tiles | ✅ `docs/25{22,24,25,27}.png` |
 | 2 | **the mechanism**: six panels, `background` share as cause | ✅ `docs/fig2_mechanism.{png,pdf}` · `scripts/fig_mechanism.py` |
-| 3 | per-class IoU delta on OEM (background +22.67 against real classes −2.11) | ⛔ to make |
-| 4 | detection AUC across signals, both datasets, with the 0.53 floor | ⛔ to make |
-| 5 | atom purity distribution, cc vs SLIC | ⛔ to make |
+| 3 | per-class IoU delta on OEM (background +22.67 vs real classes −2.11) | ✅ `docs/fig3_oem_per_class.{png,pdf}` |
+| 4 | detection AUC across signals, both datasets, with the 0.53 floor | ✅ `docs/fig4_detection_auc.{png,pdf}` |
+| 5 | atom purity distribution + oracle ceiling, cc vs SLIC | ✅ `docs/fig5_atom_purity.{png,pdf}` |
 | 6 | GT co-occurrence heatmap (`PMI_bnd`) | ✅ from `cooccurrence_gt.py` |
+
+Figures 2–5 are rendered by `scripts/fig_mechanism.py` and `scripts/fig_results.py`, both of which print every plotted number against its `WEEK3_RESULTS.md` section on render. A figure that has drifted from its source table is worse than no figure.
 
 ---
 
@@ -158,11 +160,10 @@ mIoU number here would have been misleading.
 
 ## 6. What is missing before submission
 
-1. **Figures 3–5** (2 is done).
-2. **Optional third dataset** (Potsdam or Vaihingen). The mechanism predicts the residual's size
+1. **Third dataset** (Potsdam or Vaihingen). The mechanism predicts the residual's size
    from the `background` share alone — a third point tests that prediction directly, which is a
    better use of GPU time than another method attempt.
-3. A ConInfer comparison row if the code runs (`github.com/Dog-Yang/ConInfer`).
+2. A ConInfer comparison row if the code runs (`github.com/Dog-Yang/ConInfer`).
 
 ---
 
