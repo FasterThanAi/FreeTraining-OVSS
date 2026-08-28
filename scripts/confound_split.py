@@ -59,22 +59,52 @@ import labels                                            # noqa: E402
 
 
 def make_map(root, out):
-    """LoveDA ships Val/Rural/images_png and Val/Urban/images_png. Once the two
-    are merged into one directory for evaluation the domain is lost, so recover
-    it from the original layout rather than guessing at ID ranges."""
+    """LoveDA ships Val/Rural/images_png and Val/Urban/images_png. Merging the two
+    into one directory for evaluation loses the domain, so recover it from the
+    original download rather than guessing at tile-ID ranges.
+
+    The domain is found rather than assumed: the layout varies (the Kaggle archive
+    has a doubled `Val/Val/` nesting), so this takes every image under `root` and
+    picks the first path component that is not shared by all of them. Whatever
+    splits the tiles IS the domain, without hardcoding "Rural" and "Urban".
+    """
     root = Path(root).expanduser()
-    rows = []
-    for d in sorted(p for p in root.iterdir() if p.is_dir()):
-        imgs = list(d.rglob('*.png')) + list(d.rglob('*.tif'))
-        stems = sorted({p.stem for p in imgs if 'mask' not in p.parent.name.lower()})
-        if not stems:
-            continue
-        print(f'  {d.name}: {len(stems)} tiles')
-        rows += [f'{s}\t{d.name.lower()}' for s in stems]
-    if not rows:
-        raise SystemExit(f'no image directories under {root}')
+    if not root.exists():
+        raise SystemExit(
+            f'{root} does not exist.\n\n'
+            'Point --make-map at the ORIGINAL LoveDA download (the one with Rural/ and\n'
+            'Urban/ subdirectories), not the merged img_dir/val used for evaluation --\n'
+            'merging is what destroyed the domain label. Find it with:\n\n'
+            '    find ~ -maxdepth 7 -type d -iname "Rural" 2>/dev/null\n\n'
+            'then pass the directory that CONTAINS Rural and Urban.')
+
+    imgs = [f for f in list(root.rglob('*.png')) + list(root.rglob('*.tif'))
+            if 'mask' not in f.parent.name.lower() and 'ann' not in f.parent.name.lower()]
+    if not imgs:
+        raise SystemExit(f'no images under {root} (looked for *.png and *.tif, '
+                         f'skipping mask/annotation directories)')
+
+    parts = [f.relative_to(root).parts for f in imgs]
+    depth = min(len(p) for p in parts)
+    split_at = next((i for i in range(depth - 1)
+                     if len({p[i] for p in parts}) > 1), None)
+    if split_at is None:
+        raise SystemExit(
+            f'all {len(imgs)} images under {root} sit in one directory, so there is no\n'
+            'domain to recover. Point --make-map one level higher, at the directory\n'
+            'containing Rural/ and Urban/.')
+
+    rows, counts = [], {}
+    for f, pr in zip(imgs, parts):
+        d = pr[split_at].lower()
+        counts[d] = counts.get(d, 0) + 1
+        rows.append(f'{f.stem}\t{d}')
+    for d, n in sorted(counts.items()):
+        print(f'  {d}: {n} tiles')
+    print(f'  (domain taken from path component {split_at} below {root})')
+
     p = Path(out).expanduser(); p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text('\n'.join(rows) + '\n')
+    p.write_text('\n'.join(sorted(rows)) + '\n')
     print(f'\nwritten: {p}  ({len(rows)} tiles)')
 
 
