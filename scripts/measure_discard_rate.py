@@ -292,6 +292,30 @@ def main():
                 except Exception as e:
                     print(f'    (P_fused capture failed on {name}: {e})')
 
+            # <<< CROSS-HEAD: the two SAM 3 heads SEPARATELY. `fused` is their
+            # elementwise max, so after the fact there is no way to ask whether
+            # they agreed -- and cross-head agreement is the leading label-free
+            # candidate for per-class precision, which WEEK3 §9a shows is what
+            # sets the right threshold. Stored as top-1 per head: which class
+            # each head would pick alone, and how strongly.
+            for key, attr in (('i', 'last_inst'), ('s', 'last_sem')):
+                hl = getattr(model, attr, None)
+                if hl is None:
+                    continue
+                try:
+                    hl = hl.float()
+                    if hl.shape[-2:] != lg.shape[-2:]:
+                        hl = torch.nn.functional.interpolate(
+                            hl[None], size=lg.shape[-2:], mode='bilinear',
+                            align_corners=False)[0]
+                    htop = torch.topk(hl, k=1, dim=0)
+                    fused_arrays[f'{key}conf'] = \
+                        htop.values[0].cpu().numpy().astype(np.float16)
+                    fused_arrays[f'{key}pred'] = \
+                        htop.indices[0].cpu().numpy().astype(np.uint8)
+                except Exception as e:
+                    print(f'    ({attr} capture failed on {name}: {e})')
+
             k = min(2, lg.shape[0])
             top = torch.topk(lg, k=k, dim=0)
             vals = top.values.cpu().numpy()
