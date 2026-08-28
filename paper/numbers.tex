@@ -1,0 +1,96 @@
+% =====================================================================
+%  Every load-bearing number in the paper, defined ONCE.
+%
+%  WHY THIS FILE EXISTS. This project has caught five silent errors, and
+%  the cheapest class of error left is a number that is right in the
+%  results table and stale in the abstract. Macros make that impossible:
+%  change it here and it changes everywhere, or it changes nowhere.
+%
+%  Each macro carries the file and section it came from. If a macro has
+%  no citation it is not allowed in the paper.
+% =====================================================================
+
+% ---- baselines ------------------------------------------------------
+\newcommand{\loveBase}{47.38}        % WEEK1 §5   reproduced, full val
+\newcommand{\lovePub}{47.4}          % SegEarth-OV3, Table 1
+\newcommand{\loveInstr}{47.37}       % WEEK1 §5   instrumented recompute (the gate)
+\newcommand{\oemBase}{44.19}         % WEEK3 §7   384 of 500 val tiles
+\newcommand{\oemPub}{42.9}           % SegEarth-OV3, published
+\newcommand{\loveTiles}{1669}
+\newcommand{\oemTiles}{384}
+
+% ---- the residual ---------------------------------------------------
+\newcommand{\discardPct}{29.68\%}    % WEEK1 §7.1
+\newcommand{\discardPx}{323{,}184{,}908}
+\newcommand{\discardOEM}{3.78\%}     % WEEK3 §7
+\newcommand{\discardRatio}{3:1}      % WEEK1 §7.6  discard vs confusion
+\newcommand{\mechA}{94.0\%}          % WEEK1 §7.7  below tau
+\newcommand{\mechB}{6.0\%}           % WEEK1 §7.7  background won the argmax
+\newcommand{\mechBpx}{19{,}378{,}177}
+\newcommand{\mechBtiles}{24}
+
+% ---- the mechanism --------------------------------------------------
+\newcommand{\bgShareLove}{36.1\%}    % WEEK3 §7
+\newcommand{\bgShareOEM}{0.84\%}
+\newcommand{\aucLove}{0.622}         % best of nine signals
+\newcommand{\aucOEM}{0.913}          % conf2
+\newcommand{\aucFloor}{0.53}         % empirical, size-stratified
+\newcommand{\presCorrLove}{-0.750}
+\newcommand{\presCorrOEM}{+0.094}
+\newcommand{\catTilesLove}{198}
+\newcommand{\catTilesOEM}{0}
+
+% ---- refuted interventions -----------------------------------------
+\newcommand{\tauCost}{-5.54}         % WEEK1 §7.2  tau 0.5 -> 0.1
+\newcommand{\tauRatio}{1.73}         % WEEK1 §8.2  wrong per right
+\newcommand{\presCost}{-11.97}       % WEEK1 §9.2b
+\newcommand{\recoverLove}{+0.04}     % WEEK3 §8
+\newcommand{\recoverOEM}{+2.28}      % WEEK3 §8   -- NEVER without \oemBgGain
+\newcommand{\oemBgGain}{+22.67}      % WEEK3 §8.1
+\newcommand{\oemRealLoss}{-2.11}     % WEEK3 §8.1
+\newcommand{\oemBuildLoss}{-3.75}    % WEEK3 §8.1
+\newcommand{\priorGain}{+0.2}        % WEEK3 §6   over a neighbour vote
+\newcommand{\priorOracle}{+0.3}      % WEEK3 §6   with a PERFECT matrix
+
+% ---- atomisation ----------------------------------------------------
+\newcommand{\ceilCC}{72.8\%}         % WEEK3 §4
+\newcommand{\ceilSLIC}{92.8\%}
+\newcommand{\ceilSLICoem}{82.9\%}
+
+% ---- the method -----------------------------------------------------
+\newcommand{\methodGain}{+1.18}      % WEEK3 §9b  5-fold mean
+\newcommand{\methodSD}{0.45}
+\newcommand{\methodWorst}{+0.80}
+\newcommand{\methodLand}{+8.30}      % 5-fold, six real classes
+\newcommand{\methodBg}{-0.01}
+\newcommand{\methodWater}{+6.78}
+\newcommand{\methodWaterTau}{0.195}
+\newcommand{\oracleBound}{+1.46}     % WEEK3 §9a  per-class oracle
+\newcommand{\oracleShare}{81\%}
+\newcommand{\globalOracle}{+0.04}    % WEEK3 §9a  best GLOBAL tau
+\newcommand{\calibTiles}{200}        % WEEK3 §9b  every draw positive
+\newcommand{\trainToVal}{-0.12}      % WEEK3 §9b  scope limit
+
+% ---- end-to-end verification ---------------------------------------
+\newcommand{\eeBase}{47.16}          % WEEK3 §9c  held-out tiles
+\newcommand{\eeFit}{48.35}
+\newcommand{\eeTiles}{1469}
+\newcommand{\eeSpread}{0.175--0.675}
+
+% ---- the label-free bound ------------------------------------------
+\newcommand{\proxyBest}{+0.42}       % WEEK3 §9d  presence, best of eight
+\newcommand{\proxyCtrl}{+0.58}       % random-control p95
+\newcommand{\proxyConfRho}{+0.943}   % mean_conf vs precision
+\newcommand{\proxyConfP}{0.017}
+\newcommand{\proxyHeadRho}{+0.886}   % sem_inst_agree vs precision
+\newcommand{\proxyHeadP}{0.033}
+\newcommand{\proxyTauRho}{-0.429}    % precision vs ORACLE TAU -- the broken link
+\newcommand{\proxyTauP}{0.419}
+\newcommand{\nAttempts}{eleven}      % 3 threshold rules + 8 proxies
+
+% ---- the co-occurrence prior ---------------------------------------
+\newcommand{\pmiSignal}{0.574}       % ANALYSIS §4, corrected marginal
+\newcommand{\pmiFloor}{0.003}
+\newcommand{\pmiRatio}{216}
+\newcommand{\rhoMined}{+0.757}       % WEEK3 §5  gate 1
+\newcommand{\rhoCirc}{-0.257}        % circularity, retired

@@ -175,8 +175,9 @@ mIoU number here would have been misleading.
 | 4 | detection AUC across signals, both datasets, with the 0.53 floor | ✅ `docs/fig4_detection_auc.{png,pdf}` |
 | 5 | atom purity distribution + oracle ceiling, cc vs SLIC | ✅ `docs/fig5_atom_purity.{png,pdf}` |
 | 6 | GT co-occurrence heatmap (`PMI_bnd`) | ✅ from `cooccurrence_gt.py` |
+| **7** | **the method**: fitted τ vs the global 0.5 · per-class ΔIoU, both protocols · calibration curve | ✅ `docs/fig7_method.{png,pdf}` · `scripts/fig_method.py` |
 
-Figures 2–5 are rendered by `scripts/fig_mechanism.py` and `scripts/fig_results.py`, both of which print every plotted number against its `WEEK3_RESULTS.md` section on render. A figure that has drifted from its source table is worse than no figure.
+Figures 2–5 and 7 are rendered by `scripts/fig_mechanism.py`, `scripts/fig_results.py` and `scripts/fig_method.py`, all of which print every plotted number against its `WEEK3_RESULTS.md` section on render. A figure that has drifted from its source table is worse than no figure.
 
 ---
 
@@ -190,6 +191,16 @@ Figures 2–5 are rendered by `scripts/fig_mechanism.py` and `scripts/fig_result
 | CVPR/ICCV main | not realistic | do not spend the calendar on this |
 
 ---
+
+## 5a. The LaTeX skeleton exists — `paper/`
+
+Started at Week 3 rather than ROADMAP's Week 9, because writing is what reveals a missing
+experiment while there is still time to run it. `paper/main.tex` carries the section map below,
+the real tables and the figure includes; the connecting prose is 27 loud `\todo{}` marks.
+
+⚠️ **`paper/numbers.tex` is the only place a number may be typed** — 67 macros, each carrying the
+results section it came from. A number that is right in Table 1 and stale in the abstract is the
+cheapest remaining class of error in this project. **No macro, no citation, not in the paper.**
 
 ## 6. What is missing before submission
 
