@@ -78,3 +78,25 @@ Everything so far has been attributed to the catch-all's **share**. But across t
 2. `measure_discard_rate.py` with this dataset's config and its own τ.
 3. `recoverability_signal.py` for the detection AUC.
 4. Compare against the bracket above and record whether the prediction held.
+---
+
+## The call, made before inference
+
+**iSAID's catch-all is visually DISTINCT from its real classes.** `background` is everything that
+is not a ship, plane, tennis court or storage tank — it does not resemble them the way LoveDA's
+unlabelled pavement resembles `road`. **So the two hypotheses disagree here, and this dataset
+discriminates:**
+
+| hypothesis | predicts detection AUC |
+|---|---|
+| **share** — a large catch-all destroys the signal | **fails**, near the 0.53 floor |
+| **confusability** — a catch-all that looks like the real classes destroys it | **works**, well above the floor |
+
+Either outcome eliminates one explanation. Note this contradicts the mechanical bracket above,
+which is derived from share alone; **confusability is the hypothesis I expect to survive**, so I
+expect detection to WORK on iSAID despite its 97.11% background.
+
+⚠️ **Scope caveat, also stated in advance.** iSAID is object-centric, not land-cover: 15 small
+object classes on a vast backdrop, where 15 of 16 classes occupy under 0.4% each. If the mechanism
+breaks here, the honest reading may be that it holds *within land-cover segmentation* — a scope
+limit, not a refutation. Deciding that now prevents choosing the convenient reading later.
