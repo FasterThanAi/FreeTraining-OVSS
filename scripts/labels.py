@@ -24,20 +24,43 @@ LOVEDA_FALLBACK = ['background', 'building', 'road', 'water',
                    'barren', 'forest', 'agricultural']
 
 
+# Datasets name the catch-all differently. LoveDA and OpenEarthMap call it
+# `background`; ISPRS Potsdam and Vaihingen call it `clutter`. Checked in this
+# order, so an explicit `background` always wins.
+CATCH_ALL_ALIASES = ['background', 'clutter', 'unlabeled', 'unlabelled',
+                     'void', 'ignore', 'other', 'misc']
+
+
 class Labels:
     """names[i] is the class at mask value i+1. Mask value 0 is always no-data."""
 
-    def __init__(self, names):
+    def __init__(self, names, bg_name=None):
         self.names = [str(n) for n in names]
         self.n = len(self.names)
         self.nc = self.n + 1                      # mask-space width incl. no-data
         low = [n.lower() for n in self.names]
-        if 'background' in low:
-            self.bg = low.index('background') + 1
-        else:
+
+        self.bg = None
+        for cand in ([bg_name.lower()] if bg_name else CATCH_ALL_ALIASES):
+            if cand in low:
+                self.bg = low.index(cand) + 1
+                break
+        if self.bg is None:
             self.bg = 1
-            print(f'  !! no class literally named "background" in {self.names}; '
-                  f'assuming mask value 1 ({self.names[0]}). Check this.')
+            print(f'  !! no catch-all class found among {CATCH_ALL_ALIASES} in '
+                  f'{self.names}; assuming mask value 1 ({self.names[0]}). '
+                  f'Pass bg_name= explicitly if that is wrong — getting this '
+                  f'backwards invalidates every number silently.')
+        elif self.bg != 1:
+            # Worth saying out loud: SegEarth-OV3's segmentor hardcodes
+            # bg_idx=0, so sub-tau pixels land in the FIRST class regardless of
+            # which one is the catch-all. Where those differ, the dataset's
+            # discard target is not its catch-all and the two must not be
+            # conflated.
+            print(f'  !! catch-all `{self.names[self.bg - 1]}` is at mask value '
+                  f'{self.bg}, not 1. The segmentor assigns sub-τ pixels to '
+                  f'bg_idx=0 (`{self.names[0]}`), so the DISCARD TARGET and the '
+                  f'CATCH-ALL CLASS are different here. Check which one you mean.')
         self.real = [c for c in range(1, self.nc) if c != self.bg]
 
     def name(self, mask_value):
@@ -48,17 +71,17 @@ class Labels:
                 f'{", ".join(self.names)})')
 
 
-def from_cache(cache_dir):
+def from_cache(cache_dir, bg_name=None):
     """Read the class list written into the .npz cache."""
     files = sorted(Path(cache_dir).expanduser().glob('*.npz'))
     if not files:
         raise SystemExit(f'no .npz under {cache_dir}')
     z = np.load(files[0], allow_pickle=True)
     if 'classes' in z.files:
-        return Labels([str(x) for x in z['classes']])
+        return Labels([str(x) for x in z['classes']], bg_name)
     print('  !! cache has no `classes` key (written before this was recorded); '
           'falling back to LoveDA. Re-run measure_discard_rate.py to fix.')
-    return Labels(LOVEDA_FALLBACK)
+    return Labels(LOVEDA_FALLBACK, bg_name)
 
 
 def from_model(model, cfg=None):
