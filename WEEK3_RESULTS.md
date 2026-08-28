@@ -410,20 +410,50 @@ Fitting on LoveDA **train** and evaluating on **val** gives **−0.12**. The spl
 > reading over the *share* reading, and it means **29.68% is a LoveDA-val number, not a LoveDA
 > number.**
 
-### 9c. ⚠️ The gain has not yet been produced by the pipeline — patch written, run pending
+### 9c. ✅ Confirmed end-to-end by the pipeline — 28 Aug
 
-Everything in §9b is arithmetic on a cached `(gt, pred, conf-bin)` histogram. That shortcut is
-now *proved* equivalent to the rule the segmentor applies (`verify_perclass_tau.py`, 20 random
-threshold vectors, exact match), but proved-equivalent is not the same as run. **Until `eval.py`
-produces the number, §9b is a prediction.**
+§9b is arithmetic on a cached `(gt, pred, conf-bin)` histogram, proved equivalent to the
+segmentor's rule by `verify_perclass_tau.py`. **It has now also been run.** `prob_thd` accepts a
+per-class vector indexed by the argmax class; `tau_deploy.py` fitted on 200 calibration tiles and
+predicted the result, then `eval.py` produced it on the 1469 disjoint tiles.
 
-The pipeline side is ready. `reference/segearthov3_segmentor.py` now accepts `prob_thd` as either
-a scalar — bit-identical to the published line, so the 47.37 gate is preserved by construction —
-or a per-class vector, indexed by the argmax class. `scripts/tau_deploy.py` fits the thresholds,
-writes the held-out tile list, emits the config, and prints the mIoU the GPU run must reproduce.
+| | predicted from the cache | **measured by `eval.py`** |
+|---|---|---|
+| published τ = 0.5 | 47.16 | **47.16** |
+| per-class τ | 48.35 | **48.35** |
+| **Δ** | **+1.18** | **+1.18** |
 
-⚠️ **Expect ~0.01–0.02 of disagreement, not 0.000.** `conf` is cached as float16 (WEEK1 §7.7) and
-the histogram quantises it to 200 bins. A larger gap is a real discrepancy, not rounding.
+**Both absolute values reproduce to the reported precision**, and every per-class Δ agrees to
+**≤ 0.04** — inside the float16 cache noise that was predicted in advance. The histogram shortcut
+is therefore validated as a measurement instrument, not just as arithmetic: every τ sweep,
+oracle bound and cross-validation in §9a/§9b rests on it, and all of them inherit this.
+
+| class | predicted Δ | measured Δ | class | predicted Δ | measured Δ |
+|---|---|---|---|---|---|
+| **water** | +6.54 | **+6.54** | forest | +0.45 | +0.44 |
+| barren | +1.07 | +1.08 | agricultural | −0.25 | −0.26 |
+| building | +0.13 | +0.17 | **road** | −0.54 | **−0.53** |
+| `background` | +0.88 | +0.85 | | | |
+
+**Real classes +7.44, 90% of the total.** The fitted thresholds span **0.175–0.675** against a
+single 0.5, and the precision/recall table shows the mechanism directly: `water` trades precision
+89.7 → 86.4 for recall 54.1 → 63.2 at τ=0.175, while `road` moves the other way at τ=0.675
+(precision 69.7 → 73.4, recall 70.6 → 66.3).
+
+⚠️ **Two honest notes, both of which must appear beside the number.**
+
+1. **`background` gains +0.85 here, against −0.01 in the 5-fold §9b.** It is 10% of the total, not
+   110% as in the OEM artefact (§8.1), and it is *incidental*: the fit objective was `real`, which
+   excludes the catch-all, so the optimiser was never rewarded for it. But §9b's "background
+   untouched" is a property of that protocol, not of the method — do not generalise it.
+2. **`road` loses 0.53.** The fit raised road's threshold on the calibration tiles and that did not
+   transfer. A per-class rule can hurt a per-class result; report the full table, never the mean
+   alone.
+
+**This run is a single fit on 200 calibration tiles**, so it sits on the learning curve
+(+0.79 ± 0.35 at n=200), not on the 5-fold protocol. That +1.18 matches §9b's 5-fold mean is a
+coincidence of two different protocols — **quote them separately.** §9b's +1.18 ± 0.45 remains
+the headline because it carries an error bar; this run is the end-to-end verification.
 
 > **A bin-edge bug was found by writing that test, and fixed.** `confusion_at` computed its bin
 > edge with `(tau * nbins).astype(int)`, which **truncates**: `29/200 * 200` is
@@ -434,7 +464,7 @@ the histogram quantises it to 200 bins. A larger gap is a real discrepancy, not 
 > the mIoU of the configuration actually evaluated, so the *gains* were never at risk — only a
 > *deployed* threshold could have gone wrong, which is exactly what this step exists to catch.
 
-**To run it** (workstation, ~50 min for both passes):
+**How it was run** (workstation, ~50 min for both passes):
 
 ```bash
 cd ~/FreeTraining-OVSS && python scripts/verify_perclass_tau.py     # CPU, must pass first
