@@ -60,18 +60,40 @@ def per_tile_hists(files, nc, nbins):
     return H
 
 
-def fit(H, bg, nbins, rounds=6):
+def obj_miou(C, bg, objective):
+    """The quantity the fit maximises.
+
+    'all'  -- mIoU over every class, the reported metric.
+    'real' -- mIoU over the real classes only, excluding the catch-all.
+
+    This distinction decides the OpenEarthMap result. There, `background` sits at
+    17.13 IoU with 17.33% precision, so roughly 54 points are available from that
+    single class -- and an optimiser maximising full mIoU will trade away
+    `road` and `building` to collect them. It is optimising exactly what it was
+    asked for; the ask was wrong. Improving the catch-all is not the goal, so the
+    fit should not be paid for it. Full mIoU is still what gets REPORTED.
+    """
+    v = per_class_iou(C)
+    if objective == 'real':
+        v = np.array([v[c] for c in range(len(v)) if c != bg])
+    return float(np.nanmean(v)) if np.isfinite(v).any() else 0.0
+
+
+def fit(H, bg, nbins, rounds=6, objective='all'):
     nc = H.shape[0]
     grid = np.arange(nbins + 1) / nbins
-    best, t0 = max((miou(confusion_at(H, np.full(nc, t), bg, nbins)), t) for t in grid)
+
+    def sc_of(t):
+        return obj_miou(confusion_at(H, t, bg, nbins), bg, objective)
+
+    best, t0 = max((sc_of(np.full(nc, t)), t) for t in grid)
     taus = np.full(nc, t0)
     for _ in range(rounds):
         moved = False
         for c in range(nc):
             if c == bg:
                 continue
-            sc, st = max((miou(confusion_at(H, np.where(np.arange(nc) == c, t, taus),
-                                            bg, nbins)), t) for t in grid)
+            sc, st = max((sc_of(np.where(np.arange(nc) == c, t, taus)), t) for t in grid)
             if sc > best + 1e-9:
                 best, taus[c], moved = sc, st, True
         if not moved:
@@ -88,6 +110,11 @@ def main():
                     default=[10, 25, 50, 100, 200, 400, 800])
     ap.add_argument('--repeats', type=int, default=5,
                     help='random draws per calibration size')
+    ap.add_argument('--objective', choices=['all', 'real'], default='all',
+                    help="what the FIT maximises. 'real' excludes the catch-all class, "
+                         "so the optimiser cannot buy mIoU by fixing an over-predicted "
+                         "background at the expense of land cover. Reporting is always "
+                         "full mIoU either way.")
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--limit', type=int, default=0)
     ap.add_argument('--md', default=None)
@@ -115,7 +142,8 @@ def main():
     for k in range(args.folds):
         te = folds[k]
         tr = np.concatenate([folds[j] for j in range(args.folds) if j != k])
-        taus = fit(PT[tr].sum(0).astype(np.int64), bg, NBINS)
+        taus = fit(PT[tr].sum(0).astype(np.int64), bg, NBINS,
+                       objective=args.objective)
         base = ev(te, np.full(nc, args.tau))
         got = ev(te, taus)
         rows.append((k + 1, len(tr), len(te), base, got, got - base))
@@ -129,7 +157,11 @@ def main():
 
     md = [f'# Per-class τ — cross-validated\n',
           f'- cache: `{args.cache}`  |  tiles: **{n}**  |  classes: **{nc}**',
-          f'- published τ: **{args.tau}**  |  folds: **{args.folds}**\n',
+          f'- published τ: **{args.tau}**  |  folds: **{args.folds}**',
+          f'- fit objective: **`{args.objective}`**'
+          + ('  — the catch-all is excluded from what the fit maximises; reporting is '
+             'still full mIoU' if args.objective == 'real' else
+             '  — full mIoU, including the catch-all') + '\n',
           'Calibration and evaluation tiles are always disjoint, and the published-τ '
           'baseline is recomputed on the same held-out tiles, so both are measured on '
           'identical pixels.\n',
@@ -162,7 +194,8 @@ def main():
         for r in range(args.repeats):
             idx = rng.permutation(n)
             tr, te = idx[:sz], idx[sz:]
-            taus = fit(PT[tr].sum(0).astype(np.int64), bg, NBINS)
+            taus = fit(PT[tr].sum(0).astype(np.int64), bg, NBINS,
+                       objective=args.objective)
             ds.append(ev(te, taus) - ev(te, np.full(nc, args.tau)))
         ds = np.array(ds)
         curve.append((sz, ds.mean(), ds.std(ddof=1) if len(ds) > 1 else 0.0, ds.min()))
