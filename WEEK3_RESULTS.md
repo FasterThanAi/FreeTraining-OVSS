@@ -4,8 +4,9 @@
 before the scoring function is built on it.
 
 **Status:** 🟢 `M_global` built and validated · 🟢 atomisation settled (SLIC) · 🟢 **replicated on a
-second dataset** · ⛔ the co-occurrence term does not earn its place · ⛔ **recovery does not
-improve land-cover segmentation on either dataset**
+second dataset** · ⛔ the co-occurrence term does not earn its place · ⛔ recovery does not
+improve land-cover segmentation on either dataset · ✅ **but calibrated per-class τ does: +1.18 ±
+0.45 mIoU on LoveDA with land cover +8.30 (§9b)**
 
 **Date:** 2026-08-27 · LoveDA val 1669 tiles @ τ=0.5 · OpenEarthMap val 384 tiles @ τ=0.1
 
@@ -323,6 +324,94 @@ training-free pipeline that thresholds a per-class score inherits it.
 
 ---
 
+## 9b. ✅ A method — per-class τ, calibrated on ~200 labelled tiles ⭐
+
+The oracle bound in §9a said per-class thresholds were worth +1.46 on LoveDA. This is what a
+deployable version gets.
+
+**Protocol.** Fit one threshold per class by coordinate ascent on a calibration subset, evaluate
+on disjoint tiles. **No model weights are trained.** SegEarth-OV3 already tunes its single τ per
+dataset using labels (0.5 / 0.1), so this is the same protocol with N parameters instead of 1 —
+parity, not a leak. The published-τ baseline is recomputed on the *same* held-out tiles.
+
+**The fit maximises land-cover mIoU, excluding the catch-all** (`--objective real`). This matters:
+optimising *full* mIoU lets the search buy the metric by repairing an over-predicted `background`
+at land cover's expense — on OEM it traded `road −2.14` and `building −1.20` for `background
++53.93`. Full mIoU is still what gets reported.
+
+### LoveDA — 5-fold, every fold positive
+
+| fold | published τ | fitted | Δ |
+|---|---|---|---|
+| 1 | 47.91 | 49.28 | +1.37 |
+| 2 | 45.41 | 47.31 | +1.89 |
+| 3 | 48.44 | 49.32 | +0.88 |
+| 4 | 46.11 | 46.91 | +0.80 |
+| 5 | 48.68 | 49.66 | +0.98 |
+
+**+1.18 ± 0.45 mIoU** (worst +0.84), **81% of the +1.46 oracle bound**.
+
+| class | Δ IoU | | class | Δ IoU |
+|---|---|---|---|---|
+| **water** | **+6.78** | | building | +0.28 |
+| barren | +0.98 | | road | +0.10 |
+| forest | +0.37 | | agricultural | −0.21 |
+| | | | **`background`** | **−0.01** |
+
+**Background is untouched; the whole gain is land cover — +8.30 IoU in aggregate.** Structurally
+immune to the background-unwinding artefact that caught three earlier results.
+
+**Why it works, and where.** `water`'s baseline precision/recall is **89.5 / 54.7** — right nine
+times in ten when it fires, finds half of what is there. Its fitted τ is **0.195** against a
+global 0.5. The fitted thresholds span **0.195–0.600**, so one global value is wrong for different
+classes in opposite directions, and the classes that gain are exactly those with a large
+precision–recall asymmetry.
+
+### Calibration cost
+
+| tiles | Δ | sd | worst draw |
+|---|---|---|---|
+| 10 | −2.14 | 1.99 | −5.59 |
+| 50 | +0.08 | 0.97 | −0.99 |
+| 100 | +0.54 | 0.71 | −0.57 |
+| **200** | **+0.79** | **0.35** | **+0.43** |
+| 400 | +1.21 | 0.16 | +1.04 |
+
+**~200 tiles is where every draw turns positive.** Below 50 it actively hurts.
+
+### OpenEarthMap — a benchmark artefact, not a method failure
+
+| objective | full mIoU | `background` | 8 real classes |
+|---|---|---|---|
+| `all` | **+5.80** ± 2.31 | +53.93 | **−1.77** |
+| `real` | +0.16 ± 0.93 | −11.04 | **+12.45** |
+
+Land cover improves substantially under the `real` objective — `building +4.35`, `road +2.95`,
+`pavement +2.71`, `cropland +2.04` — and **`background` pays for all of it**, leaving full mIoU
+flat. OEM's `background` sits at 17.13 IoU with 17.33% precision, so its mIoU is dominated by one
+pathologically calibrated class and you can improve land cover *or* the metric, not both. **A
+caveat about the benchmark, not about the method.**
+
+### ⚠️ The scope limit — calibration must match the evaluation distribution
+
+Fitting on LoveDA **train** and evaluating on **val** gives **−0.12**. The splits differ sharply:
+
+| | train | val |
+|---|---|---|
+| `background` share of GT | 35.8% | 36.1% |
+| **discarded to background** | **14.54%** | **29.68%** |
+| worst class | barren 37.4% | forest 34.6% |
+
+**Identical background share, 2.04× different discard.** Train said `water` needed no adjustment
+(fitted 0.500); val's entire gain comes from water at 0.170. State this beside the gain.
+
+> ⭐ **That comparison also constrains §7's mechanism.** Background share cannot be the sole driver
+> of the residual — held constant here, the residual doubles. It supports the *confusability*
+> reading over the *share* reading, and it means **29.68% is a LoveDA-val number, not a LoveDA
+> number.**
+
+---
+
 ## 10. Where the project stands
 
 **Established.**
@@ -342,6 +431,7 @@ training-free pipeline that thresholds a per-class score inherits it.
 | honest recovery + best abstention | +0.04 | +0.63 |
 | detect recoverability | 0.434–0.622 AUC | 0.601–0.913 AUC |
 | per-class τ, label-free | −0.17 (best of 3 rules) | +4.77 but real classes −1.90 |
+| **per-class τ, calibrated (§9b)** | ✅ **+1.18 ± 0.45, real +8.30** | +0.16, real **+12.45** |
 | **improve land-cover IoU by recovery** | **no** | **no** |
 
 **The conclusion.** Detectability is governed by label design. Recovery is not worthwhile either

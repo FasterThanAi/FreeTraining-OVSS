@@ -16,6 +16,17 @@ The project set out to build a corpus-level semantic co-occurrence prior. **That
 measurement** (`WEEK3_RESULTS.md` §6: +0.2 over a neighbour vote, oracle +0.3). Nor did the
 successor claim. What holds on two datasets is this:
 
+> **A single confidence threshold is wrong for different classes in opposite directions. Fitting
+> one threshold per class on ~200 labelled tiles — the same protocol SegEarth-OV3 already uses to
+> tune its single τ, with no weights trained — gives **+1.18 ± 0.45 mIoU** on LoveDA over a
+> reproduced published baseline, with land-cover classes gaining **8.30 IoU** in aggregate and the
+> catch-all class untouched. `water`, whose precision/recall is 89.5 / 54.7, gains 6.78 alone at a
+> fitted τ of 0.195 against a global 0.5. That captures 81% of an oracle bound of +1.46, and it
+> requires calibration data from the evaluation distribution: fitting on LoveDA *train* instead
+> gives −0.12, because the splits differ 2× in discard rate at identical background share.**
+
+And, as the measurement study that motivates it:
+
 > **Presence-gated SAM 3 pipelines assign a large fraction of real land-cover pixels to
 > `background`, but that fraction, and whether it can be detected at all, is governed by the
 > dataset's label design rather than by the model. Where `background` is a catch-all covering a
@@ -27,9 +38,10 @@ successor claim. What holds on two datasets is this:
 > attributable to `background` ceasing to be over-predicted, with the real classes losing 2.11 IoU
 > in aggregate.**
 
-One mechanism, two datasets, a positive control and a negative one. **This is a measurement paper
-with a mechanism, not a failed method paper** — and the distinction should be visible from the
-abstract.
+**So the paper has both a method and a measurement study**, and they share a mechanism: the
+residual exists because a global threshold cannot serve classes with different precision–recall
+profiles, and recovering it after the fact does not work because the pixels cannot be identified.
+Fixing the threshold beats recovering the residual, which is the useful practical message.
 
 **Secondary contributions**, each independently defensible:
 
@@ -113,7 +125,16 @@ correlation (−0.750 vs +0.094, 198 catastrophic tiles vs 0) and the 29.68% hea
 - Labelling: neighbour vote + signed PMI mixture, β-swept.
 - The prior: boundary marginals, Dirichlet smoothing, directedness via the row conditional.
 
+### 6a. The method — per-class τ ⭐ *lead with this*
+Protocol, the fit objective (land-cover mIoU, excluding the catch-all — and why: optimising full
+mIoU lets the search buy the metric by repairing an over-predicted background), 5-fold results,
+the calibration learning curve, and the train→val scope limit. `WEEK3_RESULTS.md` §9b.
+
 ### 7. Results
+- **Table 1 — the method.** 5-fold per-class τ: LoveDA +1.18 ± 0.45 (land cover +8.30,
+  background −0.01, water +6.78), against an oracle bound of +1.46 — 81% captured. OEM: land cover
+  +12.45 but full mIoU flat, because its `background` sits at 17.13 IoU and pays for the gain.
+  Calibration curve beside it: 200 tiles for a reliably positive draw.
 - **Table 2 — interventions.** LoveDA: τ→0.1 −5.54 · presence off −11.97 · honest recovery −6.19 ·
   best abstention +0.04 · oracle +3.62. OEM: honest +2.28 · oracle +5.21.
 - **Table 3 — the co-occurrence ablation.** β=0 (48.4%) vs best β (48.6%) vs oracle M (48.7%), plus

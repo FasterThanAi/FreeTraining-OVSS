@@ -184,7 +184,16 @@ alone −3.75. **Never quote +2.28 without the per-class table.**
 ⛔ **Two LoveDA claims do NOT generalise and must be labelled as such:** the presence-collapse
 correlation (§9.2/§9.2a) and the 29.68% headline itself.
 
-⛔ **Threshold tuning is closed — but not for the reason previously recorded.** Sweeping one
+✅ **THE METHOD — calibrated per-class τ.** Fit one threshold per class on ~200 labelled tiles,
+evaluate on disjoint tiles. No weights trained; same protocol SegEarth-OV3 uses for its own τ.
+**LoveDA +1.18 ± 0.45 mIoU, 5-fold, every fold positive, land cover +8.30, background −0.01** —
+81% of the +1.46 oracle bound. `water` +6.78 alone at fitted τ 0.195 vs global 0.5.
+⚠️ **Fit with `--objective real`** (excludes the catch-all): optimising full mIoU lets the search
+buy the metric by repairing an over-predicted background, which is how OEM produced +5.80 with
+land cover −1.77. ⚠️ **Calibration must match the evaluation distribution** — LoveDA train → val
+gives −0.12. WEEK3 §9b.
+
+⛔ **Threshold tuning is closed for LABEL-FREE rules — but not for the reason previously recorded.** Sweeping one
 *global* τ finds nothing (+0.04 LoveDA), but **per-class τ is worth +1.46 with real classes
 +8.63** — `water` at τ=0.170 alone gains 6.70 IoU, and the oracle thresholds span 0.170–0.595.
 **No label-free rule reaches it**: Otsu −0.17, presence-scaled −0.74, equal-commitment −2.98, all
