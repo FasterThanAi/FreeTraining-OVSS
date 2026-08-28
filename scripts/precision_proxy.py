@@ -216,6 +216,14 @@ def main():
     files = sorted(Path(args.cache).expanduser().glob('*.npz'))
     n = len(files)
     rng = np.random.default_rng(args.seed)
+    if args.calib >= n:
+        raise SystemExit(
+            f'--calib {args.calib} against only {n} tiles in {args.cache} leaves nothing '
+            f'to evaluate on.\n'
+            f'A LoveDA cache should hold 1669 .npz and OpenEarthMap 384, so this usually '
+            f'means the run that writes it is STILL IN PROGRESS. Check it finished — the '
+            f'log must print the validation gate (47.37 mIoU / 29.68% discard on LoveDA) — '
+            f'before reading anything out of the cache.')
     idx = rng.permutation(n)
     cal, held = idx[:args.calib], idx[args.calib:]
     print(f'  classes: {LB}\n{n} tiles | calib {args.calib} | held out {n - args.calib}\n')
@@ -278,6 +286,11 @@ def main():
     m_pub = miou(confusion_at(Hhel, np.full(nc, args.tau), bg, NBINS))
     m_or = miou(confusion_at(Hhel, fit(Hhel, bg, NBINS, objective='real'), bg, NBINS))
     oracle_gain = m_or - m_pub
+    # A non-positive oracle gain means per-class thresholds buy nothing on these
+    # tiles, so "share of oracle" is meaningless rather than infinite. Report the
+    # raw delta and say so, instead of dividing by ~0 and printing a huge number.
+    def share(d):
+        return f'{100 * d / oracle_gain:+.0f}%' if oracle_gain > 1e-9 else 'n/a'
 
     md += ['## Level 2 — verdict: does it move mIoU on held-out tiles?\n',
            'Each rule is `τ_c = τ_pub + b · z(proxy_c)`, with the single knob `b` — sign '
@@ -295,7 +308,7 @@ def main():
         m = miou(confusion_at(Hhel, t, bg, NBINS))
         results.append((name, b, m - m_pub))
         md.append(f'| `{name}` | {b:+.3f} | {m:.2f} | **{m - m_pub:+.2f}** | '
-                  f'{100 * (m - m_pub) / oracle_gain:+.0f}% |')
+                  f'{share(m - m_pub)} |')
 
     # ---- the control. One knob over a handful of classes can buy a gain from a
     # meaningless vector; without this the table above cannot be read.
@@ -310,7 +323,8 @@ def main():
               f'_{ctrl.mean():+.2f} ± {ctrl.std(ddof=1):.2f}_ | '
               f'_p95 {np.percentile(ctrl, 95):+.2f}_ |')
     md.append(f'| **oracle per-class τ** | _N−1 params_ | {m_or:.2f} | '
-              f'**{oracle_gain:+.2f}** | 100% |\n')
+              f'**{oracle_gain:+.2f}** | '
+              f'{"100%" if oracle_gain > 1e-9 else "⛔ no gain available here"} |\n')
     md.append(f'⚠️ **A proxy only counts if it beats the random control\'s 95th percentile '
               f'({np.percentile(ctrl, 95):+.2f}).** One fitted knob over {len(real)} classes '
               'can extract a gain from noise — the same confound that gave a colour-novelty '
@@ -339,7 +353,7 @@ def main():
                   'alternative, with this table, not as an untested gap.')
     else:
         nm, b, g = winners[0]
-        md.append(f'✅ **`{nm}` reaches {g:+.2f} mIoU**, {100 * g / oracle_gain:.0f}% of the '
+        md.append(f'✅ **`{nm}` reaches {g:+.2f} mIoU**, {share(g)} of the '
                   f'{oracle_gain:+.2f} oracle bound, against a random-control p95 of '
                   f'{thr:+.2f}. Fitted knob `b = {b:+.3f}`.\n\n'
                   '**If this is the cross-head proxy, it changes the paper\'s claim**: §9a '
