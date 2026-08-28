@@ -196,6 +196,29 @@ def main():
            'behaves like OpenEarthMap, the mechanism is wrong** and the paper\'s central '
            'claim needs rewriting. That is the point of running this before the pipeline '
            'rather than after.\n',
+           '## ⚠️ Two explanations, confounded at n=2 — which does this dataset test?\n',
+           'Everything so far has been attributed to the catch-all\'s **share**. But across '
+           'the two anchors, share moves together with a second property, and the second is '
+           'the more plausible cause:\n',
+           '| | share | **confusability** — does the catch-all LOOK like the real classes? |',
+           '|---|---|---|',
+           '| LoveDA | 36.1% | **high** — unlabelled roads, pavement and built structures '
+           'that resemble `road`, `barren`, `building` |',
+           '| OpenEarthMap | 0.84% | **low** — rare genuinely-unlabelable leftovers |',
+           '\n`conf2` may fail on LoveDA not because background is *common*, but because '
+           'background genuinely *looks like* the real classes, so a strong runner-up cannot '
+           'distinguish a suppressed real class from a background region that merely '
+           'resembles one. Two datasets cannot separate these.\n',
+           '**Decide which way this dataset breaks the tie, and write it here before '
+           'running inference:**\n',
+           '- catch-all **visually similar** to the real classes → both hypotheses predict '
+           'poor detection, and the dataset is uninformative on this question',
+           '- catch-all **visually distinct** from them → the hypotheses DISAGREE. High '
+           'share predicts failure; low confusability predicts success. Either outcome '
+           'eliminates one explanation.\n',
+           '> A dataset that can only confirm is worth less than one that can discriminate. '
+           'A result this shape can be told either way afterwards, so it has to be called '
+           'first.\n',
            '## Next\n',
            '1. Commit this file **before** running any inference.',
            '2. `measure_discard_rate.py` with this dataset\'s config and its own τ.',
