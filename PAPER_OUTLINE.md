@@ -204,9 +204,17 @@ cheapest remaining class of error in this project. **No macro, no citation, not 
 
 ## 6. What is missing before submission
 
-1. **Third dataset** (Potsdam or Vaihingen). The mechanism predicts the residual's size
-   from the `background` share alone — a third point tests that prediction directly, which is a
-   better use of GPU time than another method attempt.
+1. **Break the n=2 confound — and note that a third dataset alone will not.** Across LoveDA and
+   OpenEarthMap the catch-all's *share* moves together with its *confusability*, and the second is
+   the more plausible cause. ⛔ **iSAID does not separate them**: its catch-all is 97.11% of GT
+   *and* maximally confusable (everything outside 15 small object classes), so it would confirm the
+   ordering and discriminate nothing — do not spend the 5 GB download and GPU hours on it expecting
+   otherwise. `scripts/confound_split.py` attacks it two ways with **no GPU**: it *measures*
+   confusability from the confusion matrix instead of asserting it, and it stratifies LoveDA into
+   urban and rural, where the two variables move in **opposite** directions (rural has the larger
+   share, urban the more confusable catch-all). Whichever way detection goes, one explanation is
+   eliminated. A third dataset is still worth having — but choose one whose catch-all is common and
+   visually *distinct*.
 2. A ConInfer comparison row if the code runs (`github.com/Dog-Yang/ConInfer`).
 
 ---
