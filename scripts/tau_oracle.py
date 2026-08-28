@@ -84,7 +84,14 @@ def confusion_at(H, taus, bg, nbins):
     """
     nc = H.shape[0]
     C = np.zeros((nc, nc), np.int64)
-    edges = np.clip((np.asarray(taus) * nbins).astype(int), 0, nbins)
+    # np.rint, NOT .astype(int). Truncation was the original, and it was wrong:
+    # the search grid is k/nbins, but k/200*200 evaluates to 28.999999999999996
+    # for k=29, so int() gave bin 28 -- confusion_at silently scored a threshold
+    # one bin BELOW the one it reported. The mIoU values were achievable
+    # configurations either way, but the reported tau was off by up to 0.005,
+    # which matters the moment a threshold is deployed. Caught by
+    # verify_perclass_tau.py.
+    edges = np.clip(np.rint(np.asarray(taus, float) * nbins).astype(int), 0, nbins)
     for p in range(nc):
         cs = H[:, p, :].sum(1)                       # all bins, per gt
         if p == bg:

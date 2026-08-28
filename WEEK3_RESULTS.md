@@ -410,6 +410,48 @@ Fitting on LoveDA **train** and evaluating on **val** gives **−0.12**. The spl
 > reading over the *share* reading, and it means **29.68% is a LoveDA-val number, not a LoveDA
 > number.**
 
+### 9c. ⚠️ The gain has not yet been produced by the pipeline — patch written, run pending
+
+Everything in §9b is arithmetic on a cached `(gt, pred, conf-bin)` histogram. That shortcut is
+now *proved* equivalent to the rule the segmentor applies (`verify_perclass_tau.py`, 20 random
+threshold vectors, exact match), but proved-equivalent is not the same as run. **Until `eval.py`
+produces the number, §9b is a prediction.**
+
+The pipeline side is ready. `reference/segearthov3_segmentor.py` now accepts `prob_thd` as either
+a scalar — bit-identical to the published line, so the 47.37 gate is preserved by construction —
+or a per-class vector, indexed by the argmax class. `scripts/tau_deploy.py` fits the thresholds,
+writes the held-out tile list, emits the config, and prints the mIoU the GPU run must reproduce.
+
+⚠️ **Expect ~0.01–0.02 of disagreement, not 0.000.** `conf` is cached as float16 (WEEK1 §7.7) and
+the histogram quantises it to 200 bins. A larger gap is a real discrepancy, not rounding.
+
+> **A bin-edge bug was found by writing that test, and fixed.** `confusion_at` computed its bin
+> edge with `(tau * nbins).astype(int)`, which **truncates**: `29/200 * 200` is
+> `28.999999999999996`, so the function scored a threshold one bin *below* the one it reported.
+> Now `np.rint`. **No recorded number changes** — only 7 of the 201 grid values are affected
+> (0.145, 0.285, 0.290, 0.565, 0.570, 0.575, 0.580) and none was ever chosen; 0.170, 0.195, 0.500,
+> 0.595 and 0.600 all bin exactly, as do the published τ 0.5 / 0.1. The reported mIoU was always
+> the mIoU of the configuration actually evaluated, so the *gains* were never at risk — only a
+> *deployed* threshold could have gone wrong, which is exactly what this step exists to catch.
+
+**To run it** (workstation, ~50 min for both passes):
+
+```bash
+cd ~/FreeTraining-OVSS && python scripts/verify_perclass_tau.py     # CPU, must pass first
+python scripts/tau_deploy.py --cache ~/outputs/week3_fused/cache --tau 0.5 \
+  --calib 200 --seed 0 --split-out ~/splits/loveda_heldout.txt \
+  --cfg-out ~/SegEarth-OV-3/configs/cfg_loveda_perclass.py \
+  --md ~/outputs/week3/tau_deploy.md
+cp ~/FreeTraining-OVSS/reference/segearthov3_segmentor.py ~/SegEarth-OV-3/
+cd ~/SegEarth-OV-3
+python eval.py ./configs/cfg_loveda.py \
+  --cfg-options test_dataloader.dataset.ann_file=$HOME/splits/loveda_heldout.txt
+python eval.py ./configs/cfg_loveda_perclass.py
+```
+
+Both passes evaluate the **same 1469 held-out tiles**, so the difference is the claim. The
+absolute values will not be 47.37 — that is the full split, and this is a subset.
+
 ---
 
 ## 10. Where the project stands

@@ -58,8 +58,10 @@ class SegEarthOV3Segmentation(BaseSegmentor):
         self.num_queries = len(self.query_idx)
         self.query_idx = torch.Tensor(self.query_idx).to(torch.int64).to(device)
 
-        self.prob_thd = prob_thd
         self.bg_idx = bg_idx
+        self.prob_thd = None
+        self.prob_thd_vec = None
+        self.set_prob_thd(prob_thd)
         self.slide_stride = slide_stride
         self.slide_crop = slide_crop
         self.confidence_threshold = confidence_threshold
@@ -77,6 +79,34 @@ class SegEarthOV3Segmentation(BaseSegmentor):
         self.presence_log = []
         self.last_presence = np.zeros((0, self.num_queries), dtype=np.float32)
         self.last_fused = None       # <<< INSTRUMENTATION: P_fused, pre-gating
+
+    # <<< PER-CLASS TAU: `prob_thd` may be a scalar (the published baseline,
+    # unchanged) or a sequence of length num_cls giving one threshold per class.
+    # The rule is the same either way -- a pixel is assigned to bg_idx when the
+    # winning score falls below the threshold -- but which threshold applies is
+    # chosen by the ARGMAX CLASS, not fixed globally. That is the only change.
+    #
+    # Scalar is the default and reproduces 47.37 exactly, so the validation gate
+    # is preserved by construction rather than by re-checking.
+    def set_prob_thd(self, prob_thd):
+        if isinstance(prob_thd, (list, tuple, np.ndarray, torch.Tensor)):
+            vec = torch.as_tensor(prob_thd, dtype=torch.float32).flatten()
+            if vec.numel() != self.num_cls:
+                raise ValueError(
+                    f'prob_thd has {vec.numel()} entries but the model has '
+                    f'{self.num_cls} classes. A silently misaligned threshold '
+                    f'vector would apply water\'s tau to forest and still '
+                    f'produce a plausible mIoU, so this is fatal.')
+            if not torch.all((vec >= 0) & (vec <= 1)):
+                raise ValueError(f'prob_thd out of [0, 1]: {vec.tolist()}')
+            self.prob_thd_vec = vec.to(self.device)
+            self.prob_thd = None
+            print('  per-class prob_thd: '
+                  + ', '.join(f'{t:.3f}' for t in vec.tolist()))
+        else:
+            self.prob_thd_vec = None
+            self.prob_thd = float(prob_thd)
+
 
     def _inference_single_view(self, image):
         """Inference on a single PIL image or crop patch."""
@@ -249,7 +279,11 @@ class SegEarthOV3Segmentation(BaseSegmentor):
             
             # Apply probability threshold
             max_vals = seg_logits.max(0)[0]
-            seg_pred[max_vals < self.prob_thd] = self.bg_idx
+            # <<< PER-CLASS TAU: index the threshold by the predicted class.
+            # With a scalar this is bit-identical to the published line.
+            thd = (self.prob_thd if self.prob_thd_vec is None
+                   else self.prob_thd_vec[seg_pred])
+            seg_pred[max_vals < thd] = self.bg_idx
 
             data_samples[i].set_data({
                 'seg_logits': PixelData(**{'data': seg_logits}),

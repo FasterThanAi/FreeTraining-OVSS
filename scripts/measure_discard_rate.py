@@ -175,7 +175,14 @@ def main():
              else 'raw masks shifted +1 (raw 0 = background, no no-data value)'))
     model = init_model(args.config, device='cuda')
     if args.tau is not None:
-        model.prob_thd = args.tau   # segmentor reads this attribute at inference
+        # set_prob_thd, not a bare attribute write: the segmentor now also carries
+        # `prob_thd_vec` for per-class thresholds, and assigning `prob_thd`
+        # directly would leave a vector from the config in place and silently
+        # ignore --tau. The setter clears it.
+        if hasattr(model, 'set_prob_thd'):
+            model.set_prob_thd(args.tau)
+        else:
+            model.prob_thd = args.tau
     if args.no_presence:
         model.use_presence_score = False   # same trick: read at inference, not init
         print('  PRESENCE GATING DISABLED -- P_final = P_fused. '

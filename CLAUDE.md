@@ -188,6 +188,11 @@ correlation (§9.2/§9.2a) and the 29.68% headline itself.
 evaluate on disjoint tiles. No weights trained; same protocol SegEarth-OV3 uses for its own τ.
 **LoveDA +1.18 ± 0.45 mIoU, 5-fold, every fold positive, land cover +8.30, background −0.01** —
 81% of the +1.46 oracle bound. `water` +6.78 alone at fitted τ 0.195 vs global 0.5.
+⚠️ **Not yet produced by the pipeline** — §9b is histogram arithmetic, proved equivalent to the
+segmentor's rule by `verify_perclass_tau.py` but not yet run. The segmentor now takes `prob_thd`
+as a scalar (unchanged, gate preserved) **or** a per-class vector; `tau_deploy.py` emits the
+config and the number `eval.py` must reproduce. **Run it before quoting +1.18 as measured.**
+WEEK3 §9c.
 ⚠️ **Fit with `--objective real`** (excludes the catch-all): optimising full mIoU lets the search
 buy the metric by repairing an over-predicted background, which is how OEM produced +5.80 with
 land cover −1.77. ⚠️ **Calibration must match the evaluation distribution** — LoveDA train → val
