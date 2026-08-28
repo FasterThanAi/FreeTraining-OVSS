@@ -482,6 +482,66 @@ python eval.py ./configs/cfg_loveda_perclass.py
 Both passes evaluate the **same 1469 held-out tiles**, so the difference is the claim. The
 absolute values will not be 47.37 — that is the full split, and this is a subset.
 
+### 9d. ⭐ Precision *is* predictable without labels — and it still does not set the threshold
+
+`precision_proxy.py`, LoveDA, 200 calibration tiles, 1469 held out. Eight label-free per-class
+statistics against three label-derived targets. §9a's impossibility argument was that the oracle
+exploits per-class **precision**, which is label-derived by definition. **The first half of that is
+now measured to be false, and the argument comes out stronger.**
+
+| proxy | ρ vs precision | p *(exact)* | ρ vs oracle τ | p *(exact)* | Δ mIoU held out |
+|---|---|---|---|---|---|
+| **`mean_conf`** | **+0.943** | **0.017** | −0.371 | 0.497 | **−0.18** |
+| `gate_ratio` | **+0.943** | **0.017** | −0.371 | 0.497 | −0.05 |
+| `mean_margin` | +0.829 | 0.058 | −0.086 | 0.919 | −0.04 |
+| `presence` | +0.657 | 0.175 | −0.086 | 0.919 | **+0.42** |
+| `argmax_stability` | +0.371 | 0.497 | −0.543 | 0.297 | −0.04 |
+| *random proxy ×200* | — | — | — | — | *+0.11 ± 0.28, p95 **+0.58*** |
+| **oracle per-class τ** | — | — | — | — | **+1.24** |
+
+p-values are exact, by enumerating all **720** relabelings — at six classes |ρ| = 0.6 arises by
+chance about a fifth of the time, so a table lookup would be misleading here.
+
+**Mean confidence ranks the classes by precision almost perfectly** (ρ +0.943, p 0.017). SAM 3 is
+*rank-calibrated across classes* on LoveDA, which is a small finding in itself and is not something
+the baseline reports. **And it buys nothing** — −0.18 mIoU, and nothing in the table beats the
+random control's p95 of +0.58.
+
+**Because the chain breaks one link later than §9a said.** Precision does not determine the
+threshold — the relationship is not even monotone:
+
+| class | precision | oracle τ | |
+|---|---|---|---|
+| water | 88.5 | **0.175** | highest precision → lowest τ |
+| building | 75.7 | 0.190 | |
+| **road** | 68.5 | **0.675** | ⬅ *mid* precision → **highest** τ |
+| agricultural | 66.6 | 0.565 | |
+| forest | 61.6 | 0.410 | |
+| barren | 55.6 | 0.375 | lowest precision → *middle* τ |
+
+ρ(precision, oracle τ) = **−0.429, p = 0.419**; ρ(P−R gap, oracle τ) = **−0.371, p = 0.497**.
+Neither is distinguishable from chance. §9a's `r = −0.618` was already hedged as "a direction
+rather than a law, driven by `water`" — this confirms that hedge was necessary and sharpens it.
+
+> ⭐ **The restated bound, which is stronger than the original.** The right per-class threshold is
+> not a function of any single-class quality statistic, because it is the solution to a **coupled**
+> multi-class IoU objective: raising `road`'s τ pushes pixels into `background`, which changes
+> `background`'s IoU, which changes every other class's optimum. A per-class scalar — measurable or
+> not — cannot express that. **This is why the 6-parameter fit of §9b works and every 1-parameter
+> rule fails, and it explains the failures rather than merely recording them.**
+
+That reframes the negative from *"we cannot measure the quantity that sets the threshold"* to
+*"we can measure it, and it is the wrong quantity"* — which is a better result, generalises to any
+training-free pipeline thresholding a per-class score, and closes the loophole a reviewer would
+otherwise open.
+
+⏳ **Cross-head agreement is not in this table yet.** `fused = max(P_sem, P_inst_agg)` destroys the
+distinction, so it needed instrumentation; the segmentor and cache now carry each head's own top-1
+(`iconf/ipred`, `sconf/spred`) and the re-run is pending. It is the one remaining candidate that
+asks how often the model is *right* rather than how its scores are distributed — but note that the
+coupling argument above predicts it will fail too, **for the same reason and regardless of how good
+a precision estimate it turns out to be.** That prediction is written down before the number.
+
 ---
 
 ## 10. Where the project stands
