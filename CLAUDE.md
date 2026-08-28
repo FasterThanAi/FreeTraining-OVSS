@@ -184,7 +184,14 @@ alone −3.75. **Never quote +2.28 without the per-class table.**
 ⛔ **Two LoveDA claims do NOT generalise and must be labelled as such:** the presence-collapse
 correlation (§9.2/§9.2a) and the 29.68% headline itself.
 
-⛔ **Drop the DINOv3 detection plan.** Detection already works on OEM (0.913) and recovery still
+⛔ **Threshold tuning is closed — but not for the reason previously recorded.** Sweeping one
+*global* τ finds nothing (+0.04 LoveDA), but **per-class τ is worth +1.46 with real classes
++8.63** — `water` at τ=0.170 alone gains 6.70 IoU, and the oracle thresholds span 0.170–0.595.
+**No label-free rule reaches it**: Otsu −0.17, presence-scaled −0.74, equal-commitment −2.98, all
+*below* the published τ. The oracle exploits per-class **precision**, which is label-derived by
+definition. WEEK3 §9a.
+
+⛔ **Drop the DINOv3 *detection* plan** (labelling is a separate question — see below).** Detection already works on OEM (0.913) and recovery still
 fails there, so better detection buys nothing.
 
 ### Week 3 detail — LoveDA

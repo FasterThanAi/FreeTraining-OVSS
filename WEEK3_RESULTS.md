@@ -264,6 +264,65 @@ factor-2 bins, unit-checked (pure size-leak 0.503 → 0.512, genuine signal 0.92
 
 ---
 
+## 9a. ⛔ Threshold tuning — a real oracle gain that no label-free rule reaches
+
+An earlier version of this file said threshold tuning was closed. **That was wrong**, and the
+τ-sweep is why: sweeping one *global* τ found nothing (+0.04 on LoveDA), so the family was
+declared exhausted. Per-class thresholds were never tested.
+
+`tau_oracle.py`, three rungs, each strictly more powerful (both swept rows are **oracle bounds** —
+they choose thresholds on the evaluation labels):
+
+| rung | free params | LoveDA | OEM |
+|---|---|---|---|
+| published τ | 0 | 47.37 | 44.16 |
+| best global τ | 1 | 47.41 (+0.04) | **49.31 (+5.15)** |
+| **best per-class τ** | N−1 | **48.83 (+1.46)** | 49.44 (+5.28) |
+
+**LoveDA's +1.46 is the only gain in this project where land cover genuinely improves** — the six
+real classes gain **+8.63 IoU** in aggregate against background's +1.59. It is driven almost
+entirely by `water` at τ=0.170 (**+6.70 IoU**), whose baseline precision/recall is 89.5 / 54.7.
+Chosen thresholds span **0.170 to 0.595**: one global value is wrong for different classes in
+*opposite* directions.
+
+**OEM's +5.28 is the familiar artefact.** `background +49.22`, real classes **−1.71**, and 98% of
+it comes from a single *global* change (0.1 → 0.025). Report it as a calibration observation about
+the baseline's published τ, never as a contribution.
+
+### 9a.1 No label-free rule reaches it, and the reason is structural ⭐
+
+`tau_rules.py`. Each rule spends **one** label-tuned knob — parity with the baseline, which also
+tunes τ per dataset with labels — or none. Only scoring uses labels.
+
+| rule | knobs | LoveDA Δ | share of oracle | OEM Δ | share |
+|---|---|---|---|---|---|
+| per-class Otsu | **0** | −0.17 | −12% | −5.80 | −110% |
+| equal-commitment (q-th percentile) | 1 | −2.98 | −204% | +3.53 | 67% |
+| presence-scaled (τ_c ∝ `S_pres_c`) | 1 | −0.74 | −50% | +4.77 | 90% |
+| *oracle per-class* | N−1 | *+1.46* | *100%* | *+5.28* | *100%* |
+
+**On LoveDA every label-free rule is worse than the published τ.** On OEM the two that look good
+capture the background artefact, not land cover (real classes −1.90), and a plain global τ already
+gets 98% of it.
+
+**Why.** What the oracle exploits is per-class **precision**. `water` can afford τ=0.170 because it
+is right 89.5% of the time it fires; `agricultural` needs 0.595 because it is not. Across the six
+LoveDA classes the oracle threshold tracks the precision–recall gap at **r = −0.618** (n=6, so a
+direction rather than a law — `water` is the clear case and drives most of it).
+
+**Precision and the P−R gap are computed from labels by definition.** Confidence percentiles,
+presence scores and Otsu splits all describe how the *model* is distributed, not how *often it is
+right*, and none of them predicts precision. So:
+
+> **Per-class thresholding is worth +1.46 mIoU, and the quantity needed to set it is precisely the
+> quantity a training-free method cannot have.**
+
+That is a better negative than the original "threshold tuning is closed": it bounds the family,
+explains the bound, and names what would be needed to reach it. It also generalises — any
+training-free pipeline that thresholds a per-class score inherits it.
+
+---
+
 ## 10. Where the project stands
 
 **Established.**
@@ -282,6 +341,7 @@ factor-2 bins, unit-checked (pure size-leak 0.503 → 0.512, genuine signal 0.92
 | honest recovery, no abstention | −6.19 | +2.28 (real classes **−2.11**) |
 | honest recovery + best abstention | +0.04 | +0.63 |
 | detect recoverability | 0.434–0.622 AUC | 0.601–0.913 AUC |
+| per-class τ, label-free | −0.17 (best of 3 rules) | +4.77 but real classes −1.90 |
 | **improve land-cover IoU by recovery** | **no** | **no** |
 
 **The conclusion.** Detectability is governed by label design. Recovery is not worthwhile either

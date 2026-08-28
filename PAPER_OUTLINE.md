@@ -44,7 +44,14 @@ abstract.
 3. **Atomisation dominates the prior.** Connected components of the discard region reach an oracle
    ceiling of 72.8%; SLIC reaches **92.8%**. Twenty ceiling points, against 0.3 for a *perfect*
    co-occurrence matrix.
-4. **Oracle bounds throughout.** Every negative result is reported with what a perfect version of
+4. **Per-class thresholding is worth +1.46 mIoU and is unreachable without labels.** The oracle
+   thresholds span 0.170–0.595, so one global τ is wrong for different classes in opposite
+   directions; `water` alone gains 6.70 IoU at τ=0.170. But what sets the right threshold is
+   per-class precision, and no label-free proxy we tested (confidence percentile, presence score,
+   Otsu split) predicts it — all three score *below* the published τ on LoveDA. This bounds an
+   entire family of trivial alternatives and explains the bound, and it generalises to any
+   training-free pipeline that thresholds a per-class score. (`WEEK3_RESULTS.md` §9a)
+5. **Oracle bounds throughout.** Every negative result is reported with what a perfect version of
    the missing component would buy, so the reader learns where the headroom is rather than only
    that we failed to reach it.
 
@@ -113,7 +120,11 @@ correlation (−0.750 vs +0.094, 198 catastrophic tiles vs 0) and the 29.68% hea
   the multi-neighbour stratum where it does work (+2.03 mined, +5.44 oracle, 10% of the residual).
 - **Table 4 — detection across both datasets.** Nine signals, LoveDA 0.434–0.622 against OEM
   0.601–0.913, with base rates and the ~0.53 empirical floor.
-- **Table 5 — the per-class decomposition of OEM's +2.28.** `background +22.67`, real classes
+- **Table 5 — threshold tuning, bounded.** Published τ · best global τ · best per-class τ
+  (oracle) · three label-free rules. LoveDA: the oracle is worth **+1.46** with real classes
+  **+8.63**, and **every label-free rule is worse than the published τ**. The reason is the
+  finding: the oracle exploits per-class *precision*, which is label-derived by definition.
+- **Table 6 — the per-class decomposition of OEM's +2.28.** `background +22.67`, real classes
   **−2.11**, `building −3.75`. **This table is the honesty of the paper.** It shows a headline mIoU
   gain that is not a segmentation improvement, and it is the one a reviewer would otherwise
   construct themselves.
@@ -123,7 +134,8 @@ correlation (−0.750 vs +0.094, 198 catastrophic tiles vs 0) and the 29.68% hea
 - Oracle bounds are upper bounds *under this labeller*, not true ceilings.
 - Deep features untested for detection — justified, since detection already works on OEM and
   recovery still fails there.
-- Recovery evaluated at one τ per dataset (each dataset's own tuned value).
+- Recovery evaluated at one τ per dataset (each dataset's own tuned value), though
+  §9a bounds what any other τ could have given.
 
 ### 9. Conclusion
 The residual is a property of the annotation scheme as much as of the model. Detectability follows
