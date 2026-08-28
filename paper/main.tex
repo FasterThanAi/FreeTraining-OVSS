@@ -1,11 +1,11 @@
 % =====================================================================
 %  It's the Labels, Not the Model
-%  Skeleton -- ROADMAP Phase 5. Section map follows PAPER_OUTLINE.md §3.
+%  ROADMAP Phase 5. Section map follows PAPER_OUTLINE.md §3.
 %
 %  Compiles as-is with pdflatex + a standard TeX Live. To move to the
-%  CVPR workshop template, replace the two lines marked TEMPLATE below
-%  with \documentclass[10pt,twocolumn,letterpaper]{article} + \usepackage{cvpr}
-%  (or IEEEtran for GRSL). Nothing else in this file assumes a class.
+%  CVPR workshop template, replace the two lines marked TEMPLATE with
+%  \documentclass[10pt,twocolumn,letterpaper]{article} + \usepackage{cvpr}
+%  (or IEEEtran for GRSL). Nothing else here assumes a class.
 %
 %  ⚠️ EVERY NUMBER COMES FROM numbers.tex. Do not type a figure inline --
 %  if it is not a macro there, it has no citation and does not belong.
@@ -20,16 +20,14 @@
 \usepackage{amsmath,amssymb}
 \usepackage{multirow}
 \usepackage{xcolor}
-\usepackage{siunitx}
-\sisetup{detect-weight=true, detect-family=true}
 \usepackage[hidelinks]{hyperref}
 
 \graphicspath{{../docs/}}
 \input{numbers}
 
-% marks an unwritten passage; \listoftodos at the end shows what is left
 \newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
 \newcommand{\best}[1]{\textbf{#1}}
+\newcommand{\bg}{\texttt{background}}
 
 \title{It's the Labels, Not the Model:\\
        Why Presence-Gated Segmentation Discards, and Why Recovery Doesn't Help}
@@ -40,158 +38,350 @@
 \maketitle
 
 \begin{abstract}
-\todo{Write last. The shape, in order:
-(1) presence-gated SAM~3 pipelines assign \discardPct{} of real land-cover pixels
-to \texttt{background} on LoveDA and \discardOEM{} on OpenEarthMap;
-(2) that difference, and whether the residual is detectable at all, is governed by
-the dataset's label design rather than by the model;
-(3) recovery is not worthwhile in either regime;
-(4) but a per-class threshold, fitted on \calibTiles{} labelled tiles with no weights
-trained, gives \methodGain{}~$\pm$~\methodSD{} mIoU with land cover \methodLand{};
-(5) and no label-free rule reaches it, for a reason we identify.}
+Training-free open-vocabulary segmentation pipelines built on SAM~3 gate their
+predictions by a confidence threshold and assign everything below it to a
+\bg{} class. We show this discards a great deal of real land cover ---
+\discardPct{} of all real-class pixels on LoveDA, \discardPx{} in total, with
+silence outnumbering misclassification \discardRatio{} --- and that the size of
+this residual, together with whether it can be detected at all, is governed by
+the dataset's \emph{label design} rather than by the model. Where \bg{} is a
+catch-all covering \bgShareLove{} of the scene, the residual is large and no
+signal separates it from genuine background (nine tested; best AUC \aucLove{}
+against a \aucFloor{} floor); where the vocabulary covers the scene
+(\bgShareOEM{}), only \discardOEM{} is discarded and the runner-up class score
+separates it at AUC \aucOEM{}. Recovery is nonetheless not worthwhile in either
+regime: it yields \recoverLove{}~mIoU on LoveDA, and on OpenEarthMap its
+apparent \recoverOEM{} is entirely attributable to \bg{} ceasing to be
+over-predicted (\oemBgGain{}) while the real classes lose \oemRealLoss{}~IoU.
+A different correction does work. Fitting one threshold \emph{per class} rather
+than one globally --- on \calibTiles{} labelled tiles, with no model weights
+trained, the same protocol the baseline already uses to tune its single
+threshold --- gives \methodGain{}~$\pm$~\methodSD{}~mIoU on LoveDA with
+land-cover classes gaining \methodLand{}~IoU and the catch-all untouched at
+\methodBg{}, capturing \oracleShare{} of an oracle bound of \oracleBound{}.
+Finally, we show this bound is not reachable without labels, and identify why:
+\nAttempts{} label-free rules fail, four of which provably estimate per-class
+precision, because the optimal threshold solves a \emph{coupled} multi-class
+objective that no per-class statistic can express.
 \end{abstract}
 
 % =====================================================================
 \section{Introduction}
 \label{sec:intro}
-% PAPER_OUTLINE §3.1 -- reveal the contrast on page one. Do not spend two
-% sections on LoveDA before the second dataset appears; the contrast IS the paper.
 
-\todo{The residual: \discardPx{} pixels, \discardPct{} of real land cover on LoveDA,
-with discard beating confusion \discardRatio{}. Then immediately: \discardOEM{} on
-OpenEarthMap, same pipeline.}
+Open-vocabulary semantic segmentation promises to label an image against a list
+of class names in plain English, with no training on the target dataset. For
+remote sensing this is unusually valuable: annotation is expensive, and it must
+be redone for every new region and sensor. Recent work replaces the multi-model
+CLIP stacks that dominated this area with SAM~3, whose presence, semantic and
+instance heads can be combined into a single pipeline that reports strong
+results across twenty datasets~\cite{segearthov3}.
 
-\todo{Why the obvious fixes do not work -- forward-reference Table~\ref{tab:interventions}.}
+That pipeline ends in a threshold. Class scores are gated by a presence score,
+the highest-scoring class is taken per pixel, and any pixel whose winning score
+falls below a threshold $\tau$ is assigned to \bg{}. The threshold is tuned per
+dataset using labels, and everything below it is given up on.
+
+We measure what that costs. On LoveDA, \best{\discardPct{} of all real
+land-cover pixels --- \discardPx{} of them --- are assigned to \bg{}}, and
+across every class discard outnumbers misclassification by roughly
+\discardRatio{}. The dominant failure of this pipeline is not that it is wrong;
+it is that it is \emph{silent}.
+
+The natural response is to recover those pixels, and the natural objection is
+that a lower threshold would do the same thing more cheaply. Neither works
+(Table~\ref{tab:interventions}).
+Lowering $\tau$ from $0.5$ to $0.1$ recovers two-thirds of the residual and
+costs \tauCost{}~mIoU, at \tauRatio{} wrong pixels for every one right; removing
+the presence gate costs \presCost{}. A region-level recovery method built on a
+corpus-level semantic co-occurrence prior --- our original proposal --- adds
+\priorGain{}~points over simply copying the largest neighbouring region, and a
+\emph{perfect} co-occurrence matrix adds \priorOracle{}.
+
+Running the same pipeline on a second dataset explains why, and the explanation
+is the paper's main contribution. On OpenEarthMap, whose \bg{} class is a rare
+genuine label rather than a catch-all, only \discardOEM{} is discarded, there
+are no catastrophic tiles, and the residual is easy to detect --- the runner-up
+class score reaches AUC \aucOEM{} where on LoveDA nine separate signals sit at
+chance (Fig.~\ref{fig:auc}). \best{Detectability is a property of the annotation scheme, not of the
+model.} A catch-all class gives the model a plausible answer everywhere, so a
+strong second-place score carries no information about whether a real class was
+suppressed.
+
+That analysis points somewhere more productive than recovery. A single global
+threshold is being asked to serve classes with very different precision--recall
+profiles: on LoveDA, \texttt{water} is right 89.5\% of the time it
+fires but finds only 54.7\% of what is present, while
+\texttt{agricultural} is balanced. Fitting one threshold per class on
+\calibTiles{} labelled tiles --- no weights trained, the same protocol the
+baseline already uses for its single $\tau$ --- gives
+\methodGain{}~$\pm$~\methodSD{}~mIoU, with land cover gaining \methodLand{} and
+the catch-all class untouched.
 
 \paragraph{Contributions.}
 \begin{enumerate}\itemsep2pt
-  \item \textbf{A mechanism.} Detectability of the background residual is governed by
-        label design, not by the model. Across two datasets the catch-all class's share
-        of ground truth (\bgShareLove{} vs \bgShareOEM{}) tracks the residual's size,
-        its detectability (best AUC \aucLove{} vs \aucOEM{}), the presence--discard
-        correlation, and the catastrophic-tile count.
-  \item \textbf{A method.} Per-class confidence thresholds, calibrated on
-        \calibTiles{} labelled tiles with \emph{no weights trained},
-        give \methodGain{}~$\pm$~\methodSD{} mIoU on LoveDA over a reproduced
-        published baseline, land cover \methodLand{}, catch-all \methodBg{} ---
-        \oracleShare{} of an oracle bound of \oracleBound{}.
-  \item \textbf{A bound, with its reason.} \nAttempts{} label-free rules fail to reach
-        that bound. Four of them provably measure per-class precision, which we had
-        supposed was the missing quantity. It is not: the optimal threshold solves a
-        \emph{coupled} multi-class objective that no per-class scalar can express.
+  \item \textbf{A mechanism.} The catch-all class's share of ground truth
+        (\bgShareLove{} vs \bgShareOEM{}) tracks the residual's size, its
+        detectability, the presence--discard correlation and the catastrophic-tile
+        count across two datasets (Table~\ref{tab:mechanism}).
+  \item \textbf{A method.} Calibrated per-class thresholds:
+        \methodGain{}~$\pm$~\methodSD{}~mIoU, land cover \methodLand{}, catch-all
+        \methodBg{}, \oracleShare{} of an oracle bound of \oracleBound{}, verified
+        end-to-end in the pipeline.
+  \item \textbf{A bound, with its reason.} \nAttempts{} label-free rules fail to
+        reach that bound. Four provably estimate per-class precision, which we had
+        supposed was the missing quantity; it is not.
   \item \textbf{A null-model correction} for co-occurrence analysis on segmentation
         masks, which refuted one of our own earlier findings and generalises beyond
         this setting.
 \end{enumerate}
 
+Every negative result is reported with an oracle bound --- what a perfect version
+of the missing component would have bought --- so a reader learns where the
+headroom is rather than only that we failed to reach it.
+
 % =====================================================================
 \section{Related work}
 \label{sec:related}
-\todo{SegEarth-OV (CVPR 2025); SegEarth-OV3 (arXiv:2512.08730) --- the baseline,
-its dual-head fusion and presence gating.}
 
-\todo{ConInfer (arXiv:2603.29271): visual context, patch level, per-scene, CLIP.
-Nearest competitor. \textbf{Do not} cite its $+2.80$ as evidence that appearance
-solves detection --- it does context modelling, not residual-class detection.}
+\paragraph{Training-free open-vocabulary segmentation for remote sensing.}
+SegEarth-OV~\cite{segearthov} established the setting, introducing a feature
+upsampler trained on unlabelled imagery to recover the spatial detail that
+CLIP's $1/16$ downsampling destroys. Its successor,
+SegEarth-OV3~\cite{segearthov3}, replaces the CLIP stack with SAM~3~\cite{sam3}
+and contributes two components we inherit: \emph{dual-head mask fusion}, which
+takes the elementwise maximum of the dense semantic head and the aggregated
+instance head, and \emph{presence-guided filtering}, which multiplies each class
+map by a scalar presence score before thresholding. It is our baseline
+throughout, and we reproduce it to within rounding on both datasets.
 
-\todo{DenseCRF / CRF-as-RNN --- the classical spatial-context answer, and the
-baseline a reviewer will raise against neighbour propagation.}
+\paragraph{Context at inference.} ConInfer~\cite{coninfer} is the nearest
+competitor: it fits a Gaussian mixture over DINOv3 patch features and fuses the
+resulting posterior with the vision--language prior, reporting $+2.80$~mIoU. Its
+context is \emph{visual}, at \emph{patch} level, fitted \emph{per scene}. Our
+original proposal was semantic context at region level mined corpus-wide, which
+ConInfer's own limitations section names as future work. We report that proposal
+as an ablation rather than a contribution, because we measured it and it does not
+earn its place (Section~\ref{sec:built}). We note explicitly that ConInfer's gain
+should \emph{not} be read as evidence that appearance features solve the
+detection problem we identify: it performs context modelling, not
+residual-class detection, and the two are different tasks.
+
+\paragraph{Spatial context as post-processing.} Dense CRFs~\cite{densecrf} are
+the classical answer to ``use spatial context to fix segmentation'', and remain
+the baseline a reviewer will raise against any neighbour-propagation scheme. Our
+findings are relevant to that family: we show that on a catch-all dataset the
+limiting factor is not the propagation rule but the inability to identify which
+pixels should be propagated to at all.
 
 % =====================================================================
 \section{Setup}
 \label{sec:setup}
-LoveDA validation, \loveTiles{} tiles at $\tau=0.5$; the baseline reproduces at
-\loveBase{} mIoU against a published \lovePub{}. OpenEarthMap validation,
-\oemTiles{} of the official 500 tiles at its own tuned $\tau=0.1$;
-\oemBase{} against a published \oemPub{}.
 
-\todo{State plainly that at 77\% of the OEM split this is a sanity anchor, not a
-reproduction gate.}
+\paragraph{Datasets.} LoveDA~\cite{loveda} validation, \loveTiles{} tiles at
+$1024^2$ and 0.3\,m GSD, seven classes including \bg{}, evaluated at
+the baseline's published $\tau=0.5$. OpenEarthMap~\cite{openearthmap} validation,
+\oemTiles{} of the official 500 tiles, nine classes, at its published $\tau=0.1$.
+We reproduce the baseline at \loveBase{}~mIoU on LoveDA against a published
+\lovePub{}, and \oemBase{} on OpenEarthMap against a published \oemPub{}. At
+77\% of the OpenEarthMap split the latter is a sanity anchor rather
+than a reproduction gate --- the tile mix differs --- but a broken class-name to
+label-value mapping would have landed far off in one direction, so it establishes
+that the preparation is sound.
 
-\paragraph{Validation gate.} Every instrumented LoveDA run reproduces \loveInstr{}~mIoU
-and \discardPct{} discard exactly. \todo{Say this explicitly --- it is why the
-numbers can be trusted, and it is what caught the instrumentation that was not
-observation-only.}
+\paragraph{Instrumentation and its validation gate.} All measurements come from
+an instrumented copy of the baseline segmentor that records, per pixel, the
+winning class and score, the runner-up, the pre-gating fused score, and each
+head's own top-1, plus the per-class presence score per sliding-window view.
+\best{Every instrumented run must reproduce \loveInstr{}~mIoU and \discardPct{}
+discard exactly}; a run that does not has changed behaviour and is rejected. This
+gate is not a formality --- it is what establishes that the additions are
+observation-only, and every number below inherits it.
+
+\paragraph{A cached sufficient statistic.} Because the argmax does not depend on
+$\tau$, the histogram $H[\text{gt},\text{pred},\text{conf bin}]$ is a sufficient
+statistic for the confusion matrix at \emph{any} per-class threshold vector.
+Caching it once turns every subsequent threshold sweep, oracle bound and
+cross-validation into a CPU operation on a saved array rather than a GPU run. We
+verify it against the deployed pipeline in Section~\ref{sec:results}.
 
 % =====================================================================
 \section{Anatomy of the residual}
 \label{sec:anatomy}
-\todo{Two mechanisms (\mechA{} below $\tau$; \mechB{} is \texttt{background}
-winning the argmax at $\mathrm{conf}\ge\tau$ --- \mechBpx{} pixels in \mechBtiles{}
-tiles, all water, \emph{unreachable by any threshold}).}
 
-\todo{$\tau$-sweep, non-linear: $0.5\!\to\!0.3$ costs $0.73$, $0.3\!\to\!0.1$ costs $4.81$.}
+\paragraph{Two mechanisms, not one.} A real-class pixel can be labelled \bg{} in
+two ways: its winning score falls below $\tau$, or \bg{} wins the argmax outright
+at $\mathrm{conf}\ge\tau$. On LoveDA, \mechA{} of the residual is the first and
+\mechB{} the second --- \mechBpx{} pixels in \mechBtiles{} tiles, \emph{all of
+them water}, in large homogeneous scenes where the presence head fires for \bg{}.
+The distinction matters because \best{the second group is unreachable by any
+threshold}: lowering $\tau$ cannot change an argmax. Part of the residual lies
+outside what threshold tuning can address at all.
 
-\todo{Presence gating is a correlate, \textbf{not} a cause --- refuted by our own
-counterfactual, $r=+0.018$ on recovery. Include the refutation; it is the section
-reviewers trust.}
+\paragraph{Threshold relaxation is non-linear, and expensive where it matters.}
+Lowering $\tau$ from $0.5$ to $0.3$ recovers 99M pixels for
+$0.73$~mIoU; from $0.3$ to $0.1$ recovers a nearly identical count for $4.81$.
+The residual is not a uniform mass: a shallow band sits just below the operating
+point and a deep tail does not. Tracing the confusion matrix, the full sweep
+recovers 85.3M correct agricultural pixels while creating
+147.9M false ones --- \tauRatio{} wrong per right. A scalar
+threshold carries no information about \emph{which} class a region plausibly is,
+so it cannot recover selectively.
+
+\paragraph{Presence gating is a correlate, not a cause.} Tiles that fail
+catastrophically ($\ge$99\% discarded, $n=\catTilesLove{}$) have a
+median maximum presence score of $0.273$ against $0.918$ on healthy tiles, and
+the correlation over all \loveTiles{} tiles is \presCorrLove{}. On one such tile
+the semantic head emits a $+10.13$ logit for \texttt{road} --- effective
+certainty --- while the presence gate crushes the tile's best achievable score to
+$0.076$. We proposed that gating was destroying recoverable evidence, and then
+refuted it: with gating removed, recovery on those tiles is \emph{uncorrelated}
+with how suppressed they were ($r=+0.018$), the same intervention pushes healthy,
+barely-gated tiles from 0.46\% to 54.11\% discard, and
+mIoU falls by \presCost{}. The correlation is partly mechanical --- since
+$P_{\text{final}} = P_{\text{fused}}\cdot S_{\text{pres}}$, a low presence score
+\emph{forces} discard whether or not gating is at fault --- and we report it as an
+observation only.
+
+That counterfactual produced an unexpected finding. \best{SAM~3 essentially never
+detects \bg{}}: its median presence score is $0.022$, against $0.45$--$0.91$ for
+every real class, because \bg{} is not a visual concept but the dataset's
+catch-all. The gate's largest measured effect is therefore \emph{suppressing
+\bg{}} so that $\tau$, rather than the argmax, governs background assignment ---
+which inverts the motivation the baseline paper gives for it.
 
 % =====================================================================
 \section{The mechanism: two datasets}
 \label{sec:mechanism}
+
 \begin{table}[t]\centering\small
 \caption{Every measured quantity moves with the catch-all class's share of ground
-truth. A catch-all gives SAM~3 a plausible answer everywhere, so a strong runner-up
-carries no information.}
+truth. Same pipeline, same code, two datasets.}
 \label{tab:mechanism}
 \begin{tabular}{lrr}
 \toprule
  & LoveDA & OpenEarthMap \\
 \midrule
-baseline mIoU (published)      & \loveBase{} (\lovePub{}) & \oemBase{} (\oemPub{}) \\
-\textbf{\texttt{background} share of GT} & \best{\bgShareLove{}} & \best{\bgShareOEM{}} \\
-real-class pixels discarded    & \discardPct{}   & \discardOEM{} \\
-catastrophic tiles ($\ge$99\%) & \catTilesLove{} & \catTilesOEM{} \\
-corr(\texttt{spres\_max}, discard) & \presCorrLove{} & \presCorrOEM{} \\
-best detection AUC             & \aucLove{}      & \aucOEM{} \\
+baseline mIoU (published)         & \loveBase{} (\lovePub{}) & \oemBase{} (\oemPub{}) \\
+\best{\bg{} share of ground truth} & \best{\bgShareLove{}} & \best{\bgShareOEM{}} \\
+real-class pixels discarded       & \discardPct{}   & \discardOEM{} \\
+catastrophic tiles ($\ge$99\%)    & \catTilesLove{} & \catTilesOEM{} \\
+corr(presence, discard)           & \presCorrLove{} & \presCorrOEM{} \\
+best detection AUC                & \aucLove{}      & \aucOEM{} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{figure*}[t]\centering
 \includegraphics[width=\textwidth]{fig2_mechanism.pdf}
-\caption{\todo{caption} Six panels; the catch-all share as the common cause.}
+\caption{The catch-all class's share of ground truth as a common cause. Six
+independently measured quantities --- residual size, detection AUC, the
+presence--discard correlation, the catastrophic-tile count, the fraction of
+pixels the model commits to, and the achievable recovery --- separate the two
+datasets in the same direction.}
 \label{fig:mechanism}
 \end{figure*}
 
-\todo{State explicitly that two LoveDA-only claims do \emph{not} generalise:
-the presence-collapse correlation (\presCorrLove{} vs \presCorrOEM{}) and the
-\discardPct{} headline itself.}
+Table~\ref{tab:mechanism} and Fig.~\ref{fig:mechanism} are the paper's central
+observation. Six quantities
+measured independently, by the same code on the same pipeline, separate the two
+datasets in the same direction, and they are ordered by a single property of the
+\emph{annotation scheme}: whether the vocabulary covers the scene.
+
+The explanation is direct. LoveDA's \bg{} absorbs a third of every image, so the
+model always has a plausible answer available, and a strong runner-up score means
+nothing --- it could indicate a suppressed real class, or a background region that
+merely resembles one. Its runner-up AUC is $0.541$. OpenEarthMap's \bg{} is a rare
+marker for genuinely unlabelable pixels, so a strong runner-up does indicate a
+suppressed real class, and the same signal reaches \aucOEM{}.
+
+\paragraph{Two of our own claims do not generalise, and we label them.} The
+presence-collapse correlation of Section~\ref{sec:anatomy} (\presCorrLove{} on
+LoveDA, \catTilesLove{} catastrophic tiles) becomes \presCorrOEM{} with
+\catTilesOEM{} catastrophic tiles on OpenEarthMap. It is a property of LoveDA's
+annotation scheme, not of SAM~3. Likewise \best{\discardPct{} is not a general
+figure} --- the identical pipeline discards \discardOEM{} on OpenEarthMap. Both
+are stated here rather than left for a reader to discover.
 
 % =====================================================================
 \section{What we built, and which parts are justified}
 \label{sec:built}
-\todo{Region atoms: SLIC, ceiling \ceilSLIC{} against \ceilCC{} for connected
-components (Fig.~\ref{fig:purity}). Twenty ceiling points, against \priorOracle{}
-for a \emph{perfect} co-occurrence matrix.}
 
-\todo{The prior: boundary marginals, Dirichlet smoothing, directedness via the row
-conditional. Signal \pmiSignal{} bits against a \pmiFloor{} permutation floor
-(\pmiRatio{}$\times$); mined matrix agrees with ground truth at $\rho=\rhoMined{}$,
-and the circularity concern is retired at \rhoCirc{}.}
+Our original proposal was to recover the residual with a corpus-level semantic
+co-occurrence prior: cut the discarded region into atoms, and label each atom by
+conditioning on the classes of its neighbours through a matrix mined from the
+model's own confident predictions. We report it here because two of its
+components are worth keeping and the third is not.
+
+\paragraph{The prior is real, and accurate.} Measured on ground truth, class
+adjacency carries \pmiSignal{}~bits of mean absolute pointwise mutual information
+against a structure-preserving permutation floor of \pmiFloor{} --- a factor of
+\pmiRatio{}. Mined from the model's confident predictions with no labels, the
+matrix agrees with the ground-truth matrix at Spearman $\rho=\rhoMined{}$, and
+its error does \emph{not} concentrate on the classes the pipeline discards
+($\rho=\rhoCirc{}$), which retires the obvious circularity objection with a
+number.
+
+\paragraph{A null-model correction, which refuted one of our own findings.}
+Pointwise mutual information over class adjacency compares an observed
+distribution against an independence baseline. The observation is a
+\emph{boundary}-frequency distribution; the natural baseline is built from
+\emph{area} marginals. These are different measures, and the mismatch
+systematically inflates classes with high perimeter per unit area. Under the
+area baseline we found, and believed, that \texttt{road} was a hub attracting
+every other class. Under the boundary baseline \texttt{road}'s entire row
+collapses to near zero and five class pairs change sign: we had been measuring
+road's perimeter. We report the correction because it generalises to any
+co-occurrence analysis over segmentation masks.
+
+\paragraph{Atomisation dominates the prior.} Connected components of the
+discarded region reach an oracle-labeller ceiling of \ceilCC{}; SLIC superpixels
+reach \ceilSLIC{} (\ceilSLICoem{} on OpenEarthMap), because connected components
+straddle class boundaries --- the largest was an entire tile
+(Fig.~\ref{fig:purity}). Twenty ceiling points from the choice of atom.
+
+\paragraph{The co-occurrence term does not earn its place.} Against simply
+copying the largest neighbouring region, the mined prior adds \priorGain{}
+points, and a \emph{perfect} ground-truth matrix adds \priorOracle{}. It helps
+where four or more classes border a region ($+2.03$ mined, $+5.44$ oracle), but
+that stratum is 10\% of the residual. The reason is structural
+rather than a defect in the mining: classes that are adjacent are also the
+classes that get confused, so the prior reinforces the very errors it was
+intended to fix. We keep it as an ablation row.
 
 \subsection{The method: per-class thresholds}
 \label{sec:method}
-One threshold per class, fitted by coordinate ascent on a calibration subset and
-evaluated on disjoint tiles. \emph{No model weights are trained.} SegEarth-OV3
-already tunes its single $\tau$ per dataset using labels, so this is the same
-protocol with $N$ parameters instead of one.
 
-\todo{Why it works, with \texttt{water} as the case: baseline precision/recall
-$89.5/54.7$, so it is right nine times in ten when it fires and finds half of what is
-there. Its fitted $\tau$ is \methodWaterTau{} against a global $0.5$, and it gains
-\methodWater{} IoU alone. The classes that gain are exactly those with a large
-precision--recall asymmetry.}
+A single threshold is being asked to serve classes with very different operating
+points. On LoveDA, \texttt{water} has precision 89.5\% against
+recall 54.7\%: it is right nine times in ten when it fires and finds
+half of what is there, so it can afford to fire far more readily.
+\texttt{agricultural}, at 66.9\% against 62.0\%, cannot.
 
-\todo{The fit maximises land-cover mIoU, \emph{excluding} the catch-all, and say why:
-optimising full mIoU lets the search buy the metric by repairing an over-predicted
-background. Full mIoU is still what is reported.}
+We therefore fit one threshold per class by coordinate ascent on a calibration
+subset of labelled tiles, and evaluate on disjoint tiles (Fig.~\ref{fig:method}). \best{No model weights
+are trained.} The baseline already tunes its single $\tau$ per dataset using
+labels --- $0.5$ for LoveDA, $0.1$ for OpenEarthMap --- so this is the same
+protocol with $N-1$ free parameters instead of one, and the comparison is parity
+rather than a leak. The published-$\tau$ baseline is recomputed on the same
+held-out tiles.
+
+\paragraph{The objective excludes the catch-all.} We fit to maximise mIoU over
+the real classes only. This matters: optimising \emph{full} mIoU allows the search
+to buy the metric by repairing an over-predicted background at land cover's
+expense, which on OpenEarthMap trades \texttt{road} and \texttt{building} away for
+a large \bg{} gain. Full mIoU is still what we report.
 
 \begin{figure*}[t]\centering
 \includegraphics[width=\textwidth]{fig7_method.pdf}
-\caption{\todo{caption} (a)~the fitted thresholds span \eeSpread{} against a single
-$0.5$; (b)~the gain is land cover, the catch-all is untouched; (c)~\calibTiles{}
-labelled tiles is where every draw turns positive.}
+\caption{The method. \textbf{(a)}~The fitted thresholds span \eeSpread{} against
+a single $0.5$, and move in opposite directions: classes with a large
+precision--recall gap fire more readily, classes without one fire less.
+\textbf{(b)}~The gain is land cover; the catch-all is untouched. Two protocols
+are shown --- five-fold cross-validation and the single end-to-end deployment fit
+--- because they agree on the shape and disagree on \bg{}. \textbf{(c)}~The
+calibration cost: \calibTiles{} labelled tiles is where every random draw turns
+positive.}
 \label{fig:method}
 \end{figure*}
 
@@ -200,61 +390,83 @@ labelled tiles is where every draw turns positive.}
 \label{sec:results}
 
 \begin{table}[t]\centering\small
-\caption{The method. Five-fold cross-validation on LoveDA, every fold positive.
-The published-$\tau$ baseline is recomputed on the same held-out tiles.}
+\caption{The method, five-fold cross-validation. Every LoveDA fold is positive.
+On OpenEarthMap land cover improves substantially while full mIoU stays flat;
+see the discussion below.}
 \label{tab:method}
 \begin{tabular}{lrr}
 \toprule
  & LoveDA & OpenEarthMap \\
 \midrule
-$\Delta$ mIoU (5-fold)          & \best{\methodGain{} $\pm$ \methodSD{}} & $+0.16 \pm 0.93$ \\
+$\Delta$ mIoU                   & \best{\methodGain{} $\pm$ \methodSD{}} & $+0.16 \pm 0.93$ \\
 worst fold                      & \methodWorst{} & --- \\
 land-cover classes, aggregate   & \best{\methodLand{}} & \best{$+12.45$} \\
 catch-all class                 & \methodBg{}    & $-11.04$ \\
+\texttt{water} alone            & \methodWater{} (at $\tau=\methodWaterTau{}$) & --- \\
 oracle bound                    & \oracleBound{} & --- \\
 share of the bound captured     & \oracleShare{} & --- \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\todo{Beside Table~\ref{tab:method}: OEM's land cover improves substantially while
-full mIoU stays flat, because its \texttt{background} sits at 17.13 IoU and pays for
-the gain. A caveat about the benchmark, not about the method.}
+\paragraph{LoveDA.} Five-fold cross-validation (Table~\ref{tab:method}) gives
+\methodGain{}~$\pm$~\methodSD{}~mIoU with every fold positive and a worst fold of
+\methodWorst{}. The gain is \best{entirely land cover}: the six real classes gain
+\methodLand{}~IoU in aggregate while the catch-all moves \methodBg{}. That makes
+the result structurally immune to the artefact described below, and it captures
+\oracleShare{} of an oracle bound of \oracleBound{} --- little is left on the
+table. It is driven by \texttt{water}, which gains \methodWater{}~IoU alone at a
+fitted threshold of \methodWaterTau{} against a global $0.5$.
 
-\paragraph{End-to-end verification.} A single fit on \calibTiles{} calibration tiles,
-deployed in the pipeline, moves \eeBase{}~$\to$~\eeFit{} on \eeTiles{} held-out tiles ---
-reproducing the cached-histogram prediction exactly, every per-class delta within
-$0.04$. \todo{Note honestly that in this single fit \texttt{background} gains $+0.85$
-(10\% of the total, incidental --- the objective excludes it) and \texttt{road} loses
-$0.53$. A per-class rule can hurt a per-class result.}
+\paragraph{OpenEarthMap is a benchmark artefact, not a method failure.} Land
+cover improves by $+12.45$~IoU in aggregate --- \texttt{building} $+4.35$,
+\texttt{road} $+2.95$, \texttt{pavement} $+2.71$ --- and \bg{} pays for all of it
+at $-11.04$, leaving full mIoU flat (the same shape as Fig.~\ref{fig:oemperclass}).
+OpenEarthMap's \bg{} sits at $17.13$~IoU
+with 17.33\% precision, so its mIoU is dominated by one
+pathologically calibrated class and one can improve land cover \emph{or} the
+metric, not both.
+
+\paragraph{End-to-end verification.} The results above are computed from the
+cached histogram. To confirm that this is a measurement instrument rather than
+merely arithmetic, we deployed a single fit --- \calibTiles{} calibration tiles ---
+in the actual pipeline. The prediction was \eeBase{}~$\to$~\eeFit{}~mIoU on
+\eeTiles{} held-out tiles; the pipeline produced \eeBase{}~$\to$~\eeFit{}, with
+every per-class delta agreeing to within $0.04$. Two honest notes. In this single
+fit \bg{} gains $+0.85$~IoU, 10\% of the total rather than the
+110\% of the artefact below, and incidental --- the objective
+excludes it. And \texttt{road} \emph{loses} $0.53$: a per-class rule can hurt a
+per-class result, which is why we report the full table rather than the mean.
 
 \begin{table}[t]\centering\small
-\caption{Every intervention we measured, with an oracle bound where one exists.
-Each is a trivial alternative a reviewer would otherwise propose.}
+\caption{Every intervention we measured. Each is a trivial alternative a reviewer
+would otherwise propose, and each is reported with an oracle bound where one
+exists.}
 \label{tab:interventions}
 \begin{tabular}{lrr}
 \toprule
 intervention & LoveDA & OpenEarthMap \\
 \midrule
-lower $\tau$ to $0.1$              & \tauCost{} \small(\tauRatio{} wrong per right) & --- \\
-remove presence gating             & \presCost{} & --- \\
-co-occurrence prior over neighbours& \priorGain{} \small(oracle \priorOracle{}) & --- \\
-honest recovery                    & \recoverLove{} & \recoverOEM{}\,$^\dagger$ \\
-per-class $\tau$, label-free       & $-0.17$ & $+4.77$\,$^\dagger$ \\
-\textbf{per-class $\tau$, calibrated} & \best{\methodGain{}} & $+0.16$ \\
+lower $\tau$ to $0.1$               & \tauCost{} & --- \\
+remove presence gating              & \presCost{} & --- \\
+co-occurrence prior over neighbours & \priorGain{} & --- \\
+honest recovery                     & \recoverLove{} & \recoverOEM{}\,$^\dagger$ \\
+per-class $\tau$, label-free        & $-0.17$ & $+4.77$\,$^\dagger$ \\
+\best{per-class $\tau$, calibrated} & \best{\methodGain{}} & $+0.16$ \\
 \bottomrule
-\end{tabular}
-\\[2pt]\footnotesize $^\dagger$ catch-all artefact --- see Table~\ref{tab:oemperclass}.
+\end{tabular}\\[3pt]
+\footnotesize $^\dagger$ catch-all artefact --- see Table~\ref{tab:oemperclass}.
 \end{table}
 
 \begin{table}[t]\centering\small
-\caption{\textbf{The honesty of the paper.} OpenEarthMap's headline
-\recoverOEM{}~mIoU from recovery is \emph{not} a segmentation improvement.}
+\caption{OpenEarthMap's headline \recoverOEM{}~mIoU from recovery is \emph{not} a
+segmentation improvement. We report this table because a reviewer would otherwise
+construct it.}
 \label{tab:oemperclass}
 \begin{tabular}{lr}
 \toprule
-\texttt{background} & \best{\oemBgGain{}} \\
-eight real classes, aggregate & \best{\oemRealLoss{}} \\
+\bg{}                                         & \best{\oemBgGain{}} \\
+eight real classes, aggregate                 & \best{\oemRealLoss{}} \\
 \texttt{building} (the baseline's best class) & \oemBuildLoss{} \\
 \bottomrule
 \end{tabular}
@@ -262,72 +474,127 @@ eight real classes, aggregate & \best{\oemRealLoss{}} \\
 
 \begin{figure}[t]\centering
 \includegraphics[width=\columnwidth]{fig3_oem_per_class.pdf}
-\caption{\todo{caption} Per-class decomposition of OpenEarthMap's \recoverOEM{}.}
+\caption{Per-class decomposition of OpenEarthMap's \recoverOEM{}~mIoU from
+recovery. A background-assigned real-class pixel is already wrong, so relabelling
+it either fixes it or leaves it wrong in a different class --- while \bg{} sheds
+false positives either way. Averaging over nine classes converts a worse
+segmentation into a better number.}
 \label{fig:oemperclass}
 \end{figure}
 
 \begin{figure}[t]\centering
 \includegraphics[width=\columnwidth]{fig4_detection_auc.pdf}
-\caption{\todo{caption} Nine detection signals, both datasets, against an
-empirical floor of \aucFloor{}.}
+\caption{Nine detection signals on both datasets against an empirical floor of
+\aucFloor{}. On LoveDA every signal lands between $0.434$ and \aucLove{}; on
+OpenEarthMap the same signals separate the residual well. The floor is empirical
+rather than $0.5$ because region-level features carry a size confound, which we
+control for by computing AUC within size-matched bins.}
 \label{fig:auc}
 \end{figure}
 
 \begin{figure}[t]\centering
 \includegraphics[width=\columnwidth]{fig5_atom_purity.pdf}
-\caption{\todo{caption} Atom purity and oracle ceiling, connected components
-vs SLIC.}
+\caption{Atom purity and the resulting oracle ceiling on any region-level method.
+Connected components of the discarded region straddle class boundaries; SLIC
+superpixels respect them.}
 \label{fig:purity}
 \end{figure}
 
 \subsection{The label-free bound, and why it holds}
 \label{sec:bound}
-The best global $\tau$ is worth \globalOracle{}; the best \emph{per-class} $\tau$ is
-worth \oracleBound{}. We tested \nAttempts{} label-free rules and none reaches it;
-the best scores \proxyBest{} against a random-proxy control whose 95th percentile is
-\proxyCtrl{}.
 
-\paragraph{The reason is not the one we first proposed.} We had supposed the oracle
-exploits per-class \emph{precision}, which is label-derived by definition. Precision
-is in fact predictable without labels: mean confidence ranks the classes at
-$\rho=\proxyConfRho{}$ ($p=\proxyConfP{}$), and agreement between SAM~3's two heads at
-$\rho=\proxyHeadRho{}$ ($p=\proxyHeadP{}$), by exact enumeration of all $720$
-relabelings. Both move mIoU by less than $0.1$.
+Sweeping a single global $\tau$ finds \globalOracle{}~mIoU on LoveDA, which is why
+threshold tuning is usually considered closed. Sweeping a threshold \emph{per
+class} is worth \oracleBound{} --- more than thirty times as much --- with the
+real classes gaining $+8.63$~IoU. The chosen thresholds span \eeSpread{}: one
+global value is wrong for different classes in opposite directions.
 
-\todo{The restated bound, which is the contribution: the optimal per-class threshold
-solves a \emph{coupled} multi-class IoU objective --- raising one class's $\tau$ moves
-pixels into \texttt{background} and changes every other class's optimum --- so no
-per-class scalar can express it, measurable or not. Evidence: precision itself does
-not predict the oracle threshold ($\rho=\proxyTauRho{}$, $p=\proxyTauP{}$) and the
-relation is not even monotone. This explains why the $N$-parameter fit works and
-every one-parameter rule fails.}
+We tested \nAttempts{} label-free rules against that bound: three threshold rules
+(per-class Otsu, a confidence percentile, and presence-scaled thresholds) and
+eight per-class statistics converted into thresholds by a single fitted knob ---
+the same one-parameter budget the baseline spends on its own $\tau$. \best{None
+reaches it.} The best scores \proxyBest{}~mIoU against a random-proxy control
+whose 95th percentile is \proxyCtrl{}; on LoveDA every one of the three threshold
+rules scores \emph{below} the published $\tau$. The control is not optional: one
+fitted knob over six classes can extract a gain from a meaningless vector.
+
+\paragraph{The reason is not the one we first proposed.} We had supposed the
+oracle exploits per-class \emph{precision}, which is label-derived by definition.
+That is false. Precision is predictable without labels: mean confidence ranks the
+six classes by precision at $\rho=\proxyConfRho{}$ ($p=\proxyConfP{}$), and
+agreement between SAM~3's two heads --- available only because we instrument them
+separately, since the baseline fuses them with a maximum --- at
+$\rho=\proxyHeadRho{}$ ($p=\proxyHeadP{}$). Both $p$-values are exact, by
+enumerating all $720$ relabelings, because at six classes $|\rho|=0.6$ arises by
+chance roughly a fifth of the time. Both move mIoU by less than $0.1$.
+
+\paragraph{The restated bound.} Precision does not determine the threshold. The
+relation is not even monotone: \texttt{water} at 88.5\% precision
+takes $\tau=0.175$, \texttt{road} at 68.5\% takes $0.675$, and
+\texttt{barren} at 55.6\% takes $0.375$
+($\rho=\proxyTauRho{}$, $p=\proxyTauP{}$). \best{The optimal per-class threshold
+is the solution to a coupled multi-class objective}: raising one class's threshold
+moves its pixels into \bg{}, changing \bg{}'s IoU and therefore every other
+class's optimum. No per-class scalar can express that, measurable or not. This
+explains why an $N$-parameter fit works and every one-parameter rule fails, and
+it generalises to any training-free pipeline that thresholds a per-class score.
 
 % =====================================================================
 \section{Limitations}
 \label{sec:limitations}
-% Write this honestly. PAPER_OUTLINE: it is the section that most reliably
-% distinguishes a strong project from a mediocre one.
-\begin{itemize}\itemsep2pt
-  \item Two datasets, and OpenEarthMap at \oemTiles{}/500 tiles.
-  \item \textbf{Calibration must match the evaluation distribution.} Fitting on
-        LoveDA \emph{train} and evaluating on val gives \trainToVal{}, because the
-        splits differ $2\times$ in discard rate at essentially identical catch-all
-        share. \todo{This also constrains the mechanism: share alone cannot be the
-        driver.}
-  \item Oracle bounds are upper bounds \emph{under our labeller}, not true ceilings.
-  \item \todo{The mechanism is confounded at $n=2$: catch-all \emph{share} and
-        catch-all \emph{confusability} move together across our two datasets, and the
-        second is arguably the more plausible cause. A third dataset that separates
-        them is the natural next experiment.}
-\end{itemize}
+
+\paragraph{Two datasets, and a confound we cannot yet resolve.} Across our two
+datasets the catch-all's \emph{share} moves together with its
+\emph{confusability} --- LoveDA's background is both common and visually similar
+to \texttt{road}, \texttt{barren} and \texttt{building}, while OpenEarthMap's is
+both rare and genuinely unlabelable. Either could be the cause, and the second is
+arguably the more plausible one. Two observational points cannot separate them.
+\todo{One further piece of evidence constrains it: LoveDA's train and val splits
+have essentially identical background share (35.8\% vs
+36.1\%) but differ $2\times$ in discard rate, which argues against
+share being the sole driver. Add the third-dataset or intervention result here
+when it exists.}
+
+\paragraph{Calibration must match the evaluation distribution.} Fitting on
+LoveDA's \emph{train} split and evaluating on val gives \trainToVal{}~mIoU,
+because those splits differ sharply in discard rate at identical background share.
+The method requires calibration data from the deployment distribution, and
+\calibTiles{} tiles of it; below fifty tiles it actively hurts.
+
+\paragraph{Oracle bounds are bounds under our labeller.} Every ``oracle'' figure
+we report gives one component perfect information while holding the rest of our
+implementation fixed. They bound what our design could achieve, not what is
+achievable in principle.
+
+\paragraph{Scope.} OpenEarthMap is evaluated at \oemTiles{} of 500 tiles.
+Recovery is evaluated at one threshold per dataset --- each dataset's own tuned
+value --- though Section~\ref{sec:bound} bounds what any other threshold could
+have given. Deep features remain untested for detection; we judged this
+unnecessary because detection already succeeds on OpenEarthMap (AUC \aucOEM{})
+and recovery still fails there, so better detection buys nothing.
 
 % =====================================================================
 \section{Conclusion}
 \label{sec:conclusion}
-\todo{The residual is a property of the annotation scheme as much as of the model,
-and detectability follows the same axis. Neither makes recovery worthwhile. Fixing
-the threshold beats recovering the residual --- and the per-class decomposition shows
-why a positive mIoU number here would otherwise have been misleading.}
+
+The residual that presence-gated segmentation pipelines discard is a property of
+the annotation scheme as much as of the model, and whether it can be detected
+follows the same axis. Neither regime makes recovery worthwhile: where the
+residual is hard to find it cannot be found, and where it is easy to find the
+resulting labels are not accurate enough to beat leaving it alone. What does work
+is cheaper and less interesting to describe --- fitting the threshold per class
+rather than globally --- and it works because a single threshold is being asked to
+serve classes with incompatible operating points. We give the bound on that idea,
+show it cannot be reached without labels, and identify why: the quantity that sets
+the right threshold is not a per-class property at all.
+
+We would emphasise one methodological point. Three of the results in this paper
+are refutations of our own earlier claims, each caught by a test written on
+purpose --- a null model that inverted a published finding of ours, a supervision
+leak that produced a plausible and quotable number, and a detector that scored
+$0.966$ on random noise. Reporting a headline mIoU gain without decomposing it
+per class is, on this evidence, the single easiest way to publish something that
+is not true.
 
 \bibliographystyle{plain}
 \bibliography{refs}
