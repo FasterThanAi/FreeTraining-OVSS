@@ -201,6 +201,16 @@ buy the metric by repairing an over-predicted background, which is how OEM produ
 land cover −1.77. ⚠️ **Calibration must match the evaluation distribution** — LoveDA train → val
 gives −0.12. WEEK3 §9b.
 
+⛔ **⭐ The label-free bound is now CLOSED with a mechanism, and §9a's stated reason was wrong.**
+`precision_proxy.py`: **precision IS predictable without labels** — `mean_conf` ρ +0.943 p 0.017,
+cross-head `sem_inst_agree` ρ +0.886 p 0.033 (exact enumeration, 720 relabelings) — **and it buys
+nothing**, best row +0.42 against a random-control p95 of +0.58 and a +1.24 oracle bound. Because
+precision does not determine the threshold: ρ(precision, oracle τ) = −0.429, p 0.419, and the
+relation is **non-monotone** (water 88.5→0.175, road 68.5→**0.675**, barren 55.6→0.375). **The real
+bound: the optimal per-class τ solves a COUPLED multi-class IoU objective — raising one class's τ
+moves pixels into `background` and changes every other class's optimum — so no per-class scalar can
+express it, measurable or not.** That is why §9b's 6-parameter fit works and every 1-parameter rule
+fails. **Eleven label-free attempts now, all bounded and explained.** WEEK3 §9d.
 ⛔ **Threshold tuning is closed for LABEL-FREE rules — but not for the reason previously recorded.** Sweeping one
 *global* τ finds nothing (+0.04 LoveDA), but **per-class τ is worth +1.46 with real classes
 +8.63** — `water` at τ=0.170 alone gains 6.70 IoU, and the oracle thresholds span 0.170–0.595.

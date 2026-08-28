@@ -492,20 +492,35 @@ now measured to be false, and the argument comes out stronger.**
 | proxy | ρ vs precision | p *(exact)* | ρ vs oracle τ | p *(exact)* | Δ mIoU held out |
 |---|---|---|---|---|---|
 | **`mean_conf`** | **+0.943** | **0.017** | −0.371 | 0.497 | **−0.18** |
-| `gate_ratio` | **+0.943** | **0.017** | −0.371 | 0.497 | −0.05 |
+| **`gate_ratio`** | **+0.943** | **0.017** | −0.371 | 0.497 | −0.05 |
+| **`head_conf_ratio`** ⬅ *cross-head* | **+0.943** | **0.017** | −0.486 | 0.356 | −0.06 |
+| **`sem_inst_agree`** ⬅ *cross-head* | **+0.886** | **0.033** | −0.429 | 0.419 | **+0.06** |
 | `mean_margin` | +0.829 | 0.058 | −0.086 | 0.919 | −0.04 |
 | `presence` | +0.657 | 0.175 | −0.086 | 0.919 | **+0.42** |
 | `argmax_stability` | +0.371 | 0.497 | −0.543 | 0.297 | −0.04 |
+| `inst_fires` ⬅ *cross-head* | −0.086 | 0.919 | **+0.657** | 0.175 | +0.02 |
 | *random proxy ×200* | — | — | — | — | *+0.11 ± 0.28, p95 **+0.58*** |
 | **oracle per-class τ** | — | — | — | — | **+1.24** |
 
 p-values are exact, by enumerating all **720** relabelings — at six classes |ρ| = 0.6 arises by
 chance about a fifth of the time, so a table lookup would be misleading here.
 
-**Mean confidence ranks the classes by precision almost perfectly** (ρ +0.943, p 0.017). SAM 3 is
-*rank-calibrated across classes* on LoveDA, which is a small finding in itself and is not something
-the baseline reports. **And it buys nothing** — −0.18 mIoU, and nothing in the table beats the
-random control's p95 of +0.58.
+**Four proxies rank the classes by precision at p ≤ 0.033**, two of them cross-head. SAM 3 is
+*rank-calibrated across classes* on LoveDA — a small finding in itself, and not one the baseline
+reports. **All four buy nothing.** The best row in the whole table is `presence` at +0.42, below the
+random control's p95 of +0.58; the two cross-head rows land at **+0.06** and **−0.06**.
+
+⭐ **The §9d prediction, written down before the run, held exactly.** Cross-head agreement was
+committed in advance as the one remaining candidate that asks how often the model is *right* rather
+than how its scores are *distributed* — and predicted to fail anyway, for the coupling reason
+below, "regardless of how good a precision estimate it turns out to be". It is a **good** precision
+estimate (ρ +0.886, p 0.033) and it moved mIoU by +0.06. **Measuring precision better is not the
+missing ingredient**, and that is now demonstrated rather than argued.
+
+<small>The one proxy pointing at the target rather than at precision is `inst_fires` — how often the
+instance head fires at all for a class — at ρ +0.657 against the oracle τ, the largest in that
+column. It is SegEarth-OV3's own things/stuff duality reappearing. But p = 0.175 at n=6 and Δ mIoU
++0.02, so it is a curiosity to note, not a result to cite.</small>
 
 **Because the chain breaks one link later than §9a said.** Precision does not determine the
 threshold — the relationship is not even monotone:
@@ -535,12 +550,17 @@ That reframes the negative from *"we cannot measure the quantity that sets the t
 training-free pipeline thresholding a per-class score, and closes the loophole a reviewer would
 otherwise open.
 
-⏳ **Cross-head agreement is not in this table yet.** `fused = max(P_sem, P_inst_agg)` destroys the
-distinction, so it needed instrumentation; the segmentor and cache now carry each head's own top-1
-(`iconf/ipred`, `sconf/spred`) and the re-run is pending. It is the one remaining candidate that
-asks how often the model is *right* rather than how its scores are distributed — but note that the
-coupling argument above predicts it will fail too, **for the same reason and regardless of how good
-a precision estimate it turns out to be.** That prediction is written down before the number.
+**Provenance.** `fused = max(P_sem, P_inst_agg)` destroys the distinction between the heads, so the
+cross-head rows required instrumentation rather than analysis: the segmentor now carries each head
+separately and the cache stores their own top-1 (`iconf/ipred`, `sconf/spred`). ✅ The re-run
+(`~/outputs/week3_heads`) **passed the validation gate exactly** — 47.37 mIoU, 323,184,908 discarded
+(29.68%) — so the extra accumulators are observation-only and the two caches are comparable.
+
+> **What this closes.** Eight label-free proxies, four of which measurably track per-class
+> precision, none reaching a +1.24 oracle bound and none beating a random control. Together with
+> §9a's three threshold rules that is **eleven label-free attempts**, and the coupling argument says
+> why they all fail. This is no longer "we did not find one"; it is a bounded family with a stated
+> mechanism.
 
 ---
 
