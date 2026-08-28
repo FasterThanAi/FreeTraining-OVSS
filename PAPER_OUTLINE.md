@@ -137,7 +137,7 @@ mIoU number here would have been misleading.
 | # | figure | status |
 |---|---|---|
 | 1 | image / GT / baseline / discard mask, 4 tiles | ✅ `docs/25{22,24,25,27}.png` |
-| 2 | **the mechanism**: `background` share vs discard rate vs detection AUC, both datasets | ⛔ to make — *this is the paper's figure* |
+| 2 | **the mechanism**: six panels, `background` share as cause | ✅ `docs/fig2_mechanism.{png,pdf}` · `scripts/fig_mechanism.py` |
 | 3 | per-class IoU delta on OEM (background +22.67 against real classes −2.11) | ⛔ to make |
 | 4 | detection AUC across signals, both datasets, with the 0.53 floor | ⛔ to make |
 | 5 | atom purity distribution, cc vs SLIC | ⛔ to make |
@@ -158,7 +158,7 @@ mIoU number here would have been misleading.
 
 ## 6. What is missing before submission
 
-1. **Figures 2–5.**
+1. **Figures 3–5** (2 is done).
 2. **Optional third dataset** (Potsdam or Vaihingen). The mechanism predicts the residual's size
    from the `background` share alone — a third point tests that prediction directly, which is a
    better use of GPU time than another method attempt.
