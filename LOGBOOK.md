@@ -13,10 +13,11 @@ should answer it with a `grep` instead of an archaeology session.
 
 ---
 
-## 2026-08-28 (Fri) — per-class τ is real; iSAID pre-registered
+## 2026-08-28 (Fri) — the project gets a method: calibrated per-class τ, +1.18
 
-**12 commits, 08:32–10:57.** The day the project got its first genuine land-cover gain, and
-immediately bounded it.
+**21 commits, 08:32–16:41.** The day per-class thresholds went from an untested idea to an
+oracle bound to a cross-validated, end-to-end-confirmed method — and the day the argument for
+why no label-free rule can match it was itself refuted and replaced with a better one.
 
 ### Meeting with supervisor
 
@@ -89,6 +90,10 @@ distributed*, not how *often it is right*.
 > quantity a training-free method cannot have. **That bounds the whole family** and generalises to
 > any training-free pipeline thresholding a per-class score.
 
+> ⛔ **Superseded the same day, 16:32.** The first half of that reason is **false** — precision
+> *is* predictable without labels (`mean_conf` ranks it at ρ +0.943). The bound survives for a
+> better reason. See the 16:26–16:41 block below.
+
 **Broke:** Otsu, silently. Between-class variance is **flat** across every split separating two
 well-spaced modes, so `argmax` returns the leftmost tie — a threshold *below both modes*, which
 keeps everything and defeats the point. Now takes the plateau midpoint; verified to split a
@@ -151,23 +156,142 @@ on a held-out split is the same protocol with more parameters, and no weights ar
 to run if any tile id appears in both caches, given how the earlier supervision leak happened.
 Train mIoU printed beside val for every fitted row so overfitting is visible rather than assumed.
 
+---
+
+### Afternoon — 12:09–12:40: cross-validated, and the objective corrected (`820d8d0`, `87b053b`, `dcda688`)
+
+**Tried:** not trusting one split. A single 50/50 partition gave **+1.44** with real classes +8.06,
+and the fitted thresholds landed almost on the oracle's (water 0.195 vs 0.170, barren 0.375 vs
+0.370, forest 0.445 vs 0.440). The generalisation gap was **positive (+0.52)** — six parameters on
+835 tiles are not overfitting. But one split is one draw, so: k-fold for the spread, and a learning
+curve for the label cost.
+
+Cheap because confusion matrices are functions of a `(gt, pred, conf-bin)` histogram and
+**histograms add** — each tile's own 7×7×200 histogram is built once (65 MB for LoveDA val) and
+every split afterwards is a subset sum. Verified exact against histograms built directly from the
+same subsets. The published-τ baseline is recomputed on the *same held-out tiles*, so both sides
+are measured on identical pixels.
+
+**Broke — the objective itself, on OpenEarthMap.** Five folds gave OEM **+5.80 mIoU** but real
+classes **−1.77**, background **+53.93**. Background there sits at 17.13 IoU with 17.33% precision,
+so ~54 points are available from one class, and a coordinate ascent maximising *full* mIoU trades
+away road (−2.14) and building (−1.20) to collect them. **It optimised exactly what it was asked
+for; the ask was wrong.** `--objective real` now excludes the catch-all from what the fit
+maximises while still *reporting* full mIoU.
+
+**The result (`WEEK3_RESULTS.md` §9b):**
+
+| | LoveDA, 5-fold |
+|---|---|
+| **Δ mIoU** | **+1.18 ± 0.45**, every fold positive, worst **+0.84** |
+| land cover | **+8.30 IoU** aggregate |
+| catch-all | **−0.01** — untouched |
+| `water` | **+6.78** at fitted τ **0.195** vs global 0.5 |
+| share of the +1.46 oracle | **81%** |
+
+Under the corrected objective OEM shows **land cover +12.45 with full mIoU flat** — background
+pays for all of it. A caveat about the benchmark, not the method.
+
+**Calibration cost: ~200 labelled tiles** for a reliably positive draw; **below 50 it actively
+hurts.**
+
+**Scope limit, and it cuts into the paper's mechanism.** Fitting on LoveDA *train* and evaluating
+on *val* gives **−0.12**, because those splits differ **2.04× in discard rate (14.54% vs 29.68%)
+at an essentially identical background share (35.8% vs 36.1%)**. Two consequences, both recorded:
+calibration data must come from the evaluation distribution, and — more importantly —
+**background share cannot be the sole driver of the residual, since holding it constant doubles
+the residual.** That supports the *confusability* reading over the *share* reading, and it means
+**29.68% is a LoveDA-val number, not a LoveDA number.**
+
+### Afternoon — 14:45–16:26: end-to-end through the real pipeline (`0818fdc`, `e0ac9f9`) ⭐
+
+**Tried:** proving the +1.18 is not just arithmetic on a cached histogram. The segmentor's
+`prob_thd` now accepts a scalar (bit-identical to the published line, so the 47.37 gate is
+preserved *by construction*) or a per-class vector indexed by the argmax class, with length checked
+against `num_cls` — a misaligned vector would apply water's τ to forest and still print a plausible
+mIoU. `verify_perclass_tau.py` checks equivalence on CPU over 20 random threshold vectors before
+spending 25 GPU-minutes. `tau_deploy.py` fits, writes the held-out split, emits the config, and
+prints the mIoU the GPU run must reproduce.
+
+**Number:** fitted on **200 calibration tiles**, predicted **47.16 → 48.35** on the 1469 disjoint
+tiles. `eval.py` measured **47.16 → 48.35**. Every per-class delta agrees to **≤ 0.04**, inside the
+float16 cache noise called in advance. **The histogram is now validated as an instrument, not just
+as arithmetic** — every τ sweep, oracle bound and cross-validation in §9a/§9b rests on it.
+
+**Broke — a bin-edge bug the test found.** `confusion_at` built its bin edge with
+`(tau * nbins).astype(int)`, which **truncates**: `29/200*200` is `28.999999999999996`, so it
+scored a threshold one bin below the one it reported. Now `np.rint`. **No recorded number
+changes** — 7 of 201 grid values are affected and none was ever chosen — but a *deployed* threshold
+could have gone wrong, which is exactly what this step exists to catch.
+
+**Two things recorded rather than smoothed over:** background gains **+0.85** here against −0.01 in
+the 5-fold (10% of the total, not 110% as in the OEM artefact) — so §9b's "background untouched" is
+a property of that protocol, not of the method. And **`road` LOSES 0.53**: the fit raised its
+threshold on the calibration tiles and it did not transfer. **A per-class rule can hurt a per-class
+result.** This run is one fit at n=200 on the learning curve (+0.79 ± 0.35), not the 5-fold
+protocol; that it also lands at +1.18 is a coincidence of two protocols, and they are quoted
+separately.
+
+Also dropped the stale committed `measure_discard_rate.py.bak`, and routed `--tau` through
+`set_prob_thd` so a vector from a config cannot survive a scalar override.
+
+### Afternoon — 16:26–16:41: the impossibility argument refuted and rebuilt (`2e10b8f`, `c022e28`, `8e54fcf`) ⭐
+
+**Tried:** eliminating the rule a reviewer would propose. §9a's argument rested on three rules that
+all describe how the model's **scores are distributed** (Otsu, confidence percentile, presence).
+None asks how often the model is **right**. Cross-head agreement does.
+
+The signal was not in the cache — `fused = max(P_sem, P_inst_agg)` destroys the distinction — so
+this needed instrumentation: the segmentor now carries `P_inst_agg` and `P_sem` separately
+(`-inf` as the identity for `max`, so a head that never fires stays distinguishable from one
+scoring 0.0), and the cache keeps each head's own top-1. `precision_proxy.py` tests eight
+label-free proxies against three label-derived targets, screened by Spearman with an **exact
+permutation p over all n! relabelings**, because at 6 classes |ρ| = 0.6 is not evidence.
+
+**Broke — my own stated reason (`WEEK3_RESULTS.md` §9d).** `mean_conf` ranks the six LoveDA classes
+by precision at **ρ +0.943, p 0.017** by exact enumeration of all 720 relabelings. **So precision
+IS predictable without labels** — SAM 3 is rank-calibrated across classes, which the baseline does
+not report. And it **buys nothing**: −0.18 mIoU, with no proxy beating the random control's p95 of
++0.58.
+
+**The restated bound — and it is a real argument now, not a restatement:**
+
+> The right per-class threshold solves a **coupled multi-class IoU objective.** Raising one class's
+> τ moves pixels into background and changes every other class's optimum. **No per-class scalar
+> can express that, measurable or not.**
+
+The relation is not even monotone — water 88.5 → 0.175, road 68.5 → 0.675, barren 55.6 → 0.375 —
+and **ρ(precision, oracle τ) = −0.429, p = 0.419**. This explains *why* the 6-parameter fit works
+and every 1-parameter rule fails, rather than merely recording it.
+
+Cross-head agreement is still pending its GPU re-run, but **the coupling argument predicts it fails
+regardless of how good a precision estimate it is — written down before the number.**
+
 ### Numbers to remember from today
 
-- **per-class τ oracle: LoveDA 48.83 (+1.46), real classes +8.63, water +6.70 at τ=0.170**
-- best label-free rule on LoveDA: **−0.17** (Otsu), i.e. all three are worse than doing nothing
-- oracle τ vs P−R gap: **r = −0.618**, n=6
+- ⭐ **the method: LoveDA +1.18 ± 0.45 mIoU, 5-fold, every fold positive, worst +0.84**
+- land cover **+8.30**, catch-all **−0.01**, `water` **+6.78** at fitted τ **0.195**
+- **81%** of the +1.46 oracle bound
+- end-to-end: predicted **47.16 → 48.35**, measured **47.16 → 48.35**, per-class ≤ 0.04
+- calibration cost **~200 tiles**; below 50 it hurts; train→val **−0.12**
+- `mean_conf` ranks precision **ρ +0.943, p 0.017**; ρ(precision, oracle τ) **−0.429, p 0.419**
+- OEM under the corrected objective: land cover **+12.45**, full mIoU flat
 - iSAID background share: **97.11%**
 
 ### Open at end of day
 
-1. 🔴 **`tau_fit.py` is written but has not been run** — its number is not in `WEEK3_RESULTS.md`
-   §9a. **This is the most important open number in the project**: it decides whether +1.46 is a
-   bound we report or a method we claim.
+1. **Cross-head agreement awaits its GPU re-run.** The coupling argument predicts it fails; the
+   prediction is on record before the number.
 2. **iSAID cannot run yet.** `ValidationData/val` holds 458 masks and **no images**; the DOTA-v1.0
-   val tiles are a separate download. The pre-registration only needed masks, so it is locked in
-   regardless.
-3. The **share vs confusability** confound is now the paper's central risk. iSAID resolves it.
-4. Potsdam's `bg_idx` / catch-all mismatch — flagged, not resolved.
+   val tiles are a separate download. The pre-registration is locked in regardless.
+3. **Share vs confusability** — still the paper's central risk, but no longer symmetric: today's
+   train/val comparison (2.04× discard at identical background share) already **favours
+   confusability**. iSAID settles it.
+4. **`road` −0.53 in the deployed run** — a per-class rule can damage a per-class result. Needs a
+   sentence in limitations, or a fix.
+5. Potsdam's `bg_idx` / catch-all mismatch — flagged, not resolved.
+6. `WEEK3_RESULTS.md` gives OEM's baseline as **44.19** (§7, §12) and **44.16** (§9a). Reconcile —
+   44.19 is what is compared against the published 42.9.
 
 ---
 
