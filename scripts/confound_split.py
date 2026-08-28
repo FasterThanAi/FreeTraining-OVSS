@@ -108,71 +108,92 @@ def make_map(root, out):
     print(f'\nwritten: {p}  ({len(rows)} tiles)')
 
 
-def auc(score, label):
-    """Rank AUC. `label` is 1 for a recoverable pixel (real class assigned to the
-    catch-all), 0 for genuine catch-all."""
-    ok = np.isfinite(score)
-    s, y = score[ok], label[ok]
-    if y.sum() == 0 or y.sum() == len(y):
-        return np.nan
-    r = np.empty(len(s))
-    order = np.argsort(s, kind='stable')
-    r[order] = np.arange(1, len(s) + 1)
-    # average ranks over ties, or a coarse float16 score inflates the AUC
-    su = np.sort(s)
-    i = 0
-    while i < len(su):
-        j = i
-        while j + 1 < len(su) and su[j + 1] == su[i]:
-            j += 1
-        if j > i:
-            r[order[i:j + 1]] = (i + j + 2) / 2.0
-        i = j + 1
-    n1 = y.sum()
-    return float((r[y == 1].sum() - n1 * (n1 + 1) / 2) / (n1 * (len(y) - n1)))
+NBINS = 2048          # scores are float16 in [0,1]; 0.0005 resolution is ample
+
+
+def auc_from_hist(pos, neg):
+    """Rank AUC from per-bin positive/negative counts, ties handled exactly.
+
+    ⚠️ THE OBVIOUS IMPLEMENTATION DOES NOT SCALE HERE. LoveDA has 750M
+    background-assigned pixels, so concatenating the scores costs ~12 GB, the
+    argsort is minutes, and averaging ranks over ties in a Python loop is 750M
+    iterations -- it does not finish. Scores are float16 and effectively
+    discrete, so the same sufficient-statistic trick used for the confusion
+    matrix applies: bin once per tile, and compute the AUC from the histogram in
+    O(bins). Exact, constant memory, and instant.
+
+    For each bin, every negative strictly below it contributes 1 and every
+    negative tied with it contributes 1/2.
+    """
+    P, N = pos.sum(), neg.sum()
+    if P == 0 or N == 0:
+        return float('nan')
+    below = np.concatenate(([0.0], np.cumsum(neg.astype(float))[:-1]))
+    return float((pos * (below + 0.5 * neg)).sum() / (P * N))
+
+
+SIGNALS = ('conf', 'conf2', 'gap', 'fconf')
 
 
 def scan(files, LB, tau):
     nc, BG = LB.nc, LB.bg
     C = np.zeros((nc, nc), np.int64)
-    sc = {k: [] for k in ('conf', 'conf2', 'gap', 'fconf')}
-    lab = []
-    for f in files:
+    # H[signal][label, bin] -- accumulated per tile, never concatenated
+    H = {k: np.zeros((2, NBINS), np.int64) for k in SIGNALS}
+    npos = nneg = 0
+    for i, f in enumerate(files):
         z = np.load(f)
         gt = z['gt'].astype(np.int32)
         conf = z['conf'].astype(np.float32)
         pred = (z['pred'].astype(np.int32) + 1)
         conf2 = z['conf2'].astype(np.float32) if 'conf2' in z.files else conf
-        fconf = z['fconf'].astype(np.float32) if 'fconf' in z.files else conf * np.nan
+        fconf = z['fconf'].astype(np.float32) if 'fconf' in z.files else None
         pred = np.where(conf < tau, BG, pred)
         m = gt > 0
         np.add.at(C, (gt[m], pred[m]), 1)
         # the detection problem exactly as §9 poses it: among pixels the pipeline
         # assigned to the catch-all, which ones are really a land-cover class?
         d = m & (pred == BG)
-        if d.any():
-            lab.append((gt[d] != BG).astype(np.int8))
-            sc['conf'].append(conf[d]); sc['conf2'].append(conf2[d])
-            sc['gap'].append(conf[d] - conf2[d]); sc['fconf'].append(fconf[d])
-    return C, {k: np.concatenate(v) for k, v in sc.items() if v}, np.concatenate(lab)
+        if not d.any():
+            continue
+        y = (gt[d] != BG).astype(np.int64)
+        npos += int(y.sum()); nneg += int(len(y) - y.sum())
+        vals = {'conf': conf[d], 'conf2': conf2[d], 'gap': conf[d] - conf2[d],
+                'fconf': fconf[d] if fconf is not None else None}
+        for k, v in vals.items():
+            if v is None:
+                continue
+            b = np.clip((v * NBINS).astype(np.int64), 0, NBINS - 1)
+            H[k] += np.bincount(y * NBINS + b, minlength=2 * NBINS).reshape(2, NBINS)
+        if (i + 1) % 250 == 0 or i + 1 == len(files):
+            print(f'    {i + 1}/{len(files)}')
+    return C, H, (npos, nneg)
 
 
-def stats(C, S, y, LB):
+def stats(C, H, counts, LB):
     nc, BG = LB.nc, LB.bg
+    npos, nneg = counts
     real = [c for c in range(1, nc) if c != BG]
     tot = C[1:, 1:].sum()
     bg_gt = C[BG].sum()
     # confusability, MEASURED: how much mass crosses between the catch-all and the
     # real classes in each direction, as a share of the catch-all's own totals
+    # ROW-normalised: of the true catch-all, how much escapes into real classes.
+    # This is the catch-all's recall deficit -- "does it LOOK like land cover?"
     bg_to_real = C[BG, real].sum() / max(bg_gt, 1)
+    # COLUMN-normalised: of everything PREDICTED catch-all, how much is really a
+    # real class. This is 1 - precision(catch-all), a different quantity from the
+    # discard rate, which normalises by the real classes' own total instead.
+    pred_bg_wrong = C[np.ix_(real, [BG])].sum() / max(C[:, BG].sum(), 1)
     real_to_bg = C[np.ix_(real, [BG])].sum() / max(C[real, :].sum(), 1)
     return dict(
         share=100 * bg_gt / max(tot, 1),
         conf_out=100 * bg_to_real,          # true catch-all given a real class
-        conf_in=100 * real_to_bg,           # real class given the catch-all
-        discard=100 * C[np.ix_(real, [BG])].sum() / max(C[real, :].sum(), 1),
-        base=100 * y.mean(),
-        **{f'auc_{k}': auc(v, y) for k, v in S.items()})
+        conf_in=100 * pred_bg_wrong,        # predicted catch-all that is not
+        discard=100 * real_to_bg,
+        base=100 * npos / max(npos + nneg, 1),
+        **{f'auc_{k}': auc_from_hist(v[1].astype(float), v[0].astype(float))
+           for k, v in H.items()})
 
 
 def main():
@@ -211,7 +232,8 @@ def main():
     R = {}
     for name, fs in groups.items():
         print(f'  scanning {name} ({len(fs)} tiles)…')
-        R[name] = stats(*scan(fs, LB, args.tau), LB)
+        C, H, counts = scan(fs, LB, args.tau)
+        R[name] = stats(C, H, counts, LB)
 
     md = [f'# Share or confusability? — {Path(args.cache).name}\n',
           f'- cache: `{args.cache}`  |  τ = **{args.tau}**  |  catch-all: '
