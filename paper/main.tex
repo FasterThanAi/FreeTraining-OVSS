@@ -439,6 +439,57 @@ excludes it. And \texttt{road} \emph{loses} $0.53$: a per-class rule can hurt a
 per-class result, which is why we report the full table rather than the mean.
 
 \begin{table}[t]\centering\small
+\caption{Where the gain lives, and how far it transfers. Five-fold within each
+LoveDA domain; then three calibration sources at an \emph{identical}
+\calibTiles{}-tile budget, all scored on the same held-out tiles. Equal budget
+matters: the calibration curve shows sample size dominates below
+\calibTiles{} tiles, so an unequal comparison would confound domain shift with
+data quantity.}
+\label{tab:domain}
+\begin{tabular}{lrr}
+\toprule
+ & rural (992) & urban (677) \\
+\midrule
+$\Delta$ mIoU, five-fold        & \best{\DOMr{} $\pm$ \DOMrsd{}} & \DOMu{} $\pm$ \DOMusd{} \\
+folds positive                  & 5/5 & 2/5 \\
+land-cover classes, aggregate   & \best{\DOMrreal{}} & \best{\DOMureal{}} \\
+catch-all class                 & $+0.79$ & \DOMubg{} \\
+\midrule
+calibrate on own domain         & \DOMmr{} & \DOMmu{} \\
+calibrate on the other domain   & \DOMxr{} & \DOMxu{} \\
+calibrate on a pooled draw      & \DOMpr{} & \DOMpu{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{The gain is not uniform, and the thresholds do not transfer.}
+LoveDA's urban and rural splits differ by a factor of two in discard rate and
+flip the sign of ten of fifteen class-adjacency pairs, so fitting within and
+across them is closer to independent replication than to a re-split
+(Table~\ref{tab:domain}). Two things follow, and both narrow the claim.
+First, \best{the gain is a rural result}: \DOMr{}~$\pm$~\DOMrsd{}~mIoU with every
+fold positive, against \DOMu{}~$\pm$~\DOMusd{} on urban, which is not
+distinguishable from zero. The pooled \methodGain{} is carried by the larger
+stratum, and we report it as a result on the benchmark as published rather than
+as a claim about urban imagery. Yet land cover improves in \emph{both} domains
+--- \DOMrreal{} and \DOMureal{}~IoU in aggregate --- and urban's catch-all loses
+\DOMubg{}, which accounts for the flat result exactly. \best{This is the
+OpenEarthMap artefact of Table~\ref{tab:oemperclass} with its sign reversed}, and
+we take it as independent confirmation, arriving from the opposite direction,
+that full mIoU is a poor metric wherever a catch-all class is large.
+
+Second, the two domains want genuinely different thresholds --- mean absolute
+difference \DOMtaudiff{}, and \DOMtaumax{} on \texttt{road}
+($0.725$ rural against $0.225$ urban) --- and calibrating on the wrong one is
+\best{worse than not calibrating at all}: \DOMxr{} and \DOMxu{}, both below the
+published $\tau$. Pooling is not a safe default either, retaining \DOMpr{} of
+\DOMmr{} on rural. \best{A calibration set spanning two domains fits one
+threshold vector to two optima, which is the same failure as the global $\tau$ it
+replaces, one level up.} The practitioner-facing rule is therefore narrow and
+concrete: calibrate on the distribution you will evaluate on, and do not pool
+across domains that differ this much.
+
+\begin{table}[t]\centering\small
 \caption{Every intervention we measured. Each is a trivial alternative a reviewer
 would otherwise propose, and each is reported with an oracle bound where one
 exists.}
@@ -558,11 +609,20 @@ randomised intervention --- urban and rural differ in class mix, object scale an
 scene density as well --- so it constrains the explanation rather than proving it,
 and a dataset whose catch-all is common but visually distinct would settle it.
 
-\paragraph{Calibration must match the evaluation distribution.} Fitting on
-LoveDA's \emph{train} split and evaluating on val gives \trainToVal{}~mIoU,
-because those splits differ sharply in discard rate at identical background share.
+\paragraph{Calibration must match the evaluation distribution, and the gain is
+not uniform.} Fitting on LoveDA's \emph{train} split and evaluating on val gives
+\trainToVal{}~mIoU, because those splits differ sharply in discard rate at
+identical background share. Table~\ref{tab:domain} bounds this at a controlled
+calibration budget: thresholds fitted on one LoveDA domain and applied to the
+other give \DOMxr{} and \DOMxu{}~mIoU, \emph{below} the published $\tau$, so the
+wrong domain's calibration is an active harm rather than a diminished benefit.
 The method requires calibration data from the deployment distribution, and
-\calibTiles{} tiles of it; below fifty tiles it actively hurts.
+\calibTiles{} tiles of it; below fifty tiles it actively hurts. Within LoveDA the
+gain is also concentrated: \DOMr{} on rural against \DOMu{} on urban, so our
+headline \methodGain{} is a benchmark-level figure and not a claim about every
+stratum of it. We regard this as the sharpest limitation of the work: the method
+is a calibration correction, and calibration is exactly the thing that does not
+transport.
 
 \paragraph{Oracle bounds are bounds under our labeller.} Every ``oracle'' figure
 we report gives one component perfect information while holding the rest of our

@@ -200,7 +200,19 @@ evaluate on disjoint tiles. No weights trained; same protocol SegEarth-OV3 uses 
 **exactly**: 47.16 → **48.35** on 1469 held-out tiles, every per-class Δ within 0.04. The
 segmentor takes `prob_thd` as a scalar (unchanged, gate preserved) **or** a per-class vector.
 This also validates the histogram as an instrument, so §9a/§9b's sweeps and oracle bounds inherit
-it. ⚠️ That deployment run is a **single fit on 200 tiles**, where `background` gains +0.85 (10%
+it. ⛔ **⭐ The +1.18 is a RURAL result — `tau_domain.py`, WEEK3 §9e.** 5-fold *within* each LoveDA
+domain: **rural +2.77 ± 0.92 (5/5 folds)**, **urban +0.10 ± 0.39 (2/5 folds)** — urban is not
+distinguishable from zero. ⚠️ **Never quote +1.18 without this breakdown.** But land cover improves
+in *both* (real classes +18.61 rural, **+4.18 urban**); urban's catch-all loses 3.51, and
+(4.18−3.51)/7 = +0.10 is the whole flat result — **the OEM artefact of §8.1 with the sign
+reversed**, confirming from the other side that full mIoU is a poor metric under a large catch-all.
+⛔ **Thresholds are domain-specific and do NOT transfer**: mean |τ difference| 0.227, max 0.500
+(road 0.725 rural vs 0.225 urban); the mismatched arm is **−0.40 rural / −1.11 urban, both below
+the published τ** — the wrong domain's thresholds are worse than no calibration. ⚠️ **Pooling is
+not safe either** (rural keeps 0.77 of 2.32) — a mixed calibration set fits one vector to two
+optima, *the same failure as the global τ, one level up*. Rule: **calibrate on the distribution you
+will evaluate on.**
+⚠️ That deployment run is a **single fit on 200 tiles**, where `background` gains +0.85 (10%
 of the total, incidental — the fit objective excludes it) and **`road` loses 0.53**. Quote the
 5-fold **+1.18 ± 0.45** as the headline and this run as the verification; they are different
 protocols and the match is coincidence. WEEK3 §9c.

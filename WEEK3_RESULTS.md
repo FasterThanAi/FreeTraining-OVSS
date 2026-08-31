@@ -619,6 +619,94 @@ separately and the cache stores their own top-1 (`iconf/ipred`, `sconf/spred`). 
 > why they all fail. This is no longer "we did not find one"; it is a bounded family with a stated
 > mechanism.
 
+
+### 9e. ⛔⭐ The +1.18 is a RURAL result, and the thresholds do not transfer — 31 Aug
+
+`tau_domain.py`, CPU-only on the existing cache. §9b's gain rests on one dataset, and its scope
+limit (train→val gives −0.12) was measured but never bounded. LoveDA's urban and rural strata are
+the cheapest available test: they differ **2×** in discard rate (18.5% vs 39.3%, §7a) and flip the
+sign of 10 of 15 class-adjacency pairs (`ANALYSIS §4.4`), so fitting within and across them is
+closer to independent replication than to a re-split.
+
+**Protocol.** 5-fold within each domain; then three transfer arms — **matched** (fit on the target
+domain), **mismatched** (fit on the other), **pooled** (fit on a draw across both) — **all at the
+same 200-tile budget** and all scored on **identical held-out tiles**. Equal N is not a detail: the
+§9b learning curve shows calibration size dominates below 200 tiles, so fitting the mismatched arm
+on the whole other domain would have confounded domain shift with data quantity.
+
+#### ⭐ The method is a rural result
+
+| domain | tiles | Δ mIoU | folds positive | worst |
+|---|---|---|---|---|
+| **rural** | 992 | **+2.77 ± 0.92** | **5/5** | +1.61 |
+| **urban** | 677 | **+0.10 ± 0.39** | **2/5** | −0.31 |
+
+**Urban is not distinguishable from zero.** §9b's pooled **+1.18 ± 0.45** is carried by the rural
+half of the split. ⚠️ **Never quote +1.18 without this breakdown.** It remains correct as a result
+on LoveDA val as published — that is the benchmark — but it is not a claim about urban imagery.
+
+#### But land cover improves in BOTH domains — the catch-all pays for it in urban
+
+| | rural | urban |
+|---|---|---|
+| real classes, aggregate | **+18.61** | **+4.18** |
+| `background` (catch-all) | +0.79 | **−3.51** |
+| **full mIoU** | **+2.77** | **+0.10** |
+
+(4.18 − 3.51)/7 = +0.10 — the flat urban result is *entirely* the catch-all paying for land cover.
+
+⭐ **This is the OpenEarthMap artefact of §8.1 with the sign reversed.** There, `background` gained
++22.67 and paid for real classes losing 2.11, inflating mIoU. Here, land cover gains and
+`background` pays, deflating it. Same mechanism, opposite direction — **an independent
+confirmation that full mIoU is a poor metric wherever a catch-all class is large**, which is the
+paper's own argument arriving from the other side. Per class: `water` +10.15 and `forest` +6.95 in
+rural against +1.22 and −0.01 in urban — exactly §7.3's two *deep-discard* classes, and rural is
+where their mass is.
+
+#### The domains want genuinely different thresholds
+
+| class | rural | urban | difference |
+|---|---|---|---|
+| **road** | 0.725 | 0.225 | **0.500** |
+| **forest** | 0.095 | 0.475 | **0.380** |
+| **agricultural** | 0.600 | 0.300 | **0.300** |
+| building | 0.430 | 0.305 | 0.125 |
+| water | 0.170 | 0.115 | 0.055 |
+| barren | 0.375 | 0.375 | 0.000 |
+
+Mean |difference| **0.227**, max **0.500**, against a single published τ of 0.5 for every class and
+both domains. This is `ANALYSIS §4.4`'s domain-specificity reappearing **in the method** rather
+than in the co-occurrence prior — and unlike §4.4 it is attached to a metric that moves.
+
+#### ⛔ It does not transfer — the wrong domain is worse than no calibration at all
+
+| target | matched | mismatched | pooled |
+|---|---|---|---|
+| **rural** | **+2.32** ± 0.46 | **−0.40** ± 0.42 | +0.77 ± 0.68 |
+| **urban** | +0.02 ± 0.16 | **−1.11** ± 0.14 | −0.32 ± 0.35 |
+
+**Both mismatched arms land below the published τ.** Applying another domain's thresholds is an
+active harm, not a smaller benefit. That is the honest scope statement §9b was missing, and it is
+stronger than the train→val −0.12 because the budget is controlled.
+
+⚠️ **Pooling is not a safe default either** — rural keeps only +0.77 of +2.32, urban goes −0.32.
+A mixed calibration set fits one threshold vector to two different optima, which is **the same
+failure as the global τ it replaces, one level up.** The method's own argument recurses.
+
+> **What this changes in the paper.** The claim narrows from *"per-class τ is worth +1.18 on
+> LoveDA"* to *"per-class τ is worth +2.77 where the residual is large, nothing where it is small,
+> and the thresholds are domain-specific enough that transferring them hurts."* That is a smaller
+> claim and a more defensible one, and it comes with a practitioner-facing rule: **calibrate on the
+> distribution you will evaluate on, and do not pool across domains that differ this much.**
+
+⚠️ **Two verdict-logic defects, found and fixed.** The gate for "the method holds" asked only
+`mean > 0`, so it passed urban's +0.10 with 3 of 5 folds negative; it now requires
+`mean − 2·sd > 0` **and** every fold positive. And transfer retention was printed as a percentage
+against a +0.02 denominator ("−7301% retained"); ratios are now suppressed below a 0.25 mIoU
+matched gain. **The tables were correct throughout — only the prose was wrong**, which is the
+third time this session that generated verdict text needed checking against its own table.
+
+
 ---
 
 ## 10. Where the project stands

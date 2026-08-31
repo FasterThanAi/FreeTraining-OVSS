@@ -178,8 +178,9 @@ def main():
         cells = ' | '.join(f'**{within_pc[d][c]:+.2f}**' if np.isfinite(within_pc[d][c])
                            else '—' for d in names)
         md.append(f'| {LB.names[c]}{" *(catch-all)*" if c == bg else ""} | {cells} |')
+    real_sum = {}
     for d in names:
-        rs = float(np.nansum([within_pc[d][c] for c in range(nc) if c != bg]))
+        rs = real_sum[d] = float(np.nansum([within_pc[d][c] for c in range(nc) if c != bg]))
         md.append(f'\n`{d}`: catch-all **{within_pc[d][bg]:+.2f}**, real classes '
                   f'**{rs:+.2f}** in aggregate.')
 
@@ -219,55 +220,83 @@ def main():
     keep = X / M if M > 0 else float('nan')
 
     md += ['\n## Verdict\n']
-    if min(within[d].mean() for d in names) <= 0:
-        weak = min(names, key=lambda d: within[d].mean())
-        md.append(f'⛔ **The method does not hold in both domains** — `{weak}` gives '
-                  f'{within[weak].mean():+.2f}. §9b\'s pooled gain is carried by one '
-                  f'stratum, and that must be stated wherever +1.18 appears.')
-    else:
-        md.append(f'✅ **The method holds independently in both domains** — '
-                  + ', '.join(f'`{d}` {within[d].mean():+.2f} ± {within[d].std(ddof=1):.2f}'
-                              for d in names)
-                  + '.'
+
+    # ⚠️ A mean above zero is NOT the method working. The gate is whether the gain
+    # is distinguishable from zero -- an earlier version asked only `mean > 0` and
+    # reported "holds in both domains" for a stratum with 3 of 5 folds NEGATIVE.
+    def status(g):
+        if g.mean() - 2 * g.std(ddof=1) > 0 and g.min() > 0:
+            return 'holds'
+        return 'flat' if g.mean() >= 0 else 'hurts'
+
+    st = {d: status(within[d]) for d in names}
+
+    if all(v == 'holds' for v in st.values()):
+        md.append(f'✅ **The method holds independently in both domains.**'
                   + (' These strata differ in discard rate by roughly 2x and flip the '
                      'sign of 10 of 15 class-adjacency pairs (ANALYSIS §4.4), so this '
                      'is closer to independent replication than to a re-split.'
                      if {'urban', 'rural'} <= set(names) else ''))
-    if np.isfinite(keep) and keep >= 0.8:
-        md.append(f'\n✅ **And it transfers.** Calibrating on the *other* domain retains '
-                  f'{keep * 100:.0f}% of the matched gain ({X:+.2f} against {M:+.2f}). '
-                  f'The thresholds are a property of the model\'s per-class calibration '
-                  f'more than of the scene, which widens the method\'s scope: the '
-                  f'−0.12 train→val result is then about those splits differing 2x in '
-                  f'discard rate, not about domain shift as such.')
-    elif np.isfinite(keep) and keep > 0:
-        md.append(f'\n⚠️ **Transfer is partial** — the other domain retains {keep * 100:.0f}% '
-                  f'({X:+.2f} against {M:+.2f}), still positive but materially worse. '
-                  f'Calibration data should come from the target domain where it can.')
     else:
-        md.append(f'\n⛔ **It does not transfer** — calibrating on the other domain gives '
-                  f'{X:+.2f} against {M:+.2f} matched. The fitted thresholds are '
-                  f'domain-specific, and that is the honest scope of §9b.')
-    # The mean over targets hides direction, and direction is the useful part: a
-    # threshold set may generalise one way and not the other.
-    ret = {d: (xx[d] / mm[d] if mm[d] > 0 else float('nan')) for d in names}
-    worst = min(names, key=lambda d: ret[d] if np.isfinite(ret[d]) else -1e9)
-    best = max(names, key=lambda d: ret[d] if np.isfinite(ret[d]) else -1e9)
-    if np.isfinite(ret[worst]) and np.isfinite(ret[best]) and ret[best] - ret[worst] > 0.15:
-        src_w = B if worst == A else A
-        md.append(f'\n⚠️ **Transfer is asymmetric, and the mean hides it.** Calibrating on '
-                  f'`{src_w}` and evaluating on `{worst}` retains {ret[worst] * 100:.0f}% '
-                  f'({xx[worst]:+.2f} of {mm[worst]:+.2f}), while the reverse direction '
-                  f'retains {ret[best] * 100:.0f}%. So `{worst}` needs something '
-                  f'`{src_w}` cannot supply — read the threshold table above for which '
-                  f'class it is. Quote the per-direction figures, not the average.')
+        ok = [d for d in names if st[d] == 'holds']
+        no = [d for d in names if st[d] != 'holds']
+        md.append('⛔ **The gain is not uniform across the domains** — it holds on '
+                  + ', '.join(f'`{d}`' for d in ok) + ' and not on '
+                  + ', '.join(f'`{d}`' for d in no) + '. **Any pooled figure is '
+                  'therefore carried by one stratum and must be reported with this '
+                  'breakdown beside it.**')
+    for d in names:
+        g, mark = within[d], {'holds': '✅', 'flat': '⚠️', 'hurts': '⛔'}[st[d]]
+        row = (f'\n- {mark} `{d}`: **{g.mean():+.2f} ± {g.std(ddof=1):.2f}** '
+               f'({int((g > 0).sum())}/{len(g)} folds positive, worst {g.min():+.2f}); '
+               f'real classes {real_sum[d]:+.2f}, catch-all {within_pc[d][bg]:+.2f}.')
+        if st[d] != 'holds' and real_sum[d] > 0 and within_pc[d][bg] < 0:
+            row += (' Land cover **does** improve; the catch-all pays for it almost '
+                    'exactly, which is the whole of the flat result. That is the '
+                    'OpenEarthMap artefact (§8.1) with the sign reversed — the same '
+                    'reason full mIoU is a poor metric wherever a catch-all is large.')
+        md.append(row)
 
-    md.append(f'\n**Pooling both domains gives {P:+.2f}**, against {M:+.2f} matched and '
-              f'{X:+.2f} mismatched — at the same {args.calib}-tile budget. That is the '
-              f'practical recommendation, since a practitioner holding mixed calibration '
-              f'tiles does not have to stratify them'
-              + (' and loses nothing by not doing so.' if P >= 0.9 * M else
-                 ', though stratifying is measurably better here.'))
+    # Retention as a percentage is meaningless against a near-zero denominator: an
+    # earlier version printed "-7301% retained" off a +0.02 matched gain.
+    MIN_DEN = 0.25
+    def retention(d):
+        return f'{xx[d] / mm[d] * 100:.0f}%' if mm[d] > MIN_DEN else None
+
+    md.append('\n### Transfer\n')
+    if all(xx[d] < 0 for d in names):
+        md.append('⛔ **Calibrating on the other domain is worse than not calibrating '
+                  'at all** — ' + ', '.join(f'`{d}` {xx[d]:+.2f}' for d in names)
+                  + ', every one below the published τ. The fitted thresholds are '
+                    'domain-specific, and applying the wrong domain\'s is an active '
+                    'harm rather than a smaller benefit. That is the honest scope '
+                    'statement §9b needs.')
+    elif np.isfinite(keep) and keep >= 0.8 and M > MIN_DEN:
+        md.append(f'✅ **It transfers** — the other domain retains {keep * 100:.0f}% of '
+                  f'the matched gain ({X:+.2f} against {M:+.2f}), so the thresholds are '
+                  f'more a property of the model\'s per-class calibration than of the '
+                  f'scene.')
+    else:
+        md.append(f'⚠️ **Transfer is partial** — {X:+.2f} against {M:+.2f} matched. '
+                  f'Calibration data should come from the target domain.')
+    for d in names:
+        r = retention(d)
+        md.append(f'- fit on `{B if d == A else A}` → evaluate on `{d}`: '
+                  f'**{xx[d]:+.2f}** against {mm[d]:+.2f} matched'
+                  + (f' ({r} retained)' if r else
+                     ' (matched gain too small for a ratio to mean anything)') + '.')
+
+    md.append(f'\n### Pooling\n\nDrawing the same {args.calib} tiles across both domains '
+              f'gives ' + ', '.join(f'`{d}` **{pp[d]:+.2f}**' for d in names) + '.')
+    if all(pp[d] >= 0.9 * mm[d] for d in names):
+        md.append('Pooling costs essentially nothing, so a practitioner need not '
+                  'stratify the calibration tiles.')
+    else:
+        md.append('⚠️ **Pooling is not a safe default here** — it keeps only '
+                  + ', '.join(f'{pp[d]:+.2f} of {mm[d]:+.2f} on `{d}`' for d in names)
+                  + '. A calibration set that mixes domains is fitting one threshold to '
+                    'two different optima, which is the same failure as the global τ it '
+                    'replaces, one level up.')
 
     text = '\n'.join(md)
     print('\n' + text)

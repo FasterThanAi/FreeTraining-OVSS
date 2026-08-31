@@ -102,3 +102,20 @@
 \newcommand{\CONFu}{43.3\%}        % urban -- the LOWER-share stratum is more confusable
 \newcommand{\AUCr}{0.524}          % rural detection AUC (conf)
 \newcommand{\AUCu}{0.730}          % urban
+
+% ---- WEEK3_RESULTS.md 9e: per-class tau across LoveDA's domains -------------
+\newcommand{\DOMr}{+2.77}          % rural within-domain gain, 5-fold
+\newcommand{\DOMrsd}{0.92}
+\newcommand{\DOMu}{+0.10}          % urban -- NOT distinguishable from zero (2/5 folds)
+\newcommand{\DOMusd}{0.39}
+\newcommand{\DOMrreal}{+18.61}     % rural, real classes aggregate
+\newcommand{\DOMureal}{+4.18}      % urban, real classes aggregate -- land cover DOES gain
+\newcommand{\DOMubg}{-3.51}        % urban catch-all pays for it: (4.18-3.51)/7 = +0.10
+\newcommand{\DOMtaudiff}{0.227}    % mean |tau difference| between the domains
+\newcommand{\DOMtaumax}{0.500}     % max, on `road' (0.725 rural vs 0.225 urban)
+\newcommand{\DOMxr}{-0.40}         % mismatched -> rural, BELOW the published tau
+\newcommand{\DOMxu}{-1.11}         % mismatched -> urban, BELOW the published tau
+\newcommand{\DOMmr}{+2.32}         % matched -> rural, same 200-tile budget
+\newcommand{\DOMmu}{+0.02}         % matched -> urban
+\newcommand{\DOMpr}{+0.77}         % pooled -> rural: keeps a third of matched
+\newcommand{\DOMpu}{-0.32}         % pooled -> urban
