@@ -119,3 +119,19 @@
 \newcommand{\DOMmu}{+0.02}         % matched -> urban
 \newcommand{\DOMpr}{+0.77}         % pooled -> rural: keeps a third of matched
 \newcommand{\DOMpu}{-0.32}         % pooled -> urban
+
+% ---- WEEK3_RESULTS.md 7b: the vocabulary intervention ----------------------
+% det = max(AUC, 1-AUC). AUC is symmetric, so a raw AUC of 0.208 is a detector
+% of strength 0.792 inverted, NOT an absent signal. Never quote raw AUC here.
+\newcommand{\ivA}{0.794}           % A0, published vocabulary, det(conf)
+\newcommand{\ivAtwo}{0.913}        % A0, det(conf2)
+\newcommand{\ivShareA}{0.84\%}     % catch-all share, published
+\newcommand{\ivShareD}{58.20\%}    % catch-all share, largest dose
+\newcommand{\ivB}{0.582}           % faithful dose arm, det(conf)
+\newcommand{\ivBtwo}{0.590}        % faithful dose arm, det(conf2)
+\newcommand{\ivD}{0.710}           % arity-matched control, det(conf)
+\newcommand{\ivDtwo}{0.855}        % arity-matched control, det(conf2)
+\newcommand{\ivRatio}{2.5$\times$} % dose effect / control effect, conf
+\newcommand{\ivRatioTwo}{5.6$\times$}  % ... conf2
+\newcommand{\ivRatioWorst}{3.1$\times$} % conf2 vs the WORST control, not the matched one
+\newcommand{\ivArms}{13}           % arms, all reading one cached score stack

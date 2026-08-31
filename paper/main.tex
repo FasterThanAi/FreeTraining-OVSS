@@ -304,6 +304,70 @@ figure} --- the identical pipeline discards \discardOEM{} on OpenEarthMap. Both
 are stated here rather than left for a reader to discover.
 
 % =====================================================================
+\subsection{Catch-all share, intervened on}
+\label{sec:intervention}
+
+The evidence so far is observational: across datasets and across LoveDA's urban
+and rural strata, detectability tracks the catch-all's share. Stratification
+cannot rule out everything those strata differ in. But catch-all share is not a
+property one has to go looking for --- \best{it is set by the vocabulary}. So we
+manipulate it.
+
+Every class in the baseline is an independent forward pass with its own text
+prompt, and the only cross-class operation in the pipeline is the \texttt{argmax}.
+Dropping a class from the vocabulary is therefore \emph{exactly} equivalent to
+dropping its channel, and one cached score stack answers every vocabulary
+question. All \ivArms{} arms read identical model outputs, so they differ in the
+vocabulary and in nothing else --- there is no run-to-run variation to absorb.
+
+We raise the catch-all's share by removing classes from the vocabulary and
+labelling their pixels catch-all, which leaves the catch-all its own single weak
+prompt. This is the situation a dataset like LoveDA presents. \best{Each dose arm
+is paired with an arity-matched control} that removes the same prompts but labels
+those pixels a real class, so the class count changes identically and only the
+share differs. Without that control the experiment measures ``fewer classes is an
+easier problem''.
+
+\paragraph{Detectability must be scored direction-agnostically.} AUC is symmetric,
+so an AUC of $0.208$ is a detector of strength $0.792$ with its sign reversed, not
+an absent signal. We report $\mathrm{det} = \max(\mathrm{AUC}, 1-\mathrm{AUC})$
+throughout. This is not a technicality: under a variant that merges class
+\emph{channels} into the catch-all rather than removing them, the top score does
+not degrade at all --- it \emph{inverts}, because a catch-all assembled from
+strong prompts is confidently correct about the pixels it absorbed. Scoring raw
+AUC would have reported that as a destroyed signal.
+
+\begin{table}[t]\centering\small
+\caption{Raising the catch-all's share from \ivShareA{} to \ivShareD{} of ground
+truth, against an arity-matched control that applies the same vocabulary change
+without raising the share. Detectability is
+$\max(\mathrm{AUC}, 1-\mathrm{AUC})$.}
+\label{tab:intervention}
+\begin{tabular}{lrrrr}
+\toprule
+signal & published & dose & control & ratio \\
+\midrule
+\texttt{conf}  & \ivA{}    & \best{\ivB{}}    & \ivD{}    & \ivRatio{} \\
+\texttt{conf2} & \ivAtwo{} & \best{\ivBtwo{}} & \ivDtwo{} & \ivRatioTwo{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Both signals degrade with the share, and neither degradation is explained by the
+class count (Table~\ref{tab:intervention}). The intervention moves OpenEarthMap
+from its own \ivA{} into the $0.58$--$0.62$ band where LoveDA sits, reproducing
+the observational regime rather than merely correlating with it. Against the
+weakest of the three controls rather than the matched one, the runner-up effect
+is still \ivRatioWorst{}.
+
+Predictions were registered in the repository before each run and are scored
+against the outcome, including three that failed. The effect is
+\emph{not} monotone in the interior of the dose range --- the smallest dose is the
+minimum --- so we quote the endpoints. Point predictions from a line fitted to the
+observational data missed at two of three doses, so the direction transfers and
+the rate does not.
+
+% =====================================================================
 \section{What we built, and which parts are justified}
 \label{sec:built}
 
@@ -594,20 +658,17 @@ it generalises to any training-free pipeline that thresholds a per-class score.
 \section{Limitations}
 \label{sec:limitations}
 
-\paragraph{Two datasets, and a stratification rather than an intervention.}
-Across our two datasets the catch-all's \emph{share} moves together with its
-\emph{confusability} --- whether it visually resembles the real classes --- and
-two observational points cannot separate variables that move together. We break
-the confound by stratifying LoveDA into its urban and rural domains, where the two
-dissociate: rural has the larger catch-all share (\SHAREr{} vs \SHAREu{} of
-ground truth) while urban's catch-all is the more confusable (\CONFu{} of it
-escapes into real classes, against \CONFr{}). Each explanation then predicts a
-different stratum to detect worse, and \best{share is right}: detection AUC is
-\AUCr{} in rural against \AUCu{} in urban. Across the two datasets and the two
-strata, detection is monotone in catch-all share. This is a stratification, not a
-randomised intervention --- urban and rural differ in class mix, object scale and
-scene density as well --- so it constrains the explanation rather than proving it,
-and a dataset whose catch-all is common but visually distinct would settle it.
+\paragraph{Two datasets.} The mechanism is established by intervention
+(Section~\ref{sec:intervention}) on one of them, and the stratified evidence
+supporting it comes from the other. A third dataset whose catch-all is common but
+visually distinct would strengthen both, and we did not have one: the obvious
+candidate, iSAID, has a catch-all that is 97.11\% of ground truth \emph{and}
+maximally confusable, so it would confirm the ordering and discriminate nothing.
+The doses in Section~\ref{sec:intervention} are chosen greedily from the smallest
+classes upward rather than at random, and the arity-matched control is not
+perfectly inert --- dropping a prompt disturbs the scores wherever that class's
+pixels lie --- so we report the dose-to-control \emph{ratio} rather than the
+difference alone.
 
 \paragraph{Calibration must match the evaluation distribution, and the gain is
 not uniform.} Fitting on LoveDA's \emph{train} split and evaluating on val gives

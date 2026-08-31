@@ -237,6 +237,101 @@ strata and is not an independent point; the independent ones are OEM, urban and 
 predicts will detect *worse*, and checks which is right — a form that cannot be phrased backwards,
 and verified to give the same answer with the strata in either order.
 
+
+### 7b. ⭐⭐ The mechanism is now CAUSAL — vocabulary intervention, 1 Sep
+
+§7a broke the share/confusability confound by *stratifying* LoveDA, and conceded in writing:
+**"this is a stratification, not a randomised intervention."** That sentence was the weakest joint
+in the project's strongest claim. It is now gone.
+
+**The idea.** Catch-all share is not a property to go looking for — it is **set by the vocabulary
+handed to SAM 3**. So intervene on it.
+
+**Why it cost no GPU time, and why that is better than re-running.** In
+`segearthov3_segmentor.py:141-189` every class is an *independent forward pass with its own text
+prompt*; there is no softmax, no normalisation, no interaction across classes anywhere. The only
+cross-class operation in the entire pipeline is the `argmax` in `predict()`. So **dropping a class
+from the vocabulary is exactly equivalent to dropping its channel.** One `--cache-full` pass
+(which passed the gate exactly — 44.16 mIoU, 3.78% discard) answers every vocabulary question, and
+all thirteen arms read *identical model outputs*: the vocabulary is the only thing that differs.
+Re-running per arm would have added sampling noise for nothing.
+
+**The design.** Dose arms raise the catch-all's share; each has an **arity-matched control** that
+applies the same merge to a real class instead, so class count changes identically and only the
+share differs. Two dose families, because the first one was wrong:
+
+- **`A`/`C` — merge channels by max.** Pre-registered, and **flawed**: it makes the catch-all a
+  *union of well-detected prompts*, unnaturally competent at its own pixels. A real catch-all is
+  the opposite (LoveDA's `background` has median `S_pres` **0.022**).
+- ⭐ **`B`/`D` — drop the prompts, relabel the pixels.** The merged classes are absent from the
+  **vocabulary** and their pixels are labelled catch-all, which keeps its own single weak prompt.
+  **This is LoveDA's actual situation, and it is the arm the paper quotes.**
+
+#### ⚠️ AUC must be scored direction-agnostically, or an inverted signal reads as a destroyed one
+
+`AUC(−score) = 1 − AUC(score)`, so an AUC of **0.208 is a detector of strength 0.792 with its sign
+flipped** — not an absent signal. The first version of the verdict scored raw AUC and announced
+"CAUSAL" off exactly that. Everything below is scored on **`det = max(AUC, 1−AUC)`**.
+
+#### The result (OpenEarthMap, 384 tiles, τ = 0.1)
+
+| family | signal | A0 (0.84%) | largest dose (58.20%) | control (0.84%) | dose effect | control effect | ratio |
+|---|---|---|---|---|---|---|---|
+| ⭐ **B/D** *(faithful)* | `conf` | 0.794 | **0.582** | 0.710 | **0.213** | 0.085 | **2.5×** |
+| ⭐ **B/D** *(faithful)* | `conf2` | 0.913 | **0.590** | 0.855 | **0.323** | 0.058 | **5.6×** |
+| A/C *(max-merge)* | `conf` | 0.794 | 0.785 | 0.794 | 0.009 | 0.000 | — |
+| A/C *(max-merge)* | `conf2` | 0.913 | 0.552 | 0.896 | 0.360 | 0.017 | 21× |
+
+> ⭐ **In the faithful arm BOTH signals degrade causally with catch-all share, and neither
+> degradation is explained by class count.** The intervention drives OpenEarthMap from its own
+> **0.794** into the **0.58–0.62** band where LoveDA actually sits — it reproduces the
+> observational regime rather than merely correlating with it.
+
+**The `A`-family failure is itself informative.** There, `conf` does **not** degrade (0.794 →
+0.785); it **inverts** (0.208 / 0.181 / 0.215), because a catch-all built as a union of strong
+prompts is *confidently right* about the pixels it absorbed. Only `conf2` degrades. That is the
+signature of the design flaw, and it is why `B` exists.
+
+#### Pre-registered predictions, scored
+
+`PREREGISTRATION.md`, committed before each run; nothing edited afterwards.
+
+| forward (A/C) | | faithful (B/D) | |
+|---|---|---|---|
+| **P1** AUC falls | ✅ | **Q1** `conf2` det ≤ 0.65 | ✅ 0.590 |
+| **P2** monotone | ⛔ | **Q2** every control within 0.08 | ⛔ **D25 moves 0.105** |
+| **P3** controls < 0.05 | ✅ **0.000** | **Q3** dose ≥ 2× control | ✅ 5.6× (3.1× vs the worst control) |
+| **P4** dose ≥ 2× control | ✅ | **Q4** `conf` inverts less than in A | ✅ **no `B` arm inverts at all** |
+| **P5** ±0.08 of the line | ⛔ | **Q5** `conf` det ≤ 0.70 | ✅ 0.582 |
+| **P6** `conf2` steeper | ⛔ raw / ✅ det — under-specified | | |
+| **P7** discard rises | ✅ | | |
+
+⚠️ **Report the three failures, not just the eight passes.**
+
+- **Q2 fails at `D25` (0.105 against a 0.08 bar).** Dropping prompts is not perfectly inert —
+  classes present in the image with no prompt disturb the scores wherever their pixels are
+  labelled. So the control moves a little, and the honest statistic is the **ratio**: 5.6× against
+  the matched control, **3.1× even against the worst control**.
+- **Not monotone.** `B` gives 0.507 → 0.624 → 0.582 across the doses, with the *smallest* dose the
+  minimum. **Quote the endpoints and state that the interior is non-monotone.** A plausible
+  reading: at B10 the removed classes are small (`water`+`road`, 9.3% of GT) so the
+  catch-all-assigned set is a balanced mix of removed-class and genuinely-suppressed pixels, which
+  is the worst case for separability; by B40 it is dominated by removed-class pixels.
+- **P5 mostly fails**, so the *rate* is dataset-specific even though the direction is not. Only
+  `B25` lands inside the band (0.624 against a predicted 0.549). Report the ordering, drop the line.
+
+#### What this changes
+
+✅ **§7 is an intervention now, not a stratification.** §7a's concession is replaced by this table.
+The mechanism — *a catch-all covering a large share of the scene destroys the information that
+would let a suppressed real class be detected* — is supported by a manipulation of the causal
+variable with class count controlled, and with predictions committed in advance.
+
+⚠️ Still honest about scope: run on **one** dataset, with doses chosen greedily rather than
+randomly, and a control that is not perfectly inert. It constrains the explanation far more
+tightly than §7a did; it is not a randomised trial over datasets.
+
+
 ---
 
 ## 8. ⛔ Recovery does not improve land-cover segmentation on either dataset

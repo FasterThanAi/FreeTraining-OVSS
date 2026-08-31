@@ -189,6 +189,23 @@ signal, not resemblance. Detection is monotone in share across four strata (OEM 
 urban 26.0%→0.730, pooled 36.1%→0.582, rural 42.9%→0.524). ⛔ **iSAID cannot break this confound**
 — 97.11% share *and* maximally confusable; don't spend GPU time on it. ⚠️ Stratification, not
 intervention. WEEK3 §7a.
+⭐⭐ **THE MECHANISM IS CAUSAL — vocabulary intervention, 1 Sep. WEEK3 §7b.** §7a's concession
+("stratification, not a randomised intervention") is **retired**. Catch-all share is set by the
+*vocabulary*, so it was manipulated directly. **CPU-only and that is better, not just cheaper**:
+every class is an independent forward pass with its own prompt and the only cross-class operation
+is the `argmax`, so **dropping a class from the vocabulary == dropping its channel, exactly** —
+all 13 arms read one `--cache-full` stack and differ in nothing but the vocabulary.
+⚠️ **Score `det = max(AUC, 1−AUC)`, never raw AUC** — AUC is symmetric, so 0.208 is a 0.792
+detector *inverted*, and the first verdict called that "causal" off a raw drop.
+✅ Faithful arm (prompts dropped, pixels relabelled — LoveDA's real situation), share 0.84%→58.20%:
+`conf` **0.794→0.582** vs control 0.710 (**2.5×**); `conf2` **0.913→0.590** vs control 0.855
+(**5.6×**, 3.1× vs the *worst* control). It drives OEM into the 0.58–0.62 band where LoveDA sits.
+⚠️ Quote **endpoints only** — non-monotone inside (0.507→0.624→0.582), Q2 fails at D25 (0.105 vs an
+0.08 bar), and P5's line misses at 2 of 3 doses: **direction transfers, rate does not.**
+⛔ The **max-merge** family (`A`/`C`) is a *flawed* design kept only because it was pre-registered —
+it makes the catch-all a union of strong prompts, so `conf` **inverts** instead of degrading.
+`PREREGISTRATION.md` holds all 12 predictions, committed before each run; 9 pass, 3 fail.
+
 ⛔ **Two LoveDA claims do NOT generalise and must be labelled as such:** the presence-collapse
 correlation (§9.2/§9.2a) and the 29.68% headline itself.
 
