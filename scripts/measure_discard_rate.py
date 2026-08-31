@@ -119,6 +119,18 @@ def main():
                     help='skip the per-image .npz cache (~2.5-4 GB for 1669 tiles)')
     ap.add_argument('--cache-dir', default=None,
                     help='where .npz files go (default: <out>/cache)')
+    # <<< VOCABULARY INTERVENTION (ROADMAP §6.1). Every class is an INDEPENDENT
+    # forward pass with its own text prompt (segmentor:141-189) and the only
+    # cross-class operation in the pipeline is the argmax in predict(). So
+    # dropping a class from the vocabulary is EXACTLY equivalent to dropping its
+    # channel here. Caching the full (N, H, W) stack therefore makes every
+    # vocabulary arm a CPU pass over ONE set of model outputs -- which is not
+    # merely cheaper than re-running, it is a cleaner intervention, because the
+    # arms then differ in the vocabulary and in nothing else at all.
+    ap.add_argument('--cache-full', action='store_true',
+                    help='also store the full per-class score stack `logits` '
+                         '(N, H, W) float16. ~10x the cache size; required by '
+                         'vocab_intervention.py and by nothing else.')
     args = ap.parse_args()
 
     out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
@@ -194,7 +206,9 @@ def main():
         cache_dir = Path(args.cache_dir) if args.cache_dir else out / 'cache'
         cache_dir.mkdir(parents=True, exist_ok=True)
         free_gb = shutil.disk_usage(cache_dir).free / 2**30
-        need_gb = 0.0025 * len(names)          # ~2.5 MB/image compressed
+        # ~2.5 MB/image compressed; the full stack adds ~2 bytes per class-pixel,
+        # which for 7 classes at 1024^2 is ~15 MB before compression.
+        need_gb = (0.025 if args.cache_full else 0.0025) * len(names)
         print(f'  cache -> {cache_dir}  (need ~{need_gb:.1f} GB, free {free_gb:.1f} GB)')
         if free_gb < need_gb * 1.2:
             sys.exit(f'ERROR: not enough disk for the cache. Use --no-cache, or '
@@ -330,6 +344,8 @@ def main():
                 spres=pres_views,                           # (n_views, N) full fidelity
                 classes=np.array(CLASSES),
                 **fused_arrays,                             # <<< P_fused, pre-gating
+                **({'logits': lg.cpu().numpy().astype(np.float16)}
+                   if args.cache_full else {}),             # <<< VOCABULARY INTERVENTION
             )
 
         if i % 100 == 0 or i == len(names):
