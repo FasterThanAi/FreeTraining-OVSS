@@ -334,6 +334,205 @@ Overleaf + the CVPR or IEEE TGRS template. Start the LaTeX skeleton in **week 9*
 
 ---
 
+---
+
+# PHASE 6 — Publication hardening (added 31 Aug 2026)
+
+**Why this phase exists.** Phases 0–5 are complete and roughly three roadmap-weeks early. The
+paper is written (`paper/main.tex`, one `\todo` left). So the question is no longer "can we finish"
+but **"what raises the acceptance probability per hour spent"**. Everything below is ranked by
+exactly that, with a cost and a hard gate.
+
+**The strategic read.** Both competitor papers come from a group with cluster-scale compute and a
+positive method. Competing on "our module beats theirs" from a 70 W-capped RTX 2000 is the losing
+game. **Our comparative advantage is rigor** — reproduced baselines, oracle bounds on every
+negative, validation gates, negative controls, and a *mechanism* that explains results rather than
+reporting them. Every item below plays to that.
+
+| # | item | cost | value | why |
+|---|---|---|---|---|
+| **1** | ⭐ **Vocabulary intervention** — dose–response on catch-all share | ~3 GPU h | **highest** | turns the paper's central claim from **correlational to causal** |
+| **2** | Discard-rate deployment criterion | CPU, 1 day | high | a **label-free** rule for when calibration pays |
+| **3** | Catch-all-excluded mIoU as a reported metric | CPU, hours | high | a benchmark recommendation others can adopt |
+| **4** | Label-free **coupled** objective via cross-head agreement | CPU, 1 day | high upside | would convert the biggest negative into a method |
+| **5** | Pre-registered prediction on a third dataset | data access + 1 GPU h | high | almost nobody pre-registers in CV |
+| **6** | ConInfer baseline row | 2–3 days, env risk | medium | the one comparison a reviewer will demand |
+| **7** | Bootstrap CIs, cross-dataset transfer, figures | CPU, 1 day | polish | cheap credibility |
+
+---
+
+## 6.1 ⭐ The vocabulary intervention — make the central claim causal
+
+**The problem it fixes.** WEEK3 §7a broke the share/confusability confound by *stratifying* LoveDA,
+and states plainly: **"this is a stratification, not a randomised intervention."** Urban and rural
+differ in class mix, object scale and scene density too. A reviewer will land on that sentence.
+It is currently the weakest joint in the strongest claim.
+
+**The fix.** Catch-all share is a variable **we control** — it is set by the vocabulary handed to
+SAM 3. So intervene on it directly instead of finding strata where it happens to vary.
+
+**Design — a dose–response curve with a class-count control.** On OpenEarthMap (catch-all 0.84%),
+progressively merge real classes *into* the catch-all, changing **both** the prompt vocabulary and
+the ground-truth mapping consistently, and re-measure detection AUC at each dose:
+
+| arm | vocabulary | catch-all share | tests |
+|---|---|---|---|
+| A₀ | published 8 classes + background | 0.84% | the baseline point |
+| A₁ | merge 1 class into `background` | ~10% | dose 1 |
+| A₂ | merge 2–3 classes into `background` | ~25% | dose 2 |
+| A₃ | merge 4 classes into `background` | ~40% | dose 3 — LoveDA's regime |
+| **C** | ⭐ **control**: merge the *same* classes into **each other**, not into the catch-all | stays 0.84% | isolates class-count from share |
+
+**Arm C is the whole experiment.** Merging classes also reduces the class count, which moves mIoU
+and the detection base rate on its own. The control changes the class count by exactly the same
+amount while leaving catch-all share untouched. If AUC falls along A₀→A₃ and does **not** fall in
+C, share is causal and the confound is closed by intervention rather than by argument.
+
+**Also run the reverse on LoveDA:** drop `background` from the prompt vocabulary entirely, so the
+vocabulary covers the scene. The mechanism predicts detectability should *rise* toward
+OpenEarthMap's regime. A prediction that survives in both directions is very hard to argue with.
+
+> **Gate.** Declare the predicted AUC ordering **in a committed file before the first run**
+> (`git log` is the timestamp). Prediction confirmed → §7 is upgraded from "constrains the
+> explanation" to "intervention". Prediction fails → that is a genuine finding about the mechanism
+> and must be written up as one, not quietly dropped.
+
+⚠️ Cost is real but small: one OEM pass is ~25 min. Five arms is under three hours. **This is by
+far the best use of remaining GPU time in the project.**
+
+---
+
+## 6.2 The discard-rate deployment criterion — a label-free rule for when calibration pays
+
+**The observation.** §9e found the calibration gain is +2.77 on rural and +0.10 on urban, and those
+strata differ 2× in discard rate (39.3% vs 18.5%). Domain and residual size are confounded there
+in precisely the way share and confusability were before §7a broke them.
+
+**The experiment.** Stratify all 1669 LoveDA tiles by **discard rate** into quantiles, *ignoring*
+the domain label, and run the same 5-fold within each stratum. Then check whether the gain tracks
+the discard rate or the urban/rural tag.
+
+**⭐ Why this is worth more than it looks.** Discard rate is **measurable with no ground truth at
+all** — it is just the fraction of pixels the model assigns to background. If the gain tracks it,
+the paper ends with a rule a practitioner can apply *before* paying for any annotation:
+
+> measure your discard rate; above *X*%, per-class calibration repays ~200 labelled tiles;
+> below it, do not bother.
+
+That converts a scope limitation into a **deployment criterion**, and makes the paper *predictive*
+rather than descriptive. Reviewers reward papers that predict. OpenEarthMap (3.78% discard, full
+mIoU flat) is a fifth point that either falls on the curve or does not.
+
+CPU-only; reuses `tau_domain.py` almost unchanged — the domain map becomes a quantile split.
+
+---
+
+## 6.3 Catch-all-excluded mIoU — propose the metric, don't just complain about it
+
+We now have the catch-all artefact measured **in both directions**:
+
+| | catch-all | real classes | full mIoU | effect |
+|---|---|---|---|---|
+| OpenEarthMap recovery (§8.1) | **+22.67** | −2.11 | **+2.28** | mIoU **inflated** |
+| LoveDA-urban calibration (§9e) | **−3.51** | +4.18 | **+0.10** | mIoU **deflated** |
+
+Same mechanism, opposite sign, two datasets. That is enough to make a **recommendation** rather
+than an observation: open-vocabulary segmentation benchmarks with a catch-all class should report
+**mIoU over the real classes** alongside full mIoU, because full mIoU can move substantially in
+either direction without land-cover quality changing at all.
+
+**Cost: hours.** Recompute every existing table with the extra column — the histogram cache makes
+it arithmetic. **Value: high**, because a concrete, adoptable metric recommendation is a
+contribution reviewers can point at, and it generalises past remote sensing.
+
+---
+
+## 6.4 A label-free **coupled** objective — the one attempt left that is not already bounded
+
+**Why the eleven failures don't cover it.** §9d's bound is precise: the optimal per-class τ solves a
+**coupled** multi-class IoU objective, so *no per-class scalar can express it*. Every one of the
+eleven label-free attempts was a per-class **scalar**. None was a coupled **objective**. That gap
+is still open, and it is the intellectually correct next move.
+
+**The concrete version.** The cache now stores each head's own top-1 separately (`iconf/ipred`,
+`sconf/spred`, added for §9d). So fit the threshold **vector** by coordinate ascent maximising
+**agreement between the semantic and instance heads** — a genuinely multi-class, coupled objective,
+computed with **no labels at all** — and evaluate the resulting vector against ground truth.
+
+- **Gate:** beat the random-proxy control's p95 of **+0.58** on held-out tiles. Anything less is a
+  twelfth bounded failure.
+- **If it clears the gate**, the paper's largest negative becomes a method, and the framing changes
+  from *"no label-free rule reaches the oracle"* to *"the reason is coupling, and here is the
+  coupled rule that does."* That is a substantially stronger paper.
+- **If it fails**, it is still the twelfth attempt and the *first* to test the coupled family, which
+  closes the bound properly instead of leaving a reviewer to ask about it.
+
+CPU-only. High upside, and publishable either way — which is the rare combination worth spending a
+day on.
+
+---
+
+## 6.5 Pre-register the mechanism's prediction on a third dataset
+
+The mechanism predicts the residual's size **and** detection AUC from catch-all share alone. So:
+
+1. `predict_dataset.py` computes the prediction from **ground-truth masks only** — no GPU.
+2. **Commit the prediction**, so `git log` timestamps it before any inference runs.
+3. Then run the baseline and compare.
+
+⛔ **iSAID does not qualify** — 97.11% catch-all *and* maximally confusable, so it confirms the
+ordering and discriminates nothing. Choose a dataset whose catch-all is **common but visually
+distinct**: ISPRS Potsdam / Vaihingen (`clutter`) is the nearest candidate, and its ~5% share lands
+in the empty gap between OpenEarthMap's 0.84% and LoveDA-urban's 26%.
+
+⚠️ **ISPRS access needs a registration form — start it on day one of this phase**, because it is the
+only slow item in the whole plan and everything else is CPU-bound.
+
+---
+
+## 6.6 The ConInfer row
+
+`github.com/Dog-Yang/ConInfer` — the nearest published competitor, and the one comparison a
+reviewer will ask for by name.
+
+⚠️ **It needs its own conda environment. Never touch `segov3`** — the three-way version deadlock in
+`WEEK1_RESULTS.md` §2 is the only working combination and rebuilding it costs a day.
+
+**Timebox: 3 days.** If their code does not run in that window, cite it, position against it in
+related work (visual vs semantic context, patch vs region, per-scene vs corpus) and say plainly in
+limitations that a direct comparison was not run. That is an acceptable outcome; a wrecked
+environment is not.
+
+---
+
+## 6.7 Cheap credibility
+
+- **Bootstrap CIs** on the headline gains, not just fold sd.
+- **Cross-dataset threshold transfer** (LoveDA → OpenEarthMap). §9e shows it fails *within* LoveDA;
+  completing the picture across datasets costs a numpy pass.
+- **A qualitative figure of the urban/rural threshold disagreement** — `road` at 0.725 vs 0.225 is
+  a picture, not a number.
+- **Fill the last `\todo`** in `paper/main.tex` (author block).
+
+---
+
+## Phase 6 ordering
+
+| when | do |
+|---|---|
+| **day 1** | start the ISPRS registration (slow path); write and **commit** the §6.1 predictions |
+| **days 1–2** | §6.1 vocabulary intervention — the GPU work, ~3 h |
+| **days 2–3** | §6.2 discard-rate criterion and §6.3 metric column — CPU |
+| **day 4** | §6.4 coupled label-free objective — CPU, gated at +0.58 |
+| **days 5–7** | §6.5 third dataset if access arrived; else §6.6 ConInfer, timeboxed |
+| **ongoing** | §6.7 polish; keep `paper/numbers.tex` the only place a number is typed |
+
+**Stop rule.** If §6.1 and §6.2 both land, the paper is materially stronger than it is today and
+**submission should not wait** for §6.5 or §6.6. Shipping a strong workshop paper beats polishing a
+better one past the deadline.
+
+---
+
 ## Milestones — if you miss these, replan immediately
 
 | End of week | Must be true |

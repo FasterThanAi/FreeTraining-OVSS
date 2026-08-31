@@ -264,6 +264,21 @@ fails there, so better detection buys nothing.
 **+3.62** and **56.1%**. ⚠️ **`selective_recovery_miou.py` once leaked GT** by scoping regions to
 `gt >= 2`; fixed, and `--regions oracle` reproduces it deliberately as an upper bound only.
 
+### Phase 6 — publication hardening. See @ROADMAP.md Phase 6 for the full plan.
+
+Ranked by acceptance probability per hour. ⭐ **§6.1 is worth more than the rest combined**: catch-all
+share is a variable *we control* (it is set by the prompt vocabulary), so intervene on it instead of
+stratifying — merge OEM classes into `background` at increasing doses, **with a class-count control
+that merges the same classes into each other**, and re-measure detection AUC. That upgrades §7 from
+"stratification, not intervention" to an actual intervention, closing the weakest joint in the
+strongest claim. ~3 GPU hours. **Commit the predicted ordering before the first run.**
+Then, CPU-only: **§6.2** stratify by *discard rate* rather than domain — it is label-free, so if the
+calibration gain tracks it the paper ends with a deployment criterion instead of a caveat; **§6.3**
+report catch-all-excluded mIoU everywhere, now that the artefact is measured in *both* directions
+(OEM +22.67 inflating, LoveDA-urban −3.51 deflating); **§6.4** the one label-free family §9d does
+*not* bound — a **coupled** objective (maximise cross-head agreement over the whole τ vector) rather
+than another per-class scalar, gated at the random control's +0.58.
+
 Next, in order:
 
 1. **Write.** @PAPER_OUTLINE.md has the skeleton, the section map and the figure list.
