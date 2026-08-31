@@ -841,6 +841,15 @@ labelled "building" would have named `grass` on OEM and produced a clean table w
 labels. `.png` hardcoded against a directory of `.tif` crashed. Class identity now comes from the
 data via `labels.py`, and `background` is located **by name**.
 
+**`--limit` is a smoke test, not a subset.** It takes the first *n* filenames in sorted order,
+and LoveDA val is Rural (992) + Urban (677) merged with **disjoint ID ranges** — so `--limit 500`
+is essentially rural-only. It surfaced as a run reporting **40.94 mIoU / 41.15% discard** against
+the split's 47.38 / 29.68%, which reads as a broken baseline and is nothing of the kind: those are
+rural's own figures (5-fold published-τ baselines 40.66–44.16, discard 39.3%, §9e). Caught because
+the domain split had already been measured; without §9e it would have looked like a label-alignment
+bug and cost a day. `--sample n --seed k` now draws at random, `--limit` prints a warning, and the
+two are mutually exclusive.
+
 **A symlink loop damaged the dataset directory.** `ln -s target dest` creates the link *inside*
 `dest` when `dest` already exists, producing `images/val/val → images/val`. Use `ln -sfn`. The
 tell was a file count of 385 where 384 was expected.

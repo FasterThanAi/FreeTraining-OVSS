@@ -100,7 +100,16 @@ def main():
     ap.add_argument('--img-dir', default='data/LoveDA/img_dir/val')
     ap.add_argument('--ann-dir', default='data/LoveDA/ann_dir/val')
     ap.add_argument('--out', default=os.path.expanduser('~/outputs/week2'))
-    ap.add_argument('--limit', type=int, default=0, help='0 = all images')
+    ap.add_argument('--limit', type=int, default=0,
+                    help='0 = all images. ⚠️ Takes the FIRST n in FILENAME order, '
+                         'which is NOT a representative subset when a split merges '
+                         'domains with disjoint ID ranges — on LoveDA val (Rural '
+                         '992 + Urban 677) --limit 500 is essentially rural-only. '
+                         'Use --sample for a subset you intend to generalise from.')
+    ap.add_argument('--sample', type=int, default=0,
+                    help='draw n images at RANDOM instead of taking the first n. '
+                         'Use this whenever the subset stands in for the split.')
+    ap.add_argument('--seed', type=int, default=0, help='--sample seed')
     ap.add_argument('--ext', default=None,
                     help='image extension; auto-detected (.png / .tif) if unset')
     ap.add_argument('--reduce-zero-label', type=lambda v: v.lower() == 'true',
@@ -149,8 +158,25 @@ def main():
                     if any(Path(args.ann_dir).glob(f'*{e}'))), ext)
     names = sorted(p.stem for p in Path(args.img_dir).glob(f'*{ext}'))
     print(f'  image ext {ext}, annotation ext {ann_ext}')
+    if args.limit and args.sample:
+        sys.exit('ERROR: --limit and --sample both given; they mean different '
+                 'things. --limit takes the first n (a smoke test), --sample '
+                 'draws n at random (a representative subset). Pick one.')
     if args.limit:
         names = names[:args.limit]
+        # LoveDA val is Rural 992 + Urban 677 merged, with disjoint ID ranges, so
+        # the first 500 filenames are one domain. That produced a 40.94 mIoU /
+        # 41.15% discard run that looked like a broken baseline and was actually
+        # a rural-only sample. Say so at the top rather than in the numbers.
+        print(f'  ⚠️  --limit takes the FIRST {args.limit} in filename order, which '
+              f'is not a random subset. If this split merges domains, expect one '
+              f'of them. Use --sample to generalise from the result.')
+    elif args.sample:
+        rng = np.random.default_rng(args.seed)
+        names = sorted(rng.choice(names, min(args.sample, len(names)),
+                                  replace=False).tolist())
+        print(f'  --sample {args.sample} at seed {args.seed} '
+              f'(random, representative of the split)')
     print(f'{len(names)} images | config {args.config} | out {out}')
 
     if args.tau is not None:
