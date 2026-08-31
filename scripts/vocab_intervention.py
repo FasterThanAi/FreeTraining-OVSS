@@ -76,8 +76,14 @@ class Arm:
     or None when the catch-all was dropped from the vocabulary entirely -- in
     which case sub-tau pixels go to a synthetic sink at index len(groups)."""
 
-    def __init__(self, name, groups, bg, note=''):
+    def __init__(self, name, groups, bg, note='', absorb=None):
         self.name, self.groups, self.bg, self.note = name, groups, bg, note
+        # `absorb` maps a class to an output class for GROUND TRUTH ONLY, with no
+        # channel contributed. That is the difference between "this class was
+        # merged into the catch-all" (its prompt still helps score the catch-all)
+        # and "this class is not in the vocabulary at all and its pixels are
+        # labelled catch-all" -- which is what a real catch-all actually is.
+        self.absorb = absorb or {}
         self.sink = bg if bg is not None else len(groups)
         self.n_out = len(groups) + (0 if bg is not None else 1)
 
@@ -87,6 +93,7 @@ class Arm:
         for i, g in enumerate(self.groups):
             for c in g:
                 m[c] = i
+        m.update(self.absorb)
         return m
 
 
@@ -137,6 +144,26 @@ def build_arms(LB, share, targets, drop_catchall):
                         + [[c] for c in rest_c], 0,
                         f'the same {nm} merged into `{LB.names[c0]}` instead — '
                         f'identical class count, catch-all share unchanged'))
+        # ⭐ THE FAITHFUL ANALOGUE, added after the first run. The A arms raise
+        # share by MAX-MERGING channels, which makes the catch-all a union of
+        # well-detected prompts -- unnaturally COMPETENT at its own pixels, and
+        # the opposite of a real catch-all (LoveDA's `background` has median
+        # S_pres 0.022). That is why `conf` INVERTED rather than attenuating.
+        # A real catch-all is what B models: the classes are simply absent from
+        # the vocabulary, their pixels are labelled catch-all, and the catch-all
+        # keeps its own single weak prompt.
+        arms.append(Arm(f'B{t:g} dose (prompt dropped)',
+                        [[bg]] + [[c] for c in rest_d], 0,
+                        f'{nm} removed from the VOCABULARY; their pixels are '
+                        f'labelled `{LB.names[bg]}`, which keeps its own single '
+                        f'weak prompt — the faithful analogue of a real catch-all',
+                        absorb={c: 0 for c in S}))
+        arms.append(Arm(f'D{t:g} control (prompt dropped)',
+                        [[bg]] + [[c0]] + [[c] for c in rest_c], 0,
+                        f'the same classes removed from the vocabulary, but their '
+                        f'pixels labelled `{LB.names[c0]}` — identical class '
+                        f'count, catch-all share unchanged',
+                        absorb={c: 1 for c in S}))
     if drop_catchall:
         arms.append(Arm('R reverse', [[c] for c in range(LB.n) if c != bg], None,
                         'the catch-all is removed from the vocabulary, which now '
@@ -236,19 +263,29 @@ def main():
     print(f'  {len(arms)} arms\n')
     st = scan(files, LB, arms, args.tau)
 
+    def det(x):
+        """Direction-agnostic detectability. ⚠️ AUC IS SYMMETRIC: AUC(-score) =
+        1 - AUC(score), so an AUC of 0.208 is a detector of strength 0.792 with
+        its sign flipped, NOT an absent signal. Scoring the raw AUC would let an
+        INVERTED signal be reported as a destroyed one, which is exactly what the
+        first run of this script did. The mechanism claims information is LOST,
+        so it must be scored on |AUC - 0.5|."""
+        return max(x, 1 - x) if np.isfinite(x) else x
+
     rows = []
-    for a, s in zip(arms, st):
-        tot = s['gt'].sum()
-        sh = s['gt'][a.sink] / tot * 100
-        real_tot = tot - s['gt'][a.sink]
-        disc = s['sink_gt'][:a.sink].sum() + s['sink_gt'][a.sink + 1:].sum()
-        base = disc / max(s['sink_gt'].sum(), 1) * 100
+    for a_, s_ in zip(arms, st):
+        tot = s_['gt'].sum()
+        sh = s_['gt'][a_.sink] / tot * 100
+        real_tot = tot - s_['gt'][a_.sink]
+        disc = s_['sink_gt'][:a_.sink].sum() + s_['sink_gt'][a_.sink + 1:].sum()
+        auc = auc_from_hist(s_['pos'], s_['neg'])
+        auc2 = auc_from_hist(s_['pos2'], s_['neg2'])
         rows.append(dict(
-            arm=a, share=sh, classes=len(a.groups),
-            discard=disc / max(real_tot, 1) * 100, base=base,
-            auc=auc_from_hist(s['pos'], s['neg']),
-            auc2=auc_from_hist(s['pos2'], s['neg2']),
-            miou=miou(s['C']) if a.bg is not None else float('nan')))
+            arm=a_, share=sh, classes=len(a_.groups),
+            discard=disc / max(real_tot, 1) * 100,
+            base=disc / max(s_['sink_gt'].sum(), 1) * 100,
+            auc=auc, auc2=auc2, det=det(auc), det2=det(auc2),
+            miou=miou(s_['C']) if a_.bg is not None else float('nan')))
 
     md = [f'# Catch-all share — intervened on, not stratified\n',
           f'- cache: `{args.cache}` | tiles: **{len(files)}** | τ = **{args.tau}**',
@@ -258,77 +295,102 @@ def main():
           'class from the vocabulary is exactly equivalent to dropping its channel**. '
           'All arms therefore read one cached score stack and differ in the vocabulary '
           'and in nothing else — no run-to-run variation.\n',
-          '⚠️ **The `C` arms are the experiment.** Merging classes also reduces the class '
-          'count, which moves the base rate and mIoU on its own. Each `C` arm merges the '
-          '*same* classes into one another instead of into the catch-all, so the arity '
-          'change is identical and only the share differs.\n',
-          '| arm | vocabulary size | catch-all share of GT | discard % | base % | **AUC `conf`** | '
-          'AUC `conf2` | mIoU |', '|---|---|---|---|---|---|---|---|']
+          '⚠️ **`det` is the column that matters, not `AUC`.** AUC is symmetric — '
+          '`AUC(−score) = 1 − AUC(score)` — so an AUC of 0.208 is a detector of strength '
+          '0.792 with its sign flipped, not an absent signal. The mechanism claims '
+          'information is *lost*, so it is scored on `det = max(AUC, 1−AUC)`. A ⇄ marks '
+          'an arm where the signal inverted.\n',
+          '⚠️ **The `C` and `D` arms are the experiment.** Merging also reduces the class '
+          'count, which moves the base rate on its own. Each control applies the *same* '
+          'merge to a real class instead of the catch-all, so arity changes identically '
+          'and only the share differs.\n',
+          '**Two dose families.** `A` merges channels into the catch-all by max, which '
+          'makes it a *union of well-detected prompts* — unnaturally competent, and the '
+          'opposite of a real catch-all. ⭐ **`B` is the faithful analogue**: the classes '
+          'are removed from the vocabulary entirely and their pixels labelled catch-all, '
+          'which keeps its own single weak prompt. That is LoveDA\'s actual situation.\n',
+          '| arm | vocab | catch-all share | discard % | base % | AUC `conf` | **det** | '
+          'AUC `conf2` | **det2** | mIoU |', '|---|---|---|---|---|---|---|---|---|---|']
     for r in rows:
+        inv = ' ⇄' if r['auc'] < 0.5 else ''
+        inv2 = ' ⇄' if r['auc2'] < 0.5 else ''
         md.append(f'| **{r["arm"].name}** | {r["classes"]} | **{r["share"]:.2f}%** | '
-                  f'{r["discard"]:.2f} | {r["base"]:.1f} | **{r["auc"]:.3f}** | '
-                  f'{r["auc2"]:.3f} | '
+                  f'{r["discard"]:.2f} | {r["base"]:.1f} | {r["auc"]:.3f}{inv} | '
+                  f'**{r["det"]:.3f}** | {r["auc2"]:.3f}{inv2} | **{r["det2"]:.3f}** | '
                   + (f'{r["miou"]:.2f}' if np.isfinite(r['miou']) else '—') + ' |')
     md.append('')
     for r in rows:
         md.append(f'- **{r["arm"].name}** — {r["arm"].note}.')
 
-    dose = [r for r in rows if r['arm'].name.startswith('A') and r['arm'].name != 'A0 published']
-    ctrl = [r for r in rows if r['arm'].name.startswith('C')]
-    base0 = next(r for r in rows if r['arm'].name == 'A0 published')
-
+    base0 = next(r for r in rows if r['arm'].name.startswith('A0'))
     md += ['\n## Verdict\n']
-    if dose and ctrl:
-        d_drop = base0['auc'] - dose[-1]['auc']
-        c_drop = base0['auc'] - ctrl[-1]['auc']
-        md.append('| | share at the largest dose | AUC change from `A0` |')
-        md.append('|---|---|---|')
-        md.append(f'| **dose** (`{dose[-1]["arm"].name}`) | '
-                  f'{base0["share"]:.2f}% → **{dose[-1]["share"]:.2f}%** | '
-                  f'**{-d_drop:+.3f}** |')
-        md.append(f'| **control** (`{ctrl[-1]["arm"].name}`) | '
-                  f'{base0["share"]:.2f}% → {ctrl[-1]["share"]:.2f}% (unchanged) | '
-                  f'{-c_drop:+.3f} |')
-        mono = all(dose[i]['auc'] >= dose[i + 1]['auc'] for i in range(len(dose) - 1))
-        if d_drop > 0 and d_drop > 2 * abs(c_drop):
-            md.append(f'\n⭐ **Catch-all share is CAUSAL.** Raising it from '
-                      f'{base0["share"]:.2f}% to {dose[-1]["share"]:.2f}% costs '
-                      f'**{d_drop:.3f} AUC**, while the control — the same classes '
-                      f'merged, the same class count, the share left alone — moves only '
-                      f'{c_drop:+.3f}. The effect follows the share, not the arity.'
-                      + (' Detection is monotone across the doses.' if mono else
-                         ' ⚠️ It is **not** monotone across the doses, so report the '
-                         'endpoints and say so.')
-                      + '\n\n**§7 upgrades from a stratification to an intervention**, and '
-                        'the concession in §7a ("not a randomised intervention") can be '
-                        'replaced by this table.')
-        elif d_drop > 0:
-            md.append(f'\n⚠️ **AUC falls with the dose ({d_drop:.3f}) but the control '
-                      f'moves comparably ({c_drop:+.3f}).** The effect is at least partly '
-                      f'the class count, not the share. §7a\'s stratification stands as '
-                      f'the stronger evidence and this must be reported as inconclusive — '
-                      f'it is exactly the confound arm C exists to expose.')
-        else:
-            md.append(f'\n⛔ **The prediction FAILS.** Raising the catch-all\'s share does '
-                      f'not reduce detectability ({-d_drop:+.3f} AUC). §7\'s mechanism is '
-                      f'not causal in the direction claimed, and the paper must say so. '
-                      f'The stratified result (§7a) then needs a different explanation — '
-                      f'most likely something urban and rural differ in besides these two '
-                      f'variables.')
+
+    def fam(dose_p, ctrl_p, title, lead):
+        d = [r for r in rows if r['arm'].name.startswith(dose_p)]
+        c = [r for r in rows if r['arm'].name.startswith(ctrl_p)]
+        if not d or not c:
+            return
+        md.append(f'\n### {title}\n\n{lead}\n')
+        md.append('| signal | A0 | largest dose | control | dose effect | control effect |')
+        md.append('|---|---|---|---|---|---|')
+        out = {}
+        for key, lab in (('det', '`conf`'), ('det2', '`conf2` (runner-up)')):
+            de = base0[key] - d[-1][key]
+            ce = base0[key] - c[-1][key]
+            out[key] = (de, ce)
+            md.append(f'| {lab} | {base0[key]:.3f} | **{d[-1][key]:.3f}** | '
+                      f'{c[-1][key]:.3f} | **{de:+.3f}** | {ce:+.3f} |')
+        md.append(f'\nCatch-all share {base0["share"]:.2f}% → **{d[-1]["share"]:.2f}%** '
+                  f'in the dose arm, {c[-1]["share"]:.2f}% in the control.')
+        inverted = [r['arm'].name for r in d if r['auc'] < 0.5]
+        if inverted:
+            md.append(f'\n⚠️ **`conf` INVERTED** in {", ".join(inverted)} — the signal '
+                      f'changed sign rather than disappearing, so the raw AUC understates '
+                      f'detectability badly. Scored on `det`.')
+        for key, lab, claim in (
+                ('det2', '`conf2`', "§7's mechanism is stated about the RUNNER-UP: a "
+                 "catch-all gives the model a plausible answer everywhere, so a strong "
+                 "runner-up carries no information. This is the row that tests it."),
+                ('det', '`conf`', 'The top score is what §7a\'s monotone-in-share table '
+                 'used, so it needs its own answer.')):
+            de, ce = out[key]
+            if de > 0.05 and de > 2 * abs(ce):
+                md.append(f'\n✅ **{lab}: share is causal.** {claim} Detectability falls '
+                          f'**{de:.3f}** with the dose while the control moves {ce:+.3f} '
+                          f'— same merge, same class count, share untouched.')
+            elif abs(de) <= 0.05:
+                md.append(f'\n⛔ **{lab}: share is NOT the cause.** {claim} Detectability '
+                          f'moves only {de:+.3f} across the whole dose range, so raising '
+                          f'the catch-all\'s share does not destroy this signal.')
+            else:
+                md.append(f'\n⚠️ **{lab}: inconclusive** — dose {de:+.3f} against control '
+                          f'{ce:+.3f}. {claim}')
+
+    fam('B', 'D', 'B / D — the faithful analogue ⭐',
+        'The merged classes are absent from the **vocabulary** and their pixels are '
+        'labelled catch-all, which keeps its own single weak prompt. This is what a real '
+        'catch-all is, and it is the arm the paper should quote.')
+    fam('A', 'C', 'A / C — merge by channel-max',
+        '⚠️ Here the catch-all becomes a *union of well-detected prompts*, so it is '
+        'unnaturally competent at its own pixels. Retained because it was pre-registered, '
+        'but it is **not** a faithful model of a catch-all — read `B/D` first.')
+
     rev = [r for r in rows if r['arm'].name.startswith('R')]
     if rev:
-        d = rev[0]['auc'] - base0['auc']
-        md.append(f'\n**Reverse arm.** Removing the catch-all from the vocabulary moves '
-                  f'AUC {d:+.3f} ({base0["auc"]:.3f} → {rev[0]["auc"]:.3f}). '
-                  + ('✅ Detectability rises when the vocabulary covers the scene, which '
-                     'is the mechanism pushed in the opposite direction and holding.'
-                     if d > 0.02 else
-                     '⛔ It does not rise, so the mechanism does not survive the reverse '
-                     'intervention. Report this beside the forward result.')
+        d = rev[0]['det'] - base0['det']
+        md.append(f'\n### Reverse direction\n\nRemoving the catch-all from the '
+                  f'vocabulary moves `det` {d:+.3f} ({base0["det"]:.3f} → '
+                  f'{rev[0]["det"]:.3f}).'
+                  + (' ✅ Detectability rises when the vocabulary covers the scene — the '
+                     'mechanism pushed the other way and holding.' if d > 0.02 else
+                     ' ⛔ It does not rise, so the mechanism does not survive the reverse '
+                     'intervention.')
                   + ' ⚠️ mIoU is not comparable for this arm — it has no catch-all class '
-                    'to predict — so only the detection columns are meaningful.')
-    md.append('\n⚠️ Compare against the predictions in `PREREGISTRATION.md`, which was '
-              'committed before this was run. Do not edit them now.')
+                    'to predict — so only the detection columns mean anything.')
+    md.append('\n⚠️ Score against `PREREGISTRATION.md`, committed before the first run. '
+              'The `B`/`D` family and the `det` column were added AFTER seeing that `conf` '
+              'inverted; their predictions are pre-registered separately in that file\'s '
+              'addendum, and the original predictions stand as written.')
 
     text = '\n'.join(md)
     print('\n' + text)

@@ -108,3 +108,72 @@ with than one confirmed only where it was discovered.
   **exactly** equivalent to dropping its channel. This is why all arms can read one cached
   score stack. If that equivalence were ever to break (a future segmentor with cross-class
   normalisation), this design becomes invalid and the arms must be re-run on the GPU.
+
+---
+
+# Addendum — 31 Aug 2026, after the A/C run, before the B/D run
+
+**Nothing above has been edited.** This section records how the original predictions
+scored, a design flaw the result exposed, and predictions for the new arms — committed
+before those arms are run.
+
+## How the original predictions scored (OpenEarthMap, 384 tiles, τ = 0.1)
+
+| | prediction | outcome |
+|---|---|---|
+| **P1** | AUC `conf` falls | ✅ 0.794 → 0.215 |
+| **P2** | monotone across doses | ⛔ A25 0.181 → A40 0.215 reverses |
+| **P3** | ⭐ controls move < 0.05 | ✅ **0.000 — every control sits at 0.794** |
+| **P4** | ⭐ dose ≥ 2× control | ✅ 0.580 against 0.000 |
+| **P5** | within ±0.08 of the line at achieved share | ⛔ off by 0.527 / 0.368 / 0.216 |
+| **P6** | `conf2` falls more steeply than `conf` | ⛔ as written; ✅ direction-agnostic — the prediction was under-specified |
+| **P7** | discard rises with the dose | ✅ 3.78 → 7.67 → 25.33 → 43.35 |
+
+## ⚠️ What P1 missed, and why the scoring column changed
+
+**AUC is symmetric: `AUC(−score) = 1 − AUC(score)`.** An AUC of 0.208 is a detector of
+strength 0.792 with its sign flipped, *not* an absent signal. P1 asked only whether AUC
+falls, so a signal that **inverted** scored as one that was destroyed. Scored
+direction-agnostically as `det = max(AUC, 1−AUC)`:
+
+| arm | share | `conf` det | `conf2` det |
+|---|---|---|---|
+| A0 | 0.84% | 0.794 | 0.913 |
+| A10 | 10.19% | 0.792 | 0.625 |
+| A25 | 39.57% | 0.819 | 0.548 |
+| A40 | 58.20% | 0.785 | 0.552 |
+| C40 | 0.84% | 0.794 | 0.896 |
+
+**`conf` is flat — share does not destroy it, it flips it.** **`conf2`, the runner-up, does
+fall to near chance while the control holds at 0.90** — and §7's mechanism is stated about
+the runner-up. So the claim survives for the signal it is actually about, and fails for the
+signal §7a's monotone table happened to use. Both must be reported.
+
+## ⚠️ The design flaw
+
+The `A` arms raise share by **max-merging channels into the catch-all**, which makes it a
+*union of well-detected prompts* — unnaturally competent at its own pixels. That is why
+`conf` inverted: the merged catch-all is confidently right about the classes it absorbed.
+A real catch-all is the opposite; LoveDA's `background` has median `S_pres` **0.022**.
+
+## The faithful analogue — new arms, predictions committed before the run
+
+`B_k` removes the merged classes from the **vocabulary** entirely and labels their pixels
+catch-all, leaving the catch-all its own single weak prompt — LoveDA's actual situation.
+`D_k` is its arity-matched control: the same prompts dropped, but the pixels labelled a
+real class, so share is untouched.
+
+| # | prediction | falsified if |
+|---|---|---|
+| **Q1** | ⭐ `conf2` det falls to **≤ 0.65** at the largest B dose | it stays above 0.70 |
+| **Q2** | `D` controls stay within **0.08** of A0 on `conf2` det | any control moves ≥ 0.08 |
+| **Q3** | ⭐ B dose effect ≥ **2×** D control effect on `conf2` det | it is not |
+| **Q4** | `conf` inverts **less** in B than in the matching A arm (the catch-all keeps its weak prompt, so it is not confidently right about absorbed pixels) | B inverts as strongly or more |
+| **Q5** | `conf` det in B falls **below A0's 0.794**, to ≤ 0.70 at the largest dose | it stays above 0.75 |
+
+**Q3 is the experiment**, as P4 was. Q4 and Q5 together are the real test of the mechanism:
+if a *weak* catch-all absorbing more area degrades the top score rather than inverting it,
+the intervention reproduces the observational gradient and §7 is causal as written. If
+`conf` stays flat in B as it did in A, then **share does not destroy top-score
+detectability at all**, §7a's monotone-in-share table needs another explanation, and that
+is what the paper must say.
