@@ -39,6 +39,22 @@ The existing four observational points fit a line at r = −0.928 (r² = 0.861):
 `AUC = −0.00633 · share + 0.8249`. Anchored at OpenEarthMap's own A0 = 0.794, that line
 gives the point predictions below.
 
+### Clarification of evaluation procedure — added 31 Aug 2026, still BEFORE the run
+
+OpenEarthMap's classes are chunky (`bareland` 1.3%, `water` 2.4%, `road` 7.1%, `cropland`
+11.8%, `building` 17.8%, `tree` 18.8%, `pavement` 19.8%, `grass` 21.0%), so a greedy merge
+cannot land on a nominal target. At `--targets 10 25 40` the arms will reach roughly
+**10.3%, 39.9% and 58.7%**.
+
+**P5 is therefore evaluated against the line at each arm's ACHIEVED share, not its nominal
+target**, using the formula already stated above: `AUC = 0.794 − 0.00633 · (share − 0.84)`.
+This changes no prediction — the line, the anchor and the ±0.08 band are unchanged, and the
+achieved shares are determined by the data and the greedy rule, not chosen by us. It is
+recorded here rather than applied silently after the fact.
+
+Note the largest arm extrapolates **beyond** every observational point (58.7% against
+rural's 42.9%), so P5 is weakest there and P1–P4 carry the argument.
+
 ---
 
 ## Predictions — forward direction (OpenEarthMap, τ = 0.1)
