@@ -886,6 +886,68 @@ matched gain. **The tables were correct throughout — only the prose was wrong*
 third time this session that generated verdict text needed checking against its own table.
 
 
+
+### 9f. ⛔ No label-free rule for *when* calibration pays — and it is the same bound as §9d — 1 Sep
+
+`discard_criterion.py`. §9e left the method's scope unusable in practice: *"+2.77 on rural, +0.10
+on urban"* is not something a practitioner can act on, because they do not know which stratum they
+are in until they have already bought the labels. Those strata also differ 2× in discard rate, so
+domain and residual size are confounded there exactly as share and confusability were before §7a.
+
+**The statistic is deliberately label-free**: the fraction of *all* pixels the model assigns to the
+catch-all, computable from a forward pass over unlabelled tiles. It is a good stand-in for the
+familiar discard rate — Spearman **+0.885** on LoveDA, **+0.924** on OEM — which is the only reason
+the substitution is legitimate.
+
+#### LoveDA — the gain is U-shaped in the residual, not monotone
+
+| stratum | catch-all fraction | labelled discard | **Δ mIoU** | sd | worst fold | domain mix |
+|---|---|---|---|---|---|---|
+| 1 | 0.001–0.186 | 6.0% | **+2.13** | **0.18** | **+1.96** | rural 54 / urban 45 |
+| 2 | 0.186–0.358 | 15.5% | +0.78 | 0.40 | +0.16 | rural 42 / urban 57 |
+| 3 | 0.359–0.767 | 27.9% | +0.81 | 0.24 | +0.43 | rural 44 / urban 55 |
+| 4 | 0.771–1.000 | 85.8% | **+3.22** | **3.15** | **−1.22** | rural 96 / urban 3 |
+
+Random control, same sizes: +1.81, +1.09, +0.62, +0.81 — spread **1.19** against the stratified
+**2.43**, only 2.0×, and that entire margin comes from stratum 4, whose **sd (3.15) exceeds the
+whole stratified spread**. ρ(fraction, gain) = **+0.400** over four strata.
+
+⛔ **There is no rule here.** The largest and most *reliable* gain is in the stratum with the
+**least** residual (+2.13 ± 0.18, worst fold +1.96) — the opposite of the intuition the experiment
+was built on. The high-residual stratum has the largest mean but is worthless as guidance: a
+3.15 sd and a fold at **−1.22**.
+
+#### OpenEarthMap — inconclusive, control moves as much
+
+Strata +0.51 / −0.08 / +0.47 against a control of −0.10 / +0.06 / +0.32; spread **0.59** against
+**0.41**. ρ = **−0.500**, the opposite sign to LoveDA. **Nothing replicates.**
+
+⚠️ Do not rescue this with the variance reading either. ρ(fraction, sd) is +0.800 on LoveDA and
+**−0.500 on OEM** — opposite signs, over four and three points. Four points cannot support a
+correlation, and this one does not survive the second dataset. **The honest statement is that
+neither the mean nor the spread of the gain is predicted by the label-free residual.**
+
+#### ⭐ Why it fails is the same reason §9d fails
+
+§9e's rural/urban difference is therefore **not** explained by residual size. The likely
+explanation is **class composition**: the whole gain lives in classes with a large
+precision–recall asymmetry (`water` +10.15 and `forest` +6.95 in rural, against +1.22 and −0.01 in
+urban, §9e), and rural simply contains more of them. But **which** classes those are is precisely
+per-class precision — the quantity §9d showed is measurable label-free and yet **does not determine
+the threshold**, because the objective is coupled across classes.
+
+> ⭐ **So one bound explains both halves.** You cannot choose the thresholds without labels (§9a,
+> §9d, eleven attempts), and you cannot predict whether choosing them will pay without labels
+> either (§9f, two datasets). **The ~200-tile calibration cost is irreducible: it buys the answer
+> and the question at the same time.** That is a cleaner closing statement than the deployment
+> criterion this experiment was built to find, and it generalises to any training-free pipeline
+> that thresholds a per-class score.
+
+⚠️ **The control did its job.** On OEM the random strata move nearly as far as the stratified ones,
+which is what "no signal" looks like; without it, +0.51 / −0.08 / +0.47 might have been written up
+as a pattern.
+
+
 ---
 
 ## 10. Where the project stands

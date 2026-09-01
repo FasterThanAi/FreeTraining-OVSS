@@ -296,6 +296,20 @@ report catch-all-excluded mIoU everywhere, now that the artefact is measured in 
 *not* bound — a **coupled** objective (maximise cross-head agreement over the whole τ vector) rather
 than another per-class scalar, gated at the random control's +0.58.
 
+⛔ **§6.2 answered, and it is a NEGATIVE — WEEK3 §9f.** There is **no label-free rule for *when*
+calibration pays.** Stratifying by the label-free catch-all fraction (ρ +0.885 / +0.924 with the
+labelled discard, so the proxy is sound): LoveDA is **U-shaped** — the most *reliable* gain is the
+**lowest**-residual stratum (+2.13 ± 0.18) and the highest-residual one is worthless as guidance
+(+3.22 ± **3.15**, worst fold **−1.22**); OEM is inconclusive with the random control moving nearly
+as much. ρ = +0.400 and **−0.500** — opposite signs. ⚠️ Don't rescue it with a variance reading
+either; that flips sign too.
+⭐ **One bound explains both halves:** you cannot pick the thresholds without labels (§9a/§9d,
+eleven attempts) *and* you cannot predict whether picking them will pay without labels (§9f, two
+datasets). **The ~200-tile cost is irreducible — it buys the answer and the question together.**
+⚠️ §9e's rural/urban gap is therefore **not** residual size. Likeliest cause is **class
+composition** (the gain lives in `water`/`forest`, which have the large P−R asymmetries and which
+rural has more of) — untested, and a cheap CPU check if it is worth closing.
+
 Next, in order:
 
 1. **Write.** @PAPER_OUTLINE.md has the skeleton, the section map and the figure list.
