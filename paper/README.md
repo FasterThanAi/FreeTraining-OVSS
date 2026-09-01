@@ -40,3 +40,61 @@ survive to submission.
 Written against plain `article` so it compiles anywhere. Two lines marked
 `% TEMPLATE` at the top switch it to CVPR (workshop, the primary target) or
 IEEEtran (GRSL, the backup). Nothing else assumes a document class.
+
+## ⚠️ Before submission — three things that are NOT done
+
+### 1. Complete the recent references
+
+`refs.bib` opens with a block marked **RECENT / VERIFY**. Those are 2025–2026
+works whose full author lists were not available offline, so they carry the first
+author, `and others`, and the arXiv identifier taken from `ANALYSIS.md`. Open each
+PDF and complete them:
+
+| key | what to fill in |
+|---|---|
+| `segearthov3` | full author list, arXiv:2512.08730 — **our baseline, get this right** |
+| `coninfer` | full author list, arXiv:2603.29271 |
+| `sam3` | full author list and the arXiv number |
+| `segearthov` | full author list, CVPR 2025 |
+| `ovrsisbench` | authors and title, arXiv:2604.15652 |
+
+**Do not guess an author list.** A wrong one is the error a reviewer who works in
+the area spots immediately, and it costs more credibility than a missing citation.
+
+### 2. Move to the venue template
+
+`main.tex` compiles as-is against plain `article`, deliberately — it builds
+anywhere, with no class file to chase. Two lines are marked `% TEMPLATE`:
+
+```latex
+\documentclass[10pt,a4paper]{article}         % TEMPLATE
+\usepackage[margin=2.2cm]{geometry}           % TEMPLATE
+```
+
+For a CVPR workshop, replace both with the CVPR class (Overleaf carries the
+template; start from it and paste the body in). For IEEE GRSL, use `IEEEtran`
+with `journal` options. **Nothing else in the file assumes a document class** —
+no hard-coded column widths, no `\linewidth` gymnastics — except that the two
+wide figures use `figure*`, which is correct in two-column and harmless in one.
+
+### 3. Cut it to length
+
+Currently ~7,200 words, 6 tables, 5 figures. A CVPR workshop paper is **8 pages
+two-column excluding references**, which is roughly 5,000–5,500 words once
+figures are placed. So **about 1,500–2,000 words have to go.**
+
+Cut in this order, and note the principle: **cut a table, not a caveat.** The
+caveats are what make the causal claim credible; the tables can move.
+
+1. **Table 3 (co-occurrence ablation)** → one sentence. It is a refuted idea we
+   keep for honesty, and one sentence discharges that duty.
+2. **Table 5 (threshold rules)** → merge into the bound section as prose.
+3. **Section 6 (what we built)** → compress. The atomisation ceiling is a
+   two-sentence result; the prior's construction details belong in supplementary.
+4. **Figure 5 (atom purity)** → supplementary. It supports a component that did
+   not earn its place.
+
+**Do not cut:** the intervention control arms, the saturation bound, the P8
+failure, the units note, or the per-class decomposition of OpenEarthMap. Every
+one of them exists because a reviewer would otherwise construct it themselves,
+and the paper's credibility rests on getting there first.
