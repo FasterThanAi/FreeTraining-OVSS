@@ -351,8 +351,8 @@ reporting them. Every item below plays to that.
 
 | # | item | cost | value | why |
 |---|---|---|---|---|
-| **1** | ⭐ **Vocabulary intervention** — dose–response on catch-all share | ~3 GPU h | **highest** | turns the paper's central claim from **correlational to causal** |
-| **2** | Discard-rate deployment criterion | CPU, 1 day | high | a **label-free** rule for when calibration pays |
+| ~~1~~ | ~~⭐ **Vocabulary intervention**~~ | — | ✅ **done** | §7b/§7c — the claim is causal, the locus is the **label space**, and the effect saturates by ~35% share |
+| ~~2~~ | ~~Discard-rate deployment criterion~~ | — | ⛔ **done, NEGATIVE** | no label-free rule exists; §9f, and it unifies with §9d's bound |
 | **3** | Catch-all-excluded mIoU as a reported metric | CPU, hours | high | a benchmark recommendation others can adopt |
 | **4** | Label-free **coupled** objective via cross-head agreement | CPU, 1 day | high upside | would convert the biggest negative into a method |
 | **5** | Pre-registered prediction on a third dataset | data access + 1 GPU h | high | almost nobody pre-registers in CV |
@@ -527,7 +527,12 @@ environment is not.
 | **days 5–7** | §6.5 third dataset if access arrived; else §6.6 ConInfer, timeboxed |
 | **ongoing** | §6.7 polish; keep `paper/numbers.tex` the only place a number is typed |
 
-**Stop rule.** If §6.1 and §6.2 both land, the paper is materially stronger than it is today and
+> ⭐ **THE STOP RULE HAS FIRED — 1 Sep.** §6.1 landed (causal, with an arity control and a
+> pre-registration) and §6.2 landed as a negative that unifies with §9d rather than weakening it.
+> **Write and submit.** §6.3 (the metric column) is hours and worth doing; §6.4–§6.6 are optional
+> and must not delay the deadline.
+
+**Stop rule (as written in advance).** If §6.1 and §6.2 both land, the paper is materially stronger than it is today and
 **submission should not wait** for §6.5 or §6.6. Shipping a strong workshop paper beats polishing a
 better one past the deadline.
 

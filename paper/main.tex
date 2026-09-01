@@ -677,6 +677,27 @@ class's optimum. No per-class scalar can express that, measurable or not. This
 explains why an $N$-parameter fit works and every one-parameter rule fails, and
 it generalises to any training-free pipeline that thresholds a per-class score.
 
+\paragraph{The same bound governs whether calibration is worth commissioning.}
+Since the gain is uneven across strata (Table~\ref{tab:domain}), a practitioner
+needs to know in advance whether their data is the kind where it pays --- and the
+catch-all fraction is computable from predictions alone, with no ground truth
+(it ranks tiles almost identically to the labelled discard rate,
+$\rho=\crProxyRho{}$ on LoveDA and $\crProxyRhoOEM{}$ on OpenEarthMap). It does
+not work. Stratifying LoveDA by it gives a \emph{U-shaped} profile rather than a
+monotone one: the largest and by far the most reliable gain, \crLow{}, falls in
+the stratum with the \emph{least} residual, while the most-affected stratum has
+the biggest mean and is useless as guidance at \crHigh{}, with a negative worst
+fold. Across strata $\rho=\crRho{}$, and on OpenEarthMap $\crRhoOEM{}$ --- the
+opposite sign, with random strata of the same sizes moving nearly as far.
+
+This is not a separate negative. The gain lives in classes with a large
+precision--recall asymmetry, and which classes those are \emph{is} per-class
+precision: the quantity that is measurable without labels and still does not
+determine the threshold. \best{So one bound covers both halves --- the labels
+cannot be avoided in choosing the thresholds, and they cannot be avoided in
+deciding whether to choose them.} The calibration set buys the answer and the
+question at the same time, and its cost is irreducible.
+
 % =====================================================================
 \section{Limitations}
 \label{sec:limitations}
