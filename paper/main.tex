@@ -96,15 +96,14 @@ across every class discard outnumbers misclassification by roughly
 \discardRatio{}. The dominant failure of this pipeline is not that it is wrong;
 it is that it is \emph{silent}.
 
-The natural response is to recover those pixels, and the natural objection is
-that a lower threshold would do the same thing more cheaply. Neither works
-(Table~\ref{tab:interventions}).
-Lowering $\tau$ from $0.5$ to $0.1$ recovers two-thirds of the residual and
-costs \tauCost{}~mIoU, at \tauRatio{} wrong pixels for every one right; removing
-the presence gate costs \presCost{}. A region-level recovery method built on a
-corpus-level semantic co-occurrence prior --- our original proposal --- adds
-\priorGain{}~points over simply copying the largest neighbouring region, and a
-\emph{perfect} co-occurrence matrix adds \priorOracle{}.
+The natural response is to recover those pixels; the natural objection is that a
+lower threshold would do it more cheaply. Neither works
+(Table~\ref{tab:interventions}). Lowering $\tau$ from $0.5$ to $0.1$ recovers
+two-thirds of the residual and costs \tauCost{}~mIoU, at \tauRatio{} wrong pixels
+per right one; removing the presence gate costs \presCost{}; and a region-level
+recovery method built on a corpus-level co-occurrence prior --- our original
+proposal --- adds \priorGain{} over copying the largest neighbouring region,
+where a \emph{perfect} matrix adds \priorOracle{}.
 
 Running the same pipeline on a second dataset explains why, and the explanation
 is the paper's main contribution. On OpenEarthMap, whose \bg{} class is a rare
@@ -120,15 +119,14 @@ catch-all's share is set by the vocabulary, so we \emph{intervene} on it
 vocabulary change without raising the share; the effect follows the share and not
 the class count.
 
-That analysis points somewhere more productive than recovery. A single global
-threshold is being asked to serve classes with very different precision--recall
-profiles: on LoveDA, \texttt{water} is right 89.5\% of the time it
-fires but finds only 54.7\% of what is present, while
-\texttt{agricultural} is balanced. Fitting one threshold per class on
-\calibTiles{} labelled tiles --- no weights trained, the same protocol the
-baseline already uses for its single $\tau$ --- gives
-\methodGain{}~$\pm$~\methodSD{}~mIoU, with the catch-all untouched at
-\methodBg{}~IoU, so the gain is land cover rather than a repaired catch-all.
+That points somewhere more productive than recovery. One global threshold is
+serving classes with very different precision--recall profiles: on LoveDA
+\texttt{water} is right 89.5\% of the time it fires but finds only
+54.7\% of what is present, while \texttt{agricultural} is balanced.
+Fitting one threshold per class on \calibTiles{} labelled tiles --- no weights
+trained, the protocol the baseline already uses for its single $\tau$ --- gives
+\methodGain{}~$\pm$~\methodSD{}~mIoU with the catch-all untouched at
+\methodBg{}~IoU, so the gain is land cover and not a repaired catch-all.
 
 \paragraph{Contributions.}
 \begin{enumerate}\itemsep2pt
@@ -179,42 +177,38 @@ throughout, and we reproduce it to within rounding on both datasets.
 
 \paragraph{Dense prediction from vision--language models.}
 The training-free line begins with the observation that CLIP~\cite{clip} carries
-usable dense information if the pooling that destroys it is
-removed~\cite{maskclip}, and continues through a series of surgical corrections
-to its attention~\cite{sclip,clearclip} and to the features guiding
-it~\cite{proxyclip}; grouping-based alternatives learn segment structure from
-text supervision alone~\cite{groupvit}. SAM~3 changes the setting rather than
-extending it: presence, semantic and instance heads arrive in one model, so the
-pipeline collapses to prompting and thresholding. Its instance head inherits the
-set-prediction formulation of DETR~\cite{detr} and the mask-classification view
-of MaskFormer~\cite{maskformer}, while its semantic head is FCN-style~\cite{fcn};
-the promptable-segmentation setting itself is SAM's~\cite{sam}. Our results are
-about what that final threshold does, so they apply to any pipeline in this
-family that ends in one.
+usable dense information once the pooling that destroys it is
+removed~\cite{maskclip}, and continues through corrections to its
+attention~\cite{sclip,clearclip} and to the features guiding it~\cite{proxyclip};
+grouping-based alternatives learn segment structure from text supervision
+alone~\cite{groupvit}. SAM~3 changes the setting rather than extending it:
+presence, semantic and instance heads arrive in one model, so the pipeline
+collapses to prompting and thresholding. Its instance head inherits
+DETR's~\cite{detr} set prediction and MaskFormer's~\cite{maskformer} mask
+classification, its semantic head is FCN-style~\cite{fcn}, and the promptable
+setting is SAM's~\cite{sam}. Our results concern what that final threshold does,
+so they apply to any pipeline in the family that ends in one.
 
 \paragraph{Thresholds and calibration.}
-The step we study is a decision rule over per-class scores, and the observation
-that a network's scores are systematically miscalibrated is
-well established~\cite{calibration}. What is specific here is that the pipeline
-is training-free, so the usual remedies --- temperature scaling, or any
-post-hoc fit on a validation set --- are available only in the same restricted
-sense that the baseline's own single threshold is: a small labelled calibration
-set and nothing more. We show what that budget buys, and prove a bound on what
-can be done without it. Classical automatic thresholding~\cite{otsu} is one of
-the label-free rules we test, and it does not reach the bound.
+The step we study is a decision rule over per-class scores, and that such scores
+are systematically miscalibrated is well established~\cite{calibration}. What is
+specific here is that the pipeline is training-free, so the usual remedies are
+available only in the restricted sense the baseline's own threshold already is: a
+small labelled calibration set and nothing more. We show what that budget buys
+and bound what can be done without it. Classical automatic
+thresholding~\cite{otsu} is among the label-free rules we test, and it does not
+reach the bound.
 
 \paragraph{Context at inference.} ConInfer~\cite{coninfer} is the nearest
 competitor: it fits a Gaussian mixture over self-supervised patch
-features~\cite{dinov2} and fuses the
-resulting posterior with the vision--language prior, reporting $+2.80$~mIoU. Its
-context is \emph{visual}, at \emph{patch} level, fitted \emph{per scene}. Our
-original proposal was semantic context at region level mined corpus-wide, which
-ConInfer's own limitations section names as future work. We report that proposal
-as an ablation rather than a contribution, because we measured it and it does not
-earn its place (Section~\ref{sec:built}). We note explicitly that ConInfer's gain
-should \emph{not} be read as evidence that appearance features solve the
-detection problem we identify: it performs context modelling, not
-residual-class detection, and the two are different tasks.
+features~\cite{dinov2} and fuses the posterior with the vision--language prior,
+reporting $+2.80$~mIoU. Its context is \emph{visual}, at \emph{patch} level,
+fitted \emph{per scene}; our original proposal was semantic context at region
+level mined corpus-wide, which ConInfer's own limitations name as future work. We
+report it as an ablation rather than a contribution because we measured it and it
+does not earn its place (Section~\ref{sec:built}). ConInfer's gain should
+\emph{not} be read as evidence that appearance solves the detection problem we
+identify: it performs context modelling, not residual-class detection.
 
 \paragraph{Spatial context as post-processing.} Dense CRFs~\cite{densecrf}, their
 differentiable successors~\cite{crfasrnn} and global-context encodings of the
@@ -227,12 +221,12 @@ to at all. The atoms such a scheme propagates over matter more than the rule ---
 we compare connected components against superpixels~\cite{slic,felzenszwalb} and
 find a twenty-point difference in the ceiling (Section~\ref{sec:built}).
 
-\paragraph{Benchmarks.} Both of our datasets are standard in this
-literature~\cite{loveda,openearthmap}, and a recent benchmark reformulates
-several of them under one open-vocabulary protocol~\cite{ovrsisbench}. Our
-reporting recommendation (Section~\ref{sec:results}) is aimed at exactly such
-efforts: any benchmark that supplies a catch-all class hands one class $1/N$ of
-the headline metric, and we show that this is not a hypothetical concern.
+\paragraph{Benchmarks.} Both datasets are standard
+here~\cite{loveda,openearthmap}, and a recent benchmark reformulates several
+under one open-vocabulary protocol~\cite{ovrsisbench}. Our reporting
+recommendation (Section~\ref{sec:results}) is aimed at such efforts: any
+benchmark supplying a catch-all hands one class $1/N$ of the headline metric, and
+we show this is not hypothetical.
 
 % =====================================================================
 \section{Setup}
@@ -471,51 +465,47 @@ observational data missed at two of three doses, so the direction transfers and
 the rate does not.
 
 % =====================================================================
+% ============================================================
+% ==== SUPPLEMENTARY CANDIDATE 1: the refuted co-occurrence prior (~200 words)
+% ==== Move if over length. It is DETAIL, not a caveat -- nothing
+% ==== here is load-bearing for a claim made in the abstract.
+% ============================================================
 \section{What we built, and which parts are justified}
 \label{sec:built}
 
 Our original proposal was to recover the residual with a corpus-level semantic
-co-occurrence prior: cut the discarded region into atoms, and label each atom by
-conditioning on the classes of its neighbours through a matrix mined from the
-model's own confident predictions. We report it here because two of its
-components are worth keeping and the third is not.
+co-occurrence prior: cut the discarded region into atoms and label each by
+conditioning on its neighbours through a matrix mined from the model's own
+confident predictions. The prior is real --- class adjacency carries
+\pmiSignal{}~bits of mean absolute pointwise mutual information against a
+structure-preserving permutation floor of \pmiFloor{} --- and mining it without
+labels reproduces the ground-truth matrix at Spearman $\rho=\rhoMined{}$, with
+error that does \emph{not} concentrate on the classes the pipeline discards
+($\rho=\rhoCirc{}$), which retires the circularity objection with a number.
+\best{It still does not earn its place.} Against copying the largest neighbouring
+region it adds \priorGain{} points, and a \emph{perfect} ground-truth matrix adds
+\priorOracle{}. The reason is structural rather than a mining defect: classes
+that are adjacent are also the classes that get confused, so the prior reinforces
+the errors it was meant to fix. We keep it as an ablation.
 
-\paragraph{The prior is real, and accurate.} Measured on ground truth, class
-adjacency carries \pmiSignal{}~bits of mean absolute pointwise mutual information
-against a structure-preserving permutation floor of \pmiFloor{} --- a factor of
-\pmiRatio{}. Mined from the model's confident predictions with no labels, the
-matrix agrees with the ground-truth matrix at Spearman $\rho=\rhoMined{}$, and
-its error does \emph{not} concentrate on the classes the pipeline discards
-($\rho=\rhoCirc{}$), which retires the obvious circularity objection with a
-number.
-
+% ==== end supplementary candidate 1 ====
 \paragraph{A null-model correction, which refuted one of our own findings.}
 Pointwise mutual information over class adjacency compares an observed
 distribution against an independence baseline. The observation is a
 \emph{boundary}-frequency distribution; the natural baseline is built from
 \emph{area} marginals. These are different measures, and the mismatch
-systematically inflates classes with high perimeter per unit area. Under the
-area baseline we found, and believed, that \texttt{road} was a hub attracting
-every other class. Under the boundary baseline \texttt{road}'s entire row
-collapses to near zero and five class pairs change sign: we had been measuring
-road's perimeter. We report the correction because it generalises to any
-co-occurrence analysis over segmentation masks.
+systematically inflates classes with high perimeter per unit area. Under the area
+baseline we found, and believed, that \texttt{road} was a hub attracting every
+other class; under the boundary baseline its entire row collapses to near zero
+and five class pairs change sign. We had been measuring road's perimeter. The
+correction generalises to any co-occurrence analysis over segmentation masks.
 
 \paragraph{Atomisation dominates the prior.} Connected components of the
-discarded region reach an oracle-labeller ceiling of \ceilCC{}; SLIC
-superpixels~\cite{slic}
-reach \ceilSLIC{} (\ceilSLICoem{} on OpenEarthMap), because connected components
-straddle class boundaries --- the largest was an entire tile
-(Fig.~\ref{fig:purity}). Twenty ceiling points from the choice of atom.
-
-\paragraph{The co-occurrence term does not earn its place.} Against simply
-copying the largest neighbouring region, the mined prior adds \priorGain{}
-points, and a \emph{perfect} ground-truth matrix adds \priorOracle{}. It helps
-where four or more classes border a region ($+2.03$ mined, $+5.44$ oracle), but
-that stratum is 10\% of the residual. The reason is structural
-rather than a defect in the mining: classes that are adjacent are also the
-classes that get confused, so the prior reinforces the very errors it was
-intended to fix. We keep it as an ablation row.
+discarded region reach an oracle-labeller ceiling of \ceilCC{}, because they
+straddle class boundaries --- the largest was an entire tile. SLIC
+superpixels~\cite{slic} reach \ceilSLIC{} (\ceilSLICoem{} on OpenEarthMap).
+Twenty ceiling points from the choice of atom, against \priorOracle{} for a
+perfect prior.
 
 \subsection{The method: per-class thresholds}
 \label{sec:method}
@@ -597,7 +587,7 @@ catch-all-excluded mIoU it gains \best{\mrOemReal{}} --- more than LoveDA does.
 The headline decomposes exactly: \mrOemFull{} is \mrOemLand{} contributed by the
 eight real classes and \mrOemBgC{} contributed by \bg{} alone, whose IoU falls
 \mrOemBg{}. \best{The catch-all cancels a real gain, so here the headline
-\emph{understates} the method} --- the mirror of Table~\ref{tab:oemperclass},
+\emph{understates} the method} --- the mirror of Fig.~\ref{fig:oemperclass},
 where it overstated it. The per-class movements are ordinary segmentation gains:
 \texttt{building} $+4.34$, \texttt{road} $+2.94$, \texttt{pavement} $+2.71$,
 \texttt{cropland} $+2.50$. LoveDA is the clean case, where both metrics agree
@@ -617,7 +607,7 @@ distortion is present before any method is applied: OpenEarthMap's \bg{} sits at
 \mrOemBgIoU{}~IoU against a real-class mean of $47.54$, so its published headline
 is depressed by \mrOemDistort{} points by a single pathologically calibrated
 class. We have now measured this artefact moving the headline in both directions
---- inflating it in Table~\ref{tab:oemperclass}, deflating it here --- which is
+--- inflating it in Fig.~\ref{fig:oemperclass}, deflating it here --- which is
 why we treat it as a property of the metric rather than of either result.
 
 \paragraph{End-to-end verification.} The results above are computed from the
@@ -631,6 +621,11 @@ fit \bg{} gains $+0.85$~IoU, 10\% of the total rather than the
 excludes it. And \texttt{road} \emph{loses} $0.53$: a per-class rule can hurt a
 per-class result, which is why we report the full table rather than the mean.
 
+% ============================================================
+% ==== SUPPLEMENTARY CANDIDATE 2: domain transfer, Table 4 + prose (~520 words)
+% ==== Move if over length. It is DETAIL, not a caveat -- nothing
+% ==== here is load-bearing for a claim made in the abstract.
+% ============================================================
 \begin{table}[t]\centering\small
 \caption{Where the gain lives, and how far it transfers. Five-fold within each
 LoveDA domain; then three calibration sources at an \emph{identical}
@@ -667,10 +662,11 @@ stratum, and we report it as a result on the benchmark as published rather than
 as a claim about urban imagery. Yet land cover improves in \emph{both} domains
 --- \DOMrreal{} and \DOMureal{}~IoU in aggregate --- and urban's catch-all loses
 \DOMubg{}, which accounts for the flat result exactly. \best{This is the
-OpenEarthMap artefact of Table~\ref{tab:oemperclass} with its sign reversed}, and
+OpenEarthMap artefact of Fig.~\ref{fig:oemperclass} with its sign reversed}, and
 we take it as independent confirmation, arriving from the opposite direction,
 that full mIoU is a poor metric wherever a catch-all class is large.
 
+% ==== end supplementary candidate 2 ====
 \paragraph{What the gap is made of.} Because mIoU is an unweighted mean over
 classes, the difference between the domains decomposes exactly into per-class
 contributions, and it is concentrated: \texttt{water} accounts for \cpWater{} of
@@ -721,22 +717,9 @@ per-class $\tau$, label-free        & $-0.17$ & $+4.77$\,$^\dagger$ \\
 \best{per-class $\tau$, calibrated} & \best{\methodGain{}} & $+0.16$ \\
 \bottomrule
 \end{tabular}\\[3pt]
-\footnotesize $^\dagger$ catch-all artefact --- see Table~\ref{tab:oemperclass}.
+\footnotesize $^\dagger$ catch-all artefact --- see Fig.~\ref{fig:oemperclass}.
 \end{table}
 
-\begin{table}[t]\centering\small
-\caption{OpenEarthMap's headline \recoverOEM{}~mIoU from recovery is \emph{not} a
-segmentation improvement. We report this table because a reviewer would otherwise
-construct it.}
-\label{tab:oemperclass}
-\begin{tabular}{lr}
-\toprule
-\bg{}                                         & \best{\oemBgGain{}} \\
-eight real classes, aggregate                 & \best{\oemRealLoss{}} \\
-\texttt{building} (the baseline's best class) & \oemBuildLoss{} \\
-\bottomrule
-\end{tabular}
-\end{table}
 
 \begin{figure}[t]\centering
 \includegraphics[width=\columnwidth]{fig3_oem_per_class.pdf}
@@ -758,13 +741,6 @@ control for by computing AUC within size-matched bins.}
 \label{fig:auc}
 \end{figure}
 
-\begin{figure}[t]\centering
-\includegraphics[width=\columnwidth]{fig5_atom_purity.pdf}
-\caption{Atom purity and the resulting oracle ceiling on any region-level method.
-Connected components of the discarded region straddle class boundaries; SLIC
-superpixels respect them.}
-\label{fig:purity}
-\end{figure}
 
 \subsection{The label-free bound, and why it holds}
 \label{sec:bound}
