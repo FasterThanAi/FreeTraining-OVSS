@@ -54,6 +54,13 @@ echo "→ mmcv 2.2.0 from the PREBUILT index (never source -- nvcc 13.3 vs torch
 pip install mmcv==2.2.0 \
     -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.4/index.html
 pip install mmengine==0.10.7 "mmsegmentation==1.2.2"
+# ⚠️ mmseg 1.2.2 does NOT declare these, but imports them unconditionally:
+# mmseg/utils/__init__.py does `from .tokenizer import tokenize`, and that
+# tokenizer (CLIP's) imports ftfy and regex. Nothing else pulls them in, and
+# ConInfer's requirements.txt does not list them either, so `import mmseg` dies
+# with ModuleNotFoundError: ftfy on a clean environment. `segov3` has them only
+# by accident, as a transitive dependency of something else.
+pip install ftfy regex
 
 # mmseg 1.2.2 asserts mmcv < 2.2.0 and the wheel is exactly 2.2.0; the ops mmseg
 # calls are unchanged between 2.1 and 2.2.
@@ -109,6 +116,10 @@ import mmcv, mmseg, mmengine
 print(f"mmcv {mmcv.__version__} | mmseg {mmseg.__version__} | mmengine {mmengine.__version__}")
 from mmcv.ops import nms          # the compiled-ops import that mmcv-lite fails
 print("mmcv compiled ops: OK")
+# The import that actually breaks a clean env -- `import mmseg` alone succeeds
+# because the failure is one level deeper, in mmseg.models -> mmseg.utils.
+from mmseg.models.segmentors import BaseSegmentor
+print("mmseg.models import chain: OK")
 PY
 echo
 echo "⚠️ Now verify segov3 is untouched:  bash scripts/setup_coninfer.sh --verify"
