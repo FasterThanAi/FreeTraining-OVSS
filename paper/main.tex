@@ -177,8 +177,35 @@ instance head, and \emph{presence-guided filtering}, which multiplies each class
 map by a scalar presence score before thresholding. It is our baseline
 throughout, and we reproduce it to within rounding on both datasets.
 
+\paragraph{Dense prediction from vision--language models.}
+The training-free line begins with the observation that CLIP~\cite{clip} carries
+usable dense information if the pooling that destroys it is
+removed~\cite{maskclip}, and continues through a series of surgical corrections
+to its attention~\cite{sclip,clearclip} and to the features guiding
+it~\cite{proxyclip}; grouping-based alternatives learn segment structure from
+text supervision alone~\cite{groupvit}. SAM~3 changes the setting rather than
+extending it: presence, semantic and instance heads arrive in one model, so the
+pipeline collapses to prompting and thresholding. Its instance head inherits the
+set-prediction formulation of DETR~\cite{detr} and the mask-classification view
+of MaskFormer~\cite{maskformer}, while its semantic head is FCN-style~\cite{fcn};
+the promptable-segmentation setting itself is SAM's~\cite{sam}. Our results are
+about what that final threshold does, so they apply to any pipeline in this
+family that ends in one.
+
+\paragraph{Thresholds and calibration.}
+The step we study is a decision rule over per-class scores, and the observation
+that a network's scores are systematically miscalibrated is
+well established~\cite{calibration}. What is specific here is that the pipeline
+is training-free, so the usual remedies --- temperature scaling, or any
+post-hoc fit on a validation set --- are available only in the same restricted
+sense that the baseline's own single threshold is: a small labelled calibration
+set and nothing more. We show what that budget buys, and prove a bound on what
+can be done without it. Classical automatic thresholding~\cite{otsu} is one of
+the label-free rules we test, and it does not reach the bound.
+
 \paragraph{Context at inference.} ConInfer~\cite{coninfer} is the nearest
-competitor: it fits a Gaussian mixture over DINOv3 patch features and fuses the
+competitor: it fits a Gaussian mixture over self-supervised patch
+features~\cite{dinov2} and fuses the
 resulting posterior with the vision--language prior, reporting $+2.80$~mIoU. Its
 context is \emph{visual}, at \emph{patch} level, fitted \emph{per scene}. Our
 original proposal was semantic context at region level mined corpus-wide, which
@@ -189,16 +216,32 @@ should \emph{not} be read as evidence that appearance features solve the
 detection problem we identify: it performs context modelling, not
 residual-class detection, and the two are different tasks.
 
-\paragraph{Spatial context as post-processing.} Dense CRFs~\cite{densecrf} are
-the classical answer to ``use spatial context to fix segmentation'', and remain
-the baseline a reviewer will raise against any neighbour-propagation scheme. Our
-findings are relevant to that family: we show that on a catch-all dataset the
-limiting factor is not the propagation rule but the inability to identify which
-pixels should be propagated to at all.
+\paragraph{Spatial context as post-processing.} Dense CRFs~\cite{densecrf}, their
+differentiable successors~\cite{crfasrnn} and global-context encodings of the
+label distribution~\cite{encnet} are the classical answer to ``use spatial
+context to fix segmentation'', and remain the baseline a reviewer will raise
+against any neighbour-propagation scheme. Our findings are relevant to that whole
+family: we show that on a catch-all dataset the limiting factor is not the
+propagation rule but the inability to identify which pixels should be propagated
+to at all. The atoms such a scheme propagates over matter more than the rule ---
+we compare connected components against superpixels~\cite{slic,felzenszwalb} and
+find a twenty-point difference in the ceiling (Section~\ref{sec:built}).
+
+\paragraph{Benchmarks.} Both of our datasets are standard in this
+literature~\cite{loveda,openearthmap}, and a recent benchmark reformulates
+several of them under one open-vocabulary protocol~\cite{ovrsisbench}. Our
+reporting recommendation (Section~\ref{sec:results}) is aimed at exactly such
+efforts: any benchmark that supplies a catch-all class hands one class $1/N$ of
+the headline metric, and we show that this is not a hypothetical concern.
 
 % =====================================================================
 \section{Setup}
 \label{sec:setup}
+
+We evaluate on LoveDA~\cite{loveda} and OpenEarthMap~\cite{openearthmap}, which
+differ in exactly the property this paper turns out to depend on: LoveDA's
+\bg{} is a catch-all covering a third of every scene, while OpenEarthMap's
+vocabulary very nearly covers it.
 
 \paragraph{Datasets.} LoveDA~\cite{loveda} validation, \loveTiles{} tiles at
 $1024^2$ and 0.3\,m GSD, seven classes including \bg{}, evaluated at
@@ -459,7 +502,8 @@ road's perimeter. We report the correction because it generalises to any
 co-occurrence analysis over segmentation masks.
 
 \paragraph{Atomisation dominates the prior.} Connected components of the
-discarded region reach an oracle-labeller ceiling of \ceilCC{}; SLIC superpixels
+discarded region reach an oracle-labeller ceiling of \ceilCC{}; SLIC
+superpixels~\cite{slic}
 reach \ceilSLIC{} (\ceilSLICoem{} on OpenEarthMap), because connected components
 straddle class boundaries --- the largest was an entire tile
 (Fig.~\ref{fig:purity}). Twenty ceiling points from the choice of atom.
@@ -561,7 +605,10 @@ where it overstated it. The per-class movements are ordinary segmentation gains:
 \mrLoveBg{}.
 
 \paragraph{Reporting recommendation.} We therefore report both, and suggest the
-field does. mIoU is an \emph{unweighted} mean over $N$ classes, so \best{a
+field does. That a single averaged score can hide the behaviour it is meant to
+summarise is not a new worry~\cite{evalmeasure}; what is new here is a concrete,
+measured instance of it in open-vocabulary segmentation, moving the headline in
+both directions. mIoU is an \emph{unweighted} mean over $N$ classes, so \best{a
 catch-all owns exactly $1/N$ of the metric however meaningful it is} ---
 \mrLoveLever{} on LoveDA for a class its annotation guide defines as ``everything
 else'', \mrOemLever{} on OpenEarthMap for a class covering $0.84\%$ of the pixels.
@@ -729,7 +776,8 @@ real classes gaining $+8.63$~IoU. The chosen thresholds span \eeSpread{}: one
 global value is wrong for different classes in opposite directions.
 
 We tested \nAttempts{} label-free rules against that bound: three threshold rules
-(per-class Otsu, a confidence percentile, and presence-scaled thresholds) and
+(per-class Otsu~\cite{otsu}, a confidence percentile, and presence-scaled
+thresholds) and
 eight per-class statistics converted into thresholds by a single fitted knob ---
 the same one-parameter budget the baseline spends on its own $\tau$. \best{None
 reaches it.} The best scores \proxyBest{}~mIoU against a random-proxy control

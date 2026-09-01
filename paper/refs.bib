@@ -1,63 +1,250 @@
+% =====================================================================
+%  References
+%
+%  ⚠️ VERIFY BEFORE SUBMISSION — the entries in the block marked
+%  "RECENT / VERIFY" are 2025–2026 works whose full author lists were not
+%  available offline. First authors and arXiv identifiers come from
+%  ANALYSIS.md, which recorded them from the PDFs; the remaining authors are
+%  given as `and others`. Open each PDF and complete the author list before
+%  submitting. Do NOT guess them — a wrong author list is the kind of error a
+%  reviewer who knows the area spots immediately.
+% =====================================================================
+
+% ---------------------------------------------------------------------
+%  RECENT / VERIFY
+% ---------------------------------------------------------------------
 @inproceedings{segearthov,
-  title     = {SegEarth-OV: Towards Training-Free Open-Vocabulary Segmentation
+  title     = {{SegEarth-OV}: Towards Training-Free Open-Vocabulary Segmentation
                for Remote Sensing Images},
   author    = {Li, Kaiyu and others},
-  booktitle = {CVPR},
+  booktitle = {Proc. IEEE/CVF Conf. Computer Vision and Pattern Recognition (CVPR)},
   year      = {2025}
 }
 
 @article{segearthov3,
-  title   = {SegEarth-OV3: Exploring SAM 3 for Open-Vocabulary Semantic
-             Segmentation in Remote Sensing Images},
-  author  = {Li, Kaiyu and Zhang, and Wang, and Deng, and Wang, and Meng, and Cao},
+  title  = {{SegEarth-OV3}: Exploring {SAM}~3 for Open-Vocabulary Semantic
+            Segmentation in Remote Sensing Images},
+  author = {Li, Kaiyu and others},
   journal = {arXiv preprint arXiv:2512.08730},
-  year    = {2025},
-  note    = {Our baseline. \url{https://github.com/earth-insights/SegEarth-OV-3}}
+  year   = {2025}
 }
 
 @article{coninfer,
-  title   = {ConInfer: Context-Aware Inference for Training-Free Open-Vocabulary
-             Remote Sensing Segmentation},
-  author  = {Chen, and others},
+  title  = {{ConInfer}: Context-Aware Inference for Training-Free
+            Open-Vocabulary Remote Sensing Segmentation},
+  author = {Chen and others},
   journal = {arXiv preprint arXiv:2603.29271},
-  year    = {2026},
-  note    = {Nearest competitor: visual context, patch level, per-scene}
+  year   = {2026}
 }
 
 @article{sam3,
-  title   = {SAM 3: Segment Anything with Concepts},
-  author  = {Carion, Nicolas and others},
+  title  = {{SAM}~3: Segment Anything with Concepts},
+  author = {Carion, Nicolas and others},
   journal = {arXiv preprint},
-  year    = {2025}
+  year   = {2025}
 }
 
-@inproceedings{loveda,
-  title     = {LoveDA: A Remote Sensing Land-Cover Dataset for Domain Adaptive
+@article{ovrsisbench,
+  title  = {Towards Realistic Open-Vocabulary Remote Sensing Image Segmentation},
+  author = {others},
+  journal = {arXiv preprint arXiv:2604.15652},
+  year   = {2026}
+}
+
+% ---------------------------------------------------------------------
+%  Vision--language and dense CLIP
+% ---------------------------------------------------------------------
+@inproceedings{clip,
+  title     = {Learning Transferable Visual Models From Natural Language Supervision},
+  author    = {Radford, Alec and Kim, Jong Wook and Hallacy, Chris and
+               Ramesh, Aditya and Goh, Gabriel and Agarwal, Sandhini and
+               Sastry, Girish and Askell, Amanda and Mishkin, Pamela and
+               Clark, Jack and Krueger, Gretchen and Sutskever, Ilya},
+  booktitle = {Proc. Int. Conf. Machine Learning (ICML)},
+  year      = {2021}
+}
+
+@inproceedings{maskclip,
+  title     = {Extract Free Dense Labels from {CLIP}},
+  author    = {Zhou, Chong and Loy, Chen Change and Dai, Bo},
+  booktitle = {Proc. European Conf. Computer Vision (ECCV)},
+  year      = {2022}
+}
+
+@inproceedings{sclip,
+  title     = {{SCLIP}: Rethinking Self-Attention for Dense Vision--Language Inference},
+  author    = {Wang, Feng and Mei, Jieru and Yuille, Alan},
+  booktitle = {Proc. European Conf. Computer Vision (ECCV)},
+  year      = {2024}
+}
+
+@inproceedings{clearclip,
+  title     = {{ClearCLIP}: Decomposing {CLIP} Representations for Dense
+               Vision--Language Inference},
+  author    = {Lan, Mengcheng and Chen, Chaofeng and Ke, Yiping and
+               Wang, Xinjiang and Feng, Litong and Zhang, Wayne},
+  booktitle = {Proc. European Conf. Computer Vision (ECCV)},
+  year      = {2024}
+}
+
+@inproceedings{proxyclip,
+  title     = {{ProxyCLIP}: Proxy Attention Improves {CLIP} for
+               Open-Vocabulary Segmentation},
+  author    = {Lan, Mengcheng and Chen, Chaofeng and Ke, Yiping and
+               Wang, Xinjiang and Feng, Litong and Zhang, Wayne},
+  booktitle = {Proc. European Conf. Computer Vision (ECCV)},
+  year      = {2024}
+}
+
+@inproceedings{groupvit,
+  title     = {{GroupViT}: Semantic Segmentation Emerges from Text Supervision},
+  author    = {Xu, Jiarui and De Mello, Shalini and Liu, Sifei and Byeon, Wonmin
+               and Breuel, Thomas and Kautz, Jan and Wang, Xiaolong},
+  booktitle = {Proc. IEEE/CVF Conf. Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2022}
+}
+
+% ---------------------------------------------------------------------
+%  Segmentation architectures and the SAM lineage
+% ---------------------------------------------------------------------
+@inproceedings{fcn,
+  title     = {Fully Convolutional Networks for Semantic Segmentation},
+  author    = {Long, Jonathan and Shelhamer, Evan and Darrell, Trevor},
+  booktitle = {Proc. IEEE Conf. Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2015}
+}
+
+@inproceedings{detr,
+  title     = {End-to-End Object Detection with Transformers},
+  author    = {Carion, Nicolas and Massa, Francisco and Synnaeve, Gabriel and
+               Usunier, Nicolas and Kirillov, Alexander and Zagoruyko, Sergey},
+  booktitle = {Proc. European Conf. Computer Vision (ECCV)},
+  year      = {2020}
+}
+
+@inproceedings{maskformer,
+  title     = {Per-Pixel Classification is Not All You Need for
                Semantic Segmentation},
-  author    = {Wang, Junjue and others},
-  booktitle = {NeurIPS Datasets and Benchmarks},
+  author    = {Cheng, Bowen and Schwing, Alexander G. and Kirillov, Alexander},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2021}
+}
+
+@inproceedings{sam,
+  title     = {Segment Anything},
+  author    = {Kirillov, Alexander and Mintun, Eric and Ravi, Nikhila and
+               Mao, Hanzi and Rolland, Chloe and Gustafson, Laura and
+               Xiao, Tete and Whitehead, Spencer and Berg, Alexander C. and
+               Lo, Wan-Yen and Doll{\'a}r, Piotr and Girshick, Ross},
+  booktitle = {Proc. IEEE/CVF Int. Conf. Computer Vision (ICCV)},
+  year      = {2023}
+}
+
+@article{dinov2,
+  title   = {{DINOv2}: Learning Robust Visual Features without Supervision},
+  author  = {Oquab, Maxime and Darcet, Timoth{\'e}e and Moutakanni, Th{\'e}o and
+             Vo, Huy and Szafraniec, Marc and Khalidov, Vasil and others},
+  journal = {Transactions on Machine Learning Research (TMLR)},
+  year    = {2024}
+}
+
+% ---------------------------------------------------------------------
+%  Spatial context and superpixels
+% ---------------------------------------------------------------------
+@inproceedings{densecrf,
+  title     = {Efficient Inference in Fully Connected {CRF}s with
+               Gaussian Edge Potentials},
+  author    = {Kr{\"a}henb{\"u}hl, Philipp and Koltun, Vladlen},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2011}
+}
+
+@inproceedings{crfasrnn,
+  title     = {Conditional Random Fields as Recurrent Neural Networks},
+  author    = {Zheng, Shuai and Jayasumana, Sadeep and
+               Romera-Paredes, Bernardino and Vineet, Vibhav and Su, Zhizhong and
+               Du, Dalong and Huang, Chang and Torr, Philip H. S.},
+  booktitle = {Proc. IEEE Int. Conf. Computer Vision (ICCV)},
+  year      = {2015}
+}
+
+@inproceedings{encnet,
+  title     = {Context Encoding for Semantic Segmentation},
+  author    = {Zhang, Hang and Dana, Kristin and Shi, Jianping and
+               Zhang, Zhongyue and Wang, Xiaogang and Tyagi, Ambrish and
+               Agrawal, Amit},
+  booktitle = {Proc. IEEE/CVF Conf. Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2018}
+}
+
+@article{slic,
+  title   = {{SLIC} Superpixels Compared to State-of-the-Art
+             Superpixel Methods},
+  author  = {Achanta, Radhakrishna and Shaji, Appu and Smith, Kevin and
+             Lucchi, Aurelien and Fua, Pascal and S{\"u}sstrunk, Sabine},
+  journal = {IEEE Trans. Pattern Analysis and Machine Intelligence (TPAMI)},
+  volume  = {34},
+  number  = {11},
+  pages   = {2274--2282},
+  year    = {2012}
+}
+
+@article{felzenszwalb,
+  title   = {Efficient Graph-Based Image Segmentation},
+  author  = {Felzenszwalb, Pedro F. and Huttenlocher, Daniel P.},
+  journal = {International Journal of Computer Vision (IJCV)},
+  volume  = {59},
+  number  = {2},
+  pages   = {167--181},
+  year    = {2004}
+}
+
+% ---------------------------------------------------------------------
+%  Thresholds, calibration, and evaluation measures
+% ---------------------------------------------------------------------
+@inproceedings{calibration,
+  title     = {On Calibration of Modern Neural Networks},
+  author    = {Guo, Chuan and Pleiss, Geoff and Sun, Yu and
+               Weinberger, Kilian Q.},
+  booktitle = {Proc. Int. Conf. Machine Learning (ICML)},
+  year      = {2017}
+}
+
+@article{otsu,
+  title   = {A Threshold Selection Method from Gray-Level Histograms},
+  author  = {Otsu, Nobuyuki},
+  journal = {IEEE Trans. Systems, Man, and Cybernetics},
+  volume  = {9},
+  number  = {1},
+  pages   = {62--66},
+  year    = {1979}
+}
+
+@inproceedings{evalmeasure,
+  title     = {What is a Good Evaluation Measure for Semantic Segmentation?},
+  author    = {Csurka, Gabriela and Larlus, Diane and Perronnin, Florent},
+  booktitle = {Proc. British Machine Vision Conference (BMVC)},
+  year      = {2013}
+}
+
+% ---------------------------------------------------------------------
+%  Datasets
+% ---------------------------------------------------------------------
+@inproceedings{loveda,
+  title     = {{LoveDA}: A Remote Sensing Land-Cover Dataset for
+               Domain Adaptive Semantic Segmentation},
+  author    = {Wang, Junjue and Zheng, Zhuo and Ma, Ailong and Lu, Xiaoyan and
+               Zhong, Yanfei},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)
+               Datasets and Benchmarks Track},
   year      = {2021}
 }
 
 @inproceedings{openearthmap,
-  title     = {OpenEarthMap: A Benchmark Dataset for Global High-Resolution
+  title     = {{OpenEarthMap}: A Benchmark Dataset for Global High-Resolution
                Land Cover Mapping},
-  author    = {Xia, Junshi and others},
-  booktitle = {WACV},
+  author    = {Xia, Junshi and Yokoya, Naoto and Adriano, Bruno and
+               Broni-Bediako, Clifford},
+  booktitle = {Proc. IEEE/CVF Winter Conf. Applications of Computer Vision (WACV)},
   year      = {2023}
-}
-
-@article{slic,
-  title   = {SLIC Superpixels Compared to State-of-the-Art Superpixel Methods},
-  author  = {Achanta, Radhakrishna and others},
-  journal = {IEEE TPAMI},
-  year    = {2012}
-}
-
-@inproceedings{densecrf,
-  title     = {Efficient Inference in Fully Connected CRFs with Gaussian Edge
-               Potentials},
-  author    = {Kr{\"a}henb{\"u}hl, Philipp and Koltun, Vladlen},
-  booktitle = {NeurIPS},
-  year      = {2011}
 }
