@@ -601,6 +601,18 @@ class. We have now measured this artefact moving the headline in both directions
 --- inflating it in Fig.~\ref{fig:oemperclass}, deflating it here --- which is
 why we treat it as a property of the metric rather than of either result.
 
+\paragraph{The recommended metric is not one that flatters us.} Proposing a
+secondary metric under which one's own method looks better is an obvious hazard,
+so we note that this one has already cost us a result. Our recovery experiment on
+OpenEarthMap produced \recoverOEM{}~mIoU --- a headline gain, and the only one that
+approach ever achieved. Measured over the real classes it is
+\oemRealLoss{}~IoU, with \texttt{building}, the baseline's strongest class, losing
+\oemBuildLoss{} (Fig.~\ref{fig:oemperclass}). \best{The metric we recommend
+eliminated our own most favourable number before it removed anyone else's}, and it
+also declines to credit the per-class threshold fit with a headline gain on
+OpenEarthMap for either pipeline (Table~\ref{tab:transfer}). We adopted it because
+it changed our conclusions, not because it confirmed them.
+
 \paragraph{End-to-end verification.} The results above are computed from the
 cached histogram. To confirm that this is a measurement instrument rather than
 merely arithmetic, we deployed a single fit --- \calibTiles{} calibration tiles ---
