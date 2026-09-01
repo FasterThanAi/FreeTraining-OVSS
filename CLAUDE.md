@@ -339,6 +339,18 @@ package list is *necessary, not sufficient* — the real gate is behavioural: `e
 evaluating on our splits, and report the row in **both metrics**, since a gain concentrated in the
 catch-all is exactly what §9h says to check for.
 
+⭐ **ConInfer runs — see @CONINFER_RESULTS.md (PROVISIONAL) and @CONINFER_RUNBOOK.md.**
+LoveDA **36.99**, OEM **29.90**, on our exact tiles (209×8, 48×8). ⛔ **Not for the paper until
+their published numbers are read** — a competitor 10+ points below their claim, unverified, is
+worse than no row. ⚠️ **Most of the gap is the BACKBONE** (CLIP ViT-B/16 @448 vs SAM 3 @1024); our
+contribution is the +1.16 over SegEarth-OV3, and claiming the 11.54 would be §8.1's error in our
+own table. They tune `prob_thd` too (0.8/0.3/0.1) and are ~10× faster at inference — report both.
+⭐ **The high-value follow-up is §7.1a, not another dataset:** apply per-class τ *to ConInfer*.
+They threshold per-class scores globally, our fit needs only `(gt, pred, conf)`, and the cache
+format plus `tau_cv.py` already exist. It turns "worth +1.18 on SAM 3" into "a property of any
+pipeline that thresholds per-class scores" — and answers *"is this a SAM 3 quirk?"*, which the
+paper currently cannot.
+
 Next, in order:
 
 1. **Write.** @PAPER_OUTLINE.md has the skeleton, the section map and the figure list.

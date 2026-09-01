@@ -576,6 +576,43 @@ first question a reviewer asks and currently it goes unanswered.
 **Timebox: one week** (was three days under deadline pressure; there is room now). If it will not run,
 that is still a result: say so in limitations with what was tried.
 
+## §7.1a ⭐ Apply per-class τ to ConInfer — the generality test
+
+**Worth more than the comparison row it grew out of.** §7.1 answers *"how do you
+compare to ConInfer?"*. This answers a question the paper currently cannot:
+**"is per-class thresholding a SAM 3 quirk?"**
+
+**Why it should work.** ConInfer thresholds per-class scores with a single global
+`prob_thd` — 0.8 on LoveDA, 0.1 on OpenEarthMap. That is precisely the design our
+method replaces, and our fit needs nothing but per-pixel `(gt, pred, conf)`. The
+two are orthogonal: their contribution changes the *scores*, ours changes the
+*decision rule* on top of them.
+
+**Cost: about a day, and no new analysis code.** `measure_discard_rate.py` already
+defines the `.npz` cache format, and `tau_cv.py`, `tau_oracle.py`, `metric_report.py`
+and `labels.py` all consume it. The work is instrumenting their `predict()`
+(`ConInfer_segmentor.py:247`, just before `postprocess_result`) to dump the same
+arrays per tile, then pointing the existing scripts at the result.
+
+⚠️ **Instrumentation must be observation-only, and gated like ours was.** Their
+un-instrumented LoveDA run gives **36.99**; the instrumented one must reproduce it
+exactly, or the patch changed behaviour. Same rule that governs every measurement
+in this project.
+
+⚠️ Keep it in `scripts/patch_coninfer_paths.sh`'s spirit: a `.orig` backup, a
+printed diff, and edits that only *record*, never alter, what the model computes.
+
+**What each outcome buys.**
+
+| outcome | what the paper can then say |
+|---|---|
+| **positive on both** | ⭐ the finding is a property of thresholded per-class scores, not of a backbone. The strongest version of the claim, and it costs one day. |
+| positive on one | report both; the mechanism is real but its size is backbone-dependent, which is itself informative |
+| **negative** | equally publishable — it would mean SAM 3's per-class calibration is unusually skewed, which *sharpens* the mechanism rather than refuting the method |
+
+**Do this before §7.2.** A third dataset adds a row; this adds a dimension, and it
+uses a working environment that exists right now.
+
 ## §7.2 Datasets three and four
 
 ISPRS **Potsdam** and **Vaihingen**. Their catch-all is `clutter` at roughly 5% — the empty gap
