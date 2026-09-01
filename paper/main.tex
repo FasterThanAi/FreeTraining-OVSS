@@ -53,14 +53,22 @@ separates it at AUC \aucOEM{}. Recovery is nonetheless not worthwhile in either
 regime: it yields \recoverLove{}~mIoU on LoveDA, and on OpenEarthMap its
 apparent \recoverOEM{} is entirely attributable to \bg{} ceasing to be
 over-predicted (\oemBgGain{}) while the real classes lose \oemRealLoss{}~IoU.
+We establish this causally rather than by correlation: because the catch-all's
+share is set by the vocabulary, we manipulate it directly, and against an
+arity-matched control detectability falls \ivAtwo{}~$\to$~\ivBtwo{} while the
+control moves to \ivDtwo{}. A second intervention shows the lever is the label
+space and not the prompt list.
 A different correction does work. Fitting one threshold \emph{per class} rather
 than one globally --- on \calibTiles{} labelled tiles, with no model weights
 trained, the same protocol the baseline already uses to tune its single
-threshold --- gives \methodGain{}~$\pm$~\methodSD{}~mIoU on LoveDA with
-land-cover classes gaining \methodLand{}~IoU and the catch-all untouched at
-\methodBg{}, capturing \oracleShare{} of an oracle bound of \oracleBound{}.
-Finally, we show this bound is not reachable without labels, and identify why:
-\nAttempts{} label-free rules fail, four of which provably estimate per-class
+threshold --- gives \methodGain{}~$\pm$~\methodSD{}~mIoU on LoveDA, capturing
+\oracleShare{} of an oracle bound of \oracleBound{}, and it is positive on both
+datasets once the catch-all is excluded from the metric (\mrLoveReal{} and
+\mrOemReal{}~mIoU). That exclusion is itself a recommendation: mIoU is an
+unweighted mean, so a catch-all owns $1/N$ of the score however meaningful it is,
+and we observe it moving the headline in both directions.
+Finally, we show the oracle bound is not reachable without labels, and identify
+why: \nAttempts{} label-free rules fail, four of which provably estimate per-class
 precision, because the optimal threshold solves a \emph{coupled} multi-class
 objective that no per-class statistic can express.
 \end{abstract}
@@ -106,7 +114,11 @@ class score reaches AUC \aucOEM{} where on LoveDA nine separate signals sit at
 chance (Fig.~\ref{fig:auc}). \best{Detectability is a property of the annotation scheme, not of the
 model.} A catch-all class gives the model a plausible answer everywhere, so a
 strong second-place score carries no information about whether a real class was
-suppressed.
+suppressed. We do not leave this as a correlation across two datasets. The
+catch-all's share is set by the vocabulary, so we \emph{intervene} on it
+(Section~\ref{sec:intervention}), against a control that makes the same
+vocabulary change without raising the share; the effect follows the share and not
+the class count.
 
 That analysis points somewhere more productive than recovery. A single global
 threshold is being asked to serve classes with very different precision--recall
@@ -115,19 +127,29 @@ fires but finds only 54.7\% of what is present, while
 \texttt{agricultural} is balanced. Fitting one threshold per class on
 \calibTiles{} labelled tiles --- no weights trained, the same protocol the
 baseline already uses for its single $\tau$ --- gives
-\methodGain{}~$\pm$~\methodSD{}~mIoU, with land cover gaining \methodLand{} and
-the catch-all class untouched.
+\methodGain{}~$\pm$~\methodSD{}~mIoU, with the catch-all untouched at
+\methodBg{}~IoU, so the gain is land cover rather than a repaired catch-all.
 
 \paragraph{Contributions.}
 \begin{enumerate}\itemsep2pt
-  \item \textbf{A mechanism.} The catch-all class's share of ground truth
-        (\bgShareLove{} vs \bgShareOEM{}) tracks the residual's size, its
-        detectability, the presence--discard correlation and the catastrophic-tile
-        count across two datasets (Table~\ref{tab:mechanism}).
+  \item \textbf{A mechanism, established causally.} The catch-all's share of
+        ground truth (\bgShareLove{} vs \bgShareOEM{}) tracks the residual's size,
+        its detectability, the presence--discard correlation and the
+        catastrophic-tile count across two datasets
+        (Table~\ref{tab:mechanism}). We then manipulate that share through the
+        vocabulary, with class count controlled and predictions registered before
+        each run, and show the effect follows the share
+        (Table~\ref{tab:intervention}). A further intervention localises it to the
+        label space rather than the prompt list.
   \item \textbf{A method.} Calibrated per-class thresholds:
-        \methodGain{}~$\pm$~\methodSD{}~mIoU, land cover \methodLand{}, catch-all
-        \methodBg{}, \oracleShare{} of an oracle bound of \oracleBound{}, verified
-        end-to-end in the pipeline.
+        \methodGain{}~$\pm$~\methodSD{}~mIoU on LoveDA, catch-all \methodBg{},
+        \oracleShare{} of an oracle bound of \oracleBound{}, verified end-to-end in
+        the pipeline --- and positive on \emph{both} datasets on the
+        catch-all-excluded metric (\mrLoveReal{}, \mrOemReal{}).
+  \item \textbf{A reporting recommendation.} We observe the catch-all moving the
+        headline mIoU in both directions --- supplying \oemBgGain{}~IoU of an
+        apparent gain in one experiment, and cancelling a real one in another ---
+        and recommend reporting mIoU over the real classes beside it.
   \item \textbf{A bound, with its reason.} \nAttempts{} label-free rules fail to
         reach that bound. Four provably estimate per-class precision, which we had
         supposed was the missing quantity; it is not.
@@ -304,6 +326,21 @@ figure} --- the identical pipeline discards \discardOEM{} on OpenEarthMap. Both
 are stated here rather than left for a reader to discover.
 
 % =====================================================================
+\paragraph{Confusability is not the driver.} Across two datasets the catch-all's
+share moves together with its \emph{confusability} --- how much of it the model
+gives a real class --- and either could explain the ordering. LoveDA's urban and
+rural domains separate them, and in opposite directions: rural has the larger
+share (\SHAREr{} of ground truth against \SHAREu{}) while urban's catch-all is
+much the more confusable (\CONFu{} of it escapes into real classes, against
+\CONFr{}). The two hypotheses therefore name \emph{different} strata as the one
+that should detect worse, and share is right: AUC is \AUCr{} in rural against
+\AUCu{} in urban, so the more confusable stratum is the one where detection works
+\emph{better}. We note what this does and does not settle. It eliminates
+confusability as the driver. It does not explain the gap between those two strata,
+which is large and, by the saturation result below, cannot be attributed to their
+difference in share either; we leave that unexplained rather than fitting a story
+to it.
+
 \subsection{Catch-all share, intervened on}
 \label{sec:intervention}
 
@@ -796,15 +833,24 @@ residual is hard to find it cannot be found, and where it is easy to find the
 resulting labels are not accurate enough to beat leaving it alone. What does work
 is cheaper and less interesting to describe --- fitting the threshold per class
 rather than globally --- and it works because a single threshold is being asked to
-serve classes with incompatible operating points. We give the bound on that idea,
-show it cannot be reached without labels, and identify why: the quantity that sets
-the right threshold is not a per-class property at all.
+serve classes with incompatible operating points. It is positive on both datasets
+once the catch-all is separated out, and on one of them that separation is the
+difference between a result and a null. We give the bound on the idea, show it
+cannot be reached without labels, and identify why: the quantity that sets the
+right threshold is not a per-class property at all.
 
-We would emphasise one methodological point. Three of the results in this paper
+The two halves meet in the metric. A catch-all class distorts what is measured as
+well as what is predicted, and because mIoU is an unweighted mean it does so with
+leverage $1/N$ regardless of how meaningful that class is. We would rather the
+field reported the real-class mean beside the headline than continue to discover
+this one dataset at a time.
+
+We would emphasise one methodological point. Four of the results in this paper
 are refutations of our own earlier claims, each caught by a test written on
 purpose --- a null model that inverted a published finding of ours, a supervision
-leak that produced a plausible and quotable number, and a detector that scored
-$0.966$ on random noise. Reporting a headline mIoU gain without decomposing it
+leak that produced a plausible and quotable number, a detector that scored $0.966$
+on random noise, and an intervention whose apparent success was a detector
+changing sign rather than losing information. Reporting a headline mIoU gain without decomposing it
 per class is, on this evidence, the single easiest way to publish something that
 is not true.
 
