@@ -171,3 +171,67 @@ Write it up honestly and move on to Phase 7.2. State: the version attempted, the
 commit hash, the specific failure, and how long was spent. That is a real limitation
 paragraph and reviewers accept it. What they do not accept is a competitor cited with
 no number and no explanation.
+
+
+---
+
+# ⏸ STATUS — 1 Sep 2026: blocked on gated DINOv3 weights
+
+Everything except one file is working. Resume from here.
+
+| | |
+|---|---|
+| `coninfer` env | ✅ torch 2.4.1+cu121 · mmcv 2.2.0 · mmseg 1.2.2 · ops OK |
+| undeclared deps | ✅ `ftfy`, `regex`, `psutil`, `openpyxl` |
+| `segearth_segmentor.py` | ✅ copied from upstream `likyoo/SegEarth-OV` |
+| LoveDA symlink | ✅ `~/ConInfer/data/LoveDA` → 1669 tiles |
+| single-GPU configs | ✅ `cfg_loveda_1gpu.py` in both config dirs (batch 8, workers 4) |
+| mmengine builds the runner | ✅ config parses, model construction begins |
+| `segov3` | ✅ byte-identical, and behaviourally re-gated at **47.37** |
+| **DINOv3 SAT-493M weights** | ⛔ **HTTP 403 — licence-gated** |
+
+**The blocker, precisely.** `ConInfer_segmentor.py:180` calls
+`torch.hub.load(REPO_DIR, 'dinov3_vitl16', source='local', weights=WEIGHT_DIR)`.
+The vendored `dinov3/hub/utils.py` sets
+`DINOV3_BASE_URL = "https://dl.fbaipublicfiles.com/dinov3"`, and
+`dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth` there returns **403**. Hugging Face
+carries only the `transformers` conversion (`config.json` + `model.safetensors`),
+which `torch.hub.load` cannot consume.
+
+⛔ **Do NOT convert the safetensors.** The HF conversion renames every parameter,
+so a hand-written remap can load under `strict=False` with half the network still
+randomly initialised — producing a plausible number from a broken model, with no
+way to detect it. That is the precise failure "reproduce their published figure
+first" exists to prevent.
+
+⚠️ **DINOv3 is required for their BASELINE config too.** `base_config1.py` also
+builds `ConInferSegmentation`, and the `if/else` at line ~171 selects *which*
+backbone, never whether to load one. There is no lighter path.
+
+## To resume
+
+1. Accept the DINOv3 licence (`facebookresearch/dinov3`, pretrained-models
+   section) and obtain the signed URL.
+2. `curl -fL -o ~/weights/dinov3/dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth "<url>"`
+3. `bash scripts/patch_coninfer_paths.sh ~/weights/dinov3/<that file>`
+4. `cd ~/ConInfer && python eval.py --config configs_baseline/cfg_loveda_1gpu.py --work-dir ./out_base_loveda`
+5. Check it against **SegEarth-OV's** published LoveDA mIoU — ⚠️ *not* 47.4, which
+   is SegEarth-OV**3** on SAM 3 at 1024². This baseline is CLIP at 448².
+
+## If the licence never comes through
+
+The limitation paragraph writes itself, and it is specific enough to be credible:
+
+> *We attempted a direct comparison with ConInfer. Their released code omits
+> `segearth_segmentor.py`, requires three dependencies declared by neither their
+> requirements nor the packages importing them, and hardcodes absolute paths from
+> the authors' filesystem; all were resolved. It further requires a
+> satellite-pretrained DINOv3 ViT-L/16 checkpoint whose distribution is
+> licence-gated (HTTP 403), and which is required by their baseline configuration
+> as well as their method. We therefore report the comparison qualitatively.*
+
+⭐ **And one finding stands regardless of whether the run happens:** ConInfer
+requires a second large pretrained backbone with gated weights; our method
+requires ~200 labelled tiles and no additional weights. That is a real difference
+in deployment cost, discovered only by attempting the reproduction, and it belongs
+in the related-work positioning either way.
