@@ -12,7 +12,12 @@
 # reversible. Every edit here is a PATH -- no logic, no hyperparameter, nothing
 # that could change their result.
 #
-#   bash scripts/patch_coninfer_paths.sh /path/to/dinov3_weights.pth
+#   bash scripts/patch_coninfer_paths.sh /path/to/dinov3_..._sat493m-....pth
+#
+# ⚠️ DINOv3 IS MANDATORY, INCLUDING FOR THEIR BASELINE CONFIG. The if/else at
+# line ~171 selects WHICH backbone, not whether to load one, and
+# configs_baseline/base_config1.py also builds `ConInferSegmentation`. There is
+# no lighter path for validating the environment first.
 set -euo pipefail
 
 SRC="${SRC:-$HOME/ConInfer/ConInfer_segmentor.py}"
@@ -38,13 +43,29 @@ python3 - "$SRC" "$REPO" "$W" <<'PY'
 import re, sys
 src, repo, w = sys.argv[1], sys.argv[2], sys.argv[3]
 t = open(src).read()
-t, n1 = re.subn(r'REPO_DIR\s*=\s*"[^"]*"',   f'REPO_DIR = "{repo}"', t)
-t, n2 = re.subn(r'WEIGHT_DIR\s*=\s*"[^"]*"', f'WEIGHT_DIR = "{w}"',  t)
+# REPO_DIR is the same vendored checkout for both branches -- rewrite all.
+t, n1 = re.subn(r'REPO_DIR\s*=\s*"[^"]*"', f'REPO_DIR = "{repo}"', t)
+
+# ⚠️ WEIGHT_DIR is NOT the same. The if/else picks WHICH DINOv3 to load:
+#     UAVid / VDD  -> dinov3_vith16plus, lvd1689m weights
+#     everything else -> dinov3_vitl16,  sat493m weights   <- our datasets
+# Rewriting both would point the vith16plus branch at vitl16 weights, which is
+# an architecture/checkpoint mismatch that only fires on a dataset we do not run
+# -- i.e. silently wrong. Patch ONLY the branch matching the given file.
+key = 'sat493m' if 'sat493m' in w else ('lvd1689m' if 'lvd1689m' in w else None)
+if key is None:
+    raise SystemExit(
+        f"⛔ cannot tell which branch {w} belongs to.\n"
+        "   Expected a filename containing 'sat493m' (vitl16, used by LoveDA,\n"
+        "   OpenEarthMap, Potsdam, Vaihingen) or 'lvd1689m' (vith16plus, UAVid/VDD).")
+t, n2 = re.subn(rf'WEIGHT_DIR\s*=\s*"[^"]*{key}[^"]*"', f'WEIGHT_DIR = "{w}"', t)
 open(src, 'w').write(t)
 print(f"  REPO_DIR   rewritten {n1}x -> {repo}")
-print(f"  WEIGHT_DIR rewritten {n2}x -> {w}")
-if n1 == 0 or n2 == 0:
-    raise SystemExit("⛔ expected both to match; inspect the file by hand")
+print(f"  WEIGHT_DIR rewritten {n2}x ({key} branch only) -> {w}")
+if n1 == 0 or n2 != 1:
+    raise SystemExit(
+        f"⛔ expected REPO_DIR >=1 and exactly one {key} WEIGHT_DIR; "
+        f"got {n1} and {n2}. Inspect by hand.")
 PY
 
 echo
