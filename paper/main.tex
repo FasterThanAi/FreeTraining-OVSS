@@ -485,12 +485,16 @@ see the discussion below.}
 \toprule
  & LoveDA & OpenEarthMap \\
 \midrule
-$\Delta$ mIoU                   & \best{\methodGain{} $\pm$ \methodSD{}} & $+0.16 \pm 0.93$ \\
+$\Delta$ full mIoU, five-fold    & \best{\methodGain{} $\pm$ \methodSD{}} & $+0.16 \pm 0.93$ \\
 worst fold                      & \methodWorst{} & --- \\
-land-cover classes, aggregate   & \best{\methodLand{}} & \best{$+12.45$} \\
-catch-all class                 & \methodBg{}    & $-11.04$ \\
+\midrule
+\multicolumn{3}{l}{\emph{both metrics, one partition, identical held-out pixels}}\\
+$\Delta$ full mIoU              & \mrLoveFull{} & \mrOemFull{} \\
+$\Delta$ excl.\ catch-all       & \best{\mrLoveReal{}} & \best{\mrOemReal{}} \\
+catch-all $\Delta$ IoU          & \mrLoveBg{} & \mrOemBg{} \\
+\midrule
 \texttt{water} alone            & \methodWater{} (at $\tau=\methodWaterTau{}$) & --- \\
-oracle bound                    & \oracleBound{} & --- \\
+oracle bound, full mIoU         & \oracleBound{} & --- \\
 share of the bound captured     & \oracleShare{} & --- \\
 \bottomrule
 \end{tabular}
@@ -498,21 +502,39 @@ share of the bound captured     & \oracleShare{} & --- \\
 
 \paragraph{LoveDA.} Five-fold cross-validation (Table~\ref{tab:method}) gives
 \methodGain{}~$\pm$~\methodSD{}~mIoU with every fold positive and a worst fold of
-\methodWorst{}. The gain is \best{entirely land cover}: the six real classes gain
-\methodLand{}~IoU in aggregate while the catch-all moves \methodBg{}. That makes
+\methodWorst{}. The gain is \best{entirely land cover}: excluding the catch-all
+raises the gain to \methodLandMean{}~mIoU while the catch-all itself moves
+\methodBg{}~IoU (\methodLand{} summed across the six real classes). That makes
 the result structurally immune to the artefact described below, and it captures
 \oracleShare{} of an oracle bound of \oracleBound{} --- little is left on the
 table. It is driven by \texttt{water}, which gains \methodWater{}~IoU alone at a
 fitted threshold of \methodWaterTau{} against a global $0.5$.
 
-\paragraph{OpenEarthMap is a benchmark artefact, not a method failure.} Land
-cover improves by $+12.45$~IoU in aggregate --- \texttt{building} $+4.35$,
-\texttt{road} $+2.95$, \texttt{pavement} $+2.71$ --- and \bg{} pays for all of it
-at $-11.04$, leaving full mIoU flat (the same shape as Fig.~\ref{fig:oemperclass}).
-OpenEarthMap's \bg{} sits at $17.13$~IoU
-with 17.33\% precision, so its mIoU is dominated by one
-pathologically calibrated class and one can improve land cover \emph{or} the
-metric, not both.
+\paragraph{OpenEarthMap is positive too, once the catch-all is separated.} Read
+as full mIoU the method looks flat there, \mrOemFull{}. Read as
+catch-all-excluded mIoU it gains \best{\mrOemReal{}} --- more than LoveDA does.
+The headline decomposes exactly: \mrOemFull{} is \mrOemLand{} contributed by the
+eight real classes and \mrOemBgC{} contributed by \bg{} alone, whose IoU falls
+\mrOemBg{}. \best{The catch-all cancels a real gain, so here the headline
+\emph{understates} the method} --- the mirror of Table~\ref{tab:oemperclass},
+where it overstated it. The per-class movements are ordinary segmentation gains:
+\texttt{building} $+4.34$, \texttt{road} $+2.94$, \texttt{pavement} $+2.71$,
+\texttt{cropland} $+2.50$. LoveDA is the clean case, where both metrics agree
+(\mrLoveFull{} and \mrLoveReal{}) because the catch-all barely moves at
+\mrLoveBg{}.
+
+\paragraph{Reporting recommendation.} We therefore report both, and suggest the
+field does. mIoU is an \emph{unweighted} mean over $N$ classes, so \best{a
+catch-all owns exactly $1/N$ of the metric however meaningful it is} ---
+\mrLoveLever{} on LoveDA for a class its annotation guide defines as ``everything
+else'', \mrOemLever{} on OpenEarthMap for a class covering $0.84\%$ of the pixels.
+A ten-point move in that one class is worth more than most methods claim. The
+distortion is present before any method is applied: OpenEarthMap's \bg{} sits at
+\mrOemBgIoU{}~IoU against a real-class mean of $47.54$, so its published headline
+is depressed by \mrOemDistort{} points by a single pathologically calibrated
+class. We have now measured this artefact moving the headline in both directions
+--- inflating it in Table~\ref{tab:oemperclass}, deflating it here --- which is
+why we treat it as a property of the metric rather than of either result.
 
 \paragraph{End-to-end verification.} The results above are computed from the
 cached histogram. To confirm that this is a measurement instrument rather than
