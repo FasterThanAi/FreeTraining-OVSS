@@ -194,3 +194,11 @@
 \newcommand{\cnCVsd}{0.34}
 \newcommand{\cnWorst}{+2.22}       % every fold positive
 \newcommand{\cnCalib}{25}          % tiles for a reliable gain -- 8x cheaper here
+% ConInfer on OpenEarthMap: the transfer does NOT hold there, and why
+\newcommand{\cnOemCV}{-0.39}       % five-fold, sd 1.28, 1/5 folds positive
+\newcommand{\cnOemCVsd}{1.28}
+\newcommand{\cnOemFull}{-0.09}
+\newcommand{\cnOemReal}{+1.27}     % land cover DOES improve
+\newcommand{\cnOemBg}{-10.94}      % catch-all sacrificed: 17.00 -> 6.06
+\newcommand{\cnOemBgAfter}{6.06}
+\newcommand{\mrOemBgAfter}{5.83}   % SAM 3 drives it to almost the same value

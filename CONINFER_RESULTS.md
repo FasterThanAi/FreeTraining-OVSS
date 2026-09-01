@@ -195,3 +195,68 @@ different from ConInfer?"* than any margin would have been.
 - ⚠️ ConInfer's baseline is *itself* depressed 2.07 points by its catch-all
   (`background` 24.61 against a real-class mean of 39.06) — the same metric
   distortion this paper documents, appearing in a competitor's published setup.
+
+
+---
+
+# ⛔ §7.1a on OpenEarthMap — it does NOT transfer, and the reason replicates
+
+Gates passed: instrumented run **29.90** exactly, `conf` in **[0.1042, 0.9195]**.
+Fitted at their OEM threshold (`prob_thd = 0.1`).
+
+**Five-fold: −0.39 ± 1.28, one fold of five positive. Null.**
+
+| | published τ | fitted | Δ |
+|---|---|---|---|
+| full mIoU | 29.90 | 29.81 | **−0.09** |
+| catch-all-excluded | 31.51 | **32.78** | **+1.27** |
+| `background` | 17.00 | **6.06** | **−10.94** |
+
+The full-mIoU movement decomposes as **+1.13 from the eight real classes** and
+**−1.22 from `background` alone**. And almost nothing else moves: `grass` −0.00,
+`pavement` +0.00, `road` +0.02, `tree` +0.02, `building` +0.04. The fit changed one
+threshold that mattered (`bareland` +8.18, a class that is 1.28% of the scene) and
+paid for it with the catch-all.
+
+## ⭐ Why this is a good negative: it replicates our own OEM result on a different model
+
+| OpenEarthMap | SAM 3 (ours) | ConInfer (CLIP) |
+|---|---|---|
+| Δ full mIoU | +0.30 | −0.09 |
+| Δ excl. catch-all | +1.75 | +1.27 |
+| `background` IoU | 17.13 → **5.83** | 17.00 → **6.06** |
+
+⭐ **Two unrelated models, and the fit drives the catch-all to almost the same
+value.** That is the dataset's metric pathology, not a property of either pipeline:
+OpenEarthMap's `background` sits near 17 IoU with poor precision and owns 11.1% of
+a nine-class mean, so an optimiser told to maximise land cover trades it away and
+full mIoU cannot move. §9b said exactly this about OEM — *"you can improve land
+cover or the metric, not both"* — and it now holds for a competitor's pipeline too.
+
+## The claim, correctly scoped
+
+⛔ **Not** *"per-class τ transfers across backbones."* The honest 2×2:
+
+| | LoveDA | OpenEarthMap |
+|---|---|---|
+| **SAM 3** | **+1.18 ± 0.45** ✅ | +0.30 *(land cover +1.75)* |
+| **ConInfer (CLIP)** | **+2.51 ± 0.34** ✅ | −0.09 *(land cover +1.27)* |
+
+> **The correction is not backbone-specific — it is dataset-specific, and the axis
+> is the catch-all's calibration.** Where the catch-all is competently predicted
+> (LoveDA, ~45 IoU) the fit improves land cover *and* the headline, on both
+> architectures. Where it is pathological (OpenEarthMap, ~17 IoU) the fit improves
+> land cover on both and the headline on neither, because the catch-all it must
+> sacrifice owns a ninth of the metric.
+
+That is a **stronger and more falsifiable** statement than "it transfers", and it
+ties the method back to the paper's own mechanism instead of standing beside it.
+
+⚠️ **Caveat that must travel with this row:** the OEM reproduction is off by 12.05
+against their published figure. The delta is robust to a constant offset, but this
+row rests on far weaker footing than the LoveDA one (−2.34), and should be labelled
+supporting evidence rather than an independent confirmation.
+
+⚠️ `tau_cv.py`'s verdict again printed SAM 3 boilerplate — *"the single-split +1.44
+was a favourable draw"* — which refers to a LoveDA number and is meaningless here.
+Third time generated verdict text has needed checking against its own table.
