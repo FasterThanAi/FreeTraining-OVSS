@@ -77,7 +77,30 @@ with `journal` options. **Nothing else in the file assumes a document class** �
 no hard-coded column widths, no `\linewidth` gymnastics — except that the two
 wide figures use `figure*`, which is correct in two-column and harmless in one.
 
-### 3. Cut it to length
+### 3. Length — about 2,000 words have to MOVE, not shrink
+
+~7,100 words, 5 tables, 4 figures. That is roughly 10--11 two-column pages; a
+CVPR workshop paper is **8 pages excluding references**, or about 5,000--5,500
+words once floats are placed.
+
+⚠️ **Word-level editing will not close this.** A full tightening pass over the
+introduction and related work bought **69 words**. The prose is already dense, and
+squeezing further starts costing clarity rather than length. Two blocks are marked
+in `main.tex` instead:
+
+```
+% ==== SUPPLEMENTARY CANDIDATE 1: the refuted co-occurrence prior (~200 words)
+% ==== SUPPLEMENTARY CANDIDATE 2: domain transfer, Table 4 + prose (~520 words)
+```
+
+The test applied to both: **is anything here load-bearing for a claim made in the
+abstract?** Neither is. Moving both, plus their table, is roughly 2 pages.
+
+If that is still not enough, the next candidates in order are the composition
+decomposition (Section~\ref{sec:results}), then Figure~4, then the anatomy
+section. Supplementary material is normal at CVPR workshops and costs nothing.
+
+### The old cut list, retained --- and the principle
 
 Currently ~7,200 words, 6 tables, 5 figures. A CVPR workshop paper is **8 pages
 two-column excluding references**, which is roughly 5,000–5,500 words once

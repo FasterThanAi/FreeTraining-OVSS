@@ -478,7 +478,8 @@ co-occurrence prior: cut the discarded region into atoms and label each by
 conditioning on its neighbours through a matrix mined from the model's own
 confident predictions. The prior is real --- class adjacency carries
 \pmiSignal{}~bits of mean absolute pointwise mutual information against a
-structure-preserving permutation floor of \pmiFloor{} --- and mining it without
+structure-preserving permutation floor of \pmiFloor{}, a factor of \pmiRatio{}
+--- and mining it without
 labels reproduces the ground-truth matrix at Spearman $\rho=\rhoMined{}$, with
 error that does \emph{not} concentrate on the classes the pipeline discards
 ($\rho=\rhoCirc{}$), which retires the circularity objection with a number.
@@ -724,10 +725,12 @@ per-class $\tau$, label-free        & $-0.17$ & $+4.77$\,$^\dagger$ \\
 \begin{figure}[t]\centering
 \includegraphics[width=\columnwidth]{fig3_oem_per_class.pdf}
 \caption{Per-class decomposition of OpenEarthMap's \recoverOEM{}~mIoU from
-recovery. A background-assigned real-class pixel is already wrong, so relabelling
-it either fixes it or leaves it wrong in a different class --- while \bg{} sheds
-false positives either way. Averaging over nine classes converts a worse
-segmentation into a better number.}
+recovery. \bg{} gains \oemBgGain{}~IoU while the eight real classes lose
+\oemRealLoss{} and \texttt{building}, the baseline's strongest class, loses
+\oemBuildLoss{}. A background-assigned real-class pixel is already wrong, so
+relabelling it either fixes it or leaves it wrong in a different class --- while
+\bg{} sheds false positives either way. Averaging over nine classes converts a
+worse segmentation into a better number.}
 \label{fig:oemperclass}
 \end{figure}
 
