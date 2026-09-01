@@ -13,7 +13,7 @@ should answer it with a `grep` instead of an archaeology session.
 
 ---
 
-## 2026-09-01 (Tue) — Phase 6 closes, Phase 7 opens, ConInfer begins
+## 2026-09-01 (Tue) — Phase 6 closes; ConInfer run, and the method transfers across backbones
 
 **§6.1 vocabulary intervention — the mechanism is now causal.** Catch-all share is set by the
 vocabulary, so it was manipulated directly instead of stratified. CPU-only, because every class is
