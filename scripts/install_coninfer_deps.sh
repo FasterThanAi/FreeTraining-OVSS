@@ -46,7 +46,10 @@ esac
 echo "→ torch 2.4.1+cu121 (their pin is 2.7.1; see the header for why)"
 pip install torch==2.4.1 torchvision==0.19.1 \
     --index-url https://download.pytorch.org/whl/cu121
-pip install "numpy<2"
+# ⚠️ NO `numpy<2` here. That pin belongs to `segov3`, not to ConInfer, whose own
+# requirements ask for numpy==2.1.2. Forcing it caused an install/uninstall churn
+# and a confusing resolver conflict against opencv-python. mmcv 2.2.0's compiled
+# ops import fine against numpy 2.x on this machine -- verified below.
 echo "→ mmcv 2.2.0 from the PREBUILT index (never source -- nvcc 13.3 vs torch 12.1)"
 pip install mmcv==2.2.0 \
     -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.4/index.html
@@ -74,13 +77,29 @@ grep -q "MMCV_MAX = '2.3.0'" "$INIT" || {
 echo "  ✅ MMCV_MAX patched to 2.3.0 in $INIT"
 
 # ---- everything else from their file, untouched -----------------------------
+# ⚠️ pydensecrf 1.0rc3 is EXCLUDED. Its sdist does not build against Cython 3 --
+# `densecrf.pxd` fails to resolve `eigen.pxd` and every Eigen type errors out. It
+# is a DenseCRF post-processing wrapper and may not be reached by the evaluation
+# path at all, so we install everything else and then REPORT whether ConInfer
+# actually imports it, rather than guessing either way.
 REST="$(mktemp)"
-grep -viE '^\s*(torch|torchvision|torchaudio|mmcv|mmsegmentation|mmengine)\b' "$REQ" \
+grep -viE '^\s*(torch|torchvision|torchaudio|mmcv|mmsegmentation|mmengine|pydensecrf)\b' "$REQ" \
   | grep -vE '^\s*(#|$)' > "$REST" || true
-echo "→ their remaining $(wc -l < "$REST") requirements, unchanged:"
+echo "→ their remaining $(wc -l < "$REST") requirements (pydensecrf excluded, see above):"
 sed 's/^/     /' "$REST"
 [ -s "$REST" ] && pip install -r "$REST"
 rm -f "$REST"
+
+echo
+echo "→ does ConInfer actually use pydensecrf?"
+if grep -rIn --include='*.py' -e 'pydensecrf' -e 'densecrf' "$(dirname "$REQ")" 2>/dev/null | head -20 | grep -q .; then
+  echo "  ⚠️ YES -- referenced at:"
+  grep -rIn --include='*.py' -e 'pydensecrf' -e 'densecrf' "$(dirname "$REQ")" 2>/dev/null | head -20 | sed 's/^/     /'
+  echo "  If the evaluation path reaches it, install it with Cython pinned:"
+  echo "     pip install 'cython<3' && pip install --no-build-isolation pydensecrf==1.0rc3"
+else
+  echo "  ✅ no Python file references it; excluding it is safe."
+fi
 
 echo
 python - <<'PY'
