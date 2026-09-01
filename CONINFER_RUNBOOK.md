@@ -81,6 +81,33 @@ unchanged. It refuses to run outside `coninfer` and checks `pip`'s path first.
 numbers do not reproduce, the torch version is the first suspect — which is exactly
 why the next step is to reproduce *their* number before touching our splits.
 
+## What a clean install actually required — for the reproducibility note
+
+Three things stop `python eval.py` from running on a fresh machine. None is
+exotic, and all three are worth one factual sentence in the paper, because they
+are what a reader would hit too:
+
+| problem | detail |
+|---|---|
+| `segearth_segmentor.py` **absent from their repo** | `eval.py` imports it at line 4. Copied from upstream `likyoo/SegEarth-OV`. |
+| `ftfy` undeclared | mmsegmentation 1.2.2 does `from .tokenizer import tokenize` in `mmseg/utils/__init__.py`, and that CLIP tokenizer imports `ftfy` and `regex`. mmseg does not list them; neither does ConInfer. |
+| `psutil` undeclared | `fast-pytorch-kmeans` imports it without declaring it. |
+
+Plus two that are properties of *this* machine rather than their repo:
+
+- **`torch==2.7.1` is unusable here.** No prebuilt mmcv wheel exists for torch 2.7,
+  and the source build fails on `pkg_resources` and then on nvcc 13.3 against
+  torch's 12.x (`WEEK1_RESULTS.md` §2). We run their code on torch 2.4.1+cu121
+  with mmcv 2.2.0 from the prebuilt index. ⚠️ **This deviation must be reported**,
+  and is the reason their own published number is reproduced first.
+- **`pydensecrf==1.0rc3` does not build against Cython 3** and is excluded. Nothing
+  in their tree imports it.
+
+State it neutrally: *"reproducing the comparison required one file from the
+upstream repository, two undeclared dependencies, and a torch version change; we
+verified the environment by reproducing their reported baseline before measuring."*
+That is a reproducibility note, not a complaint, and it is evidence the run is real.
+
 ## Day 2–3 — reproduce *their* number first
 
 ⚠️ **Do not evaluate on our splits until their own reported number reproduces.**
