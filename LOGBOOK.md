@@ -58,6 +58,66 @@ the causal framing; bibliography rebuilt (it had malformed author fields that wo
 as garbage); em-dashes 75→47 and 2-dash sentences 25→11. `make_overleaf_bundle.sh` flattens it for
 upload. Two blocks marked SUPPLEMENTARY CANDIDATE — ~2,000 words must *move*, not shrink.
 
+**ConInfer, start to finish — the afternoon.** The comparison row the paper cites without a
+number. Environment first: their `requirements.txt` wants torch 2.7.1, for which no prebuilt mmcv
+wheel exists, so the source build dies on `pkg_resources` and would then die again on nvcc 13.3 vs
+torch 12.x — both recorded in WEEK1 §2 back in week one. Ran it on our own stack instead (torch
+2.4.1 + mmcv 2.2.0 prebuilt), which is a **deviation that must be reported**.
+
+Then a chain of things their repo does not ship: `segearth_segmentor.py` is **absent** though
+`eval.py` imports it at line 4 (copied from upstream); `ftfy`/`regex`, `psutil` and `openpyxl` are
+imported by packages that never declare them; `ConInfer_segmentor.py` **hardcodes the first
+author's filesystem** (`/data/users/cwy/...`) for the DINOv3 repo and weights; and
+`configs_baseline/` sets `gmm_temp=0` while `gmm_fitting` computes `1/temp` unconditionally →
+`ZeroDivisionError`. DINOv3 SAT-493M is licence-gated (403 on fbaipublicfiles) until the form is
+accepted. **Every one of these is a reason most people cite the paper without a number.**
+
+⛔ **The reproduction gate FAILED, and that is the day's most important process outcome.** Their
+published figures are **39.33 LoveDA / 41.95 OEM**; we get **36.99 / 29.90**. The split that
+reproduces closely (−2.34) is the one we hold in **full**; the one that fails badly (−12.05) is the
+one we hold **384 of 500** of. So: report LoveDA with *both* numbers, drop OEM entirely. Eliminated
+as causes — label encoding (uint8 0–8, correct), prompt order (matches exactly), image format (RGB
+8-bit 1000²), `feature_up` (setting it `True` changes **nothing**, identical to the digit), and
+alphabetical subset bias (73 cities, aachen→zanzibar). Stopped there deliberately rather than
+spend the timebox on what cannot be verified without the missing 116 tiles.
+
+**⭐⭐ Then the experiment that mattered more than the comparison.** ConInfer thresholds per-class
+scores at a global `prob_thd=0.8` — exactly what our method replaces. `coninfer_cache.py` wraps
+their `predict()` **read-only** (mmseg leaves `seg_logits`/`gt_sem_seg` on each `SegDataSample`, so
+**no edit to their source at all**) and writes our `.npz` format. Both gates passed: instrumented
+run **36.99 exactly**, `conf` in **[0.1601, 0.9611]** so the [0,1] threshold grid is valid.
+
+| | SAM 3 | **ConInfer (CLIP)** |
+|---|---|---|
+| five-fold Δ | +1.18 ± 0.45 | ⭐ **+2.51 ± 0.34** |
+| worst fold | +0.84 | **+2.22** |
+| Δ excl. catch-all | +1.36 | **+1.94** |
+| calibration tiles | ~200 | ⭐ **~25** |
+
+**Every one of the seven classes improves** — which our own SAM 3 result does not manage. Their
+pipeline goes **37.00 → 39.52**.
+
+⭐ **The claim stops being about SAM 3.** It is a property of any pipeline that thresholds
+per-class scores: two architectures, two methods, two operating points, same correction — and
+*larger* on the pipeline it was not developed for. ⭐ **And we compose with the nearest competitor
+rather than beating it**, which is a better answer to "how is this different from ConInfer?" than
+any margin would have been. Paper abstract, contribution 2, related work and a new
+Table 6 rewritten accordingly.
+
+⚠️ Honest notes kept beside the result: the deltas are a **delta on our reproduction**, their
+catch-all gains **+6.01** (about a third of the full movement, and the excluded column is
+independently positive), and `tau_cv.py`'s closing "train→val −0.12" line is **SAM 3 boilerplate**
+that was never tested here.
+
+**Bugs of mine, caught and fixed today:** the `MMCV_MAX` patch located mmseg *by importing mmseg*,
+which is the very import it repairs, so it silently patched nothing — and the failure was hidden
+behind `2>/dev/null || true`; the import check tested a narrower import than `eval.py` performs, so
+it passed while `openpyxl` was still missing; and the path patcher rewrote *both* `WEEK_DIR` lines,
+which would have pointed the `vith16plus` branch at `vitl16` weights — wrong only on a dataset we
+never run, i.e. silently. **Two lessons worth keeping: never locate a package by importing it when
+the import is what you are repairing, and a verification narrower than the thing it verifies will
+pass and mean nothing.**
+
 **Timeline reset.** EarthVision 2027 is ~March 2027 (**not officially published — verify**), so the
 horizon is ~6 months, not weeks. ROADMAP Phase 7 written: ConInfer, datasets 3–4, the coupled
 label-free objective. **Content freeze 1 Jan 2027.**
