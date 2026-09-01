@@ -64,7 +64,10 @@ this is the protocol the baseline already uses to tune its single threshold. It
 gives \methodGain{}~$\pm$~\methodSD{}~mIoU on LoveDA, capturing
 \oracleShare{} of an oracle bound of \oracleBound{}, and it is positive on both
 datasets once the catch-all is excluded from the metric (\mrLoveReal{} and
-\mrOemReal{}~mIoU). That exclusion is itself a recommendation: mIoU is an
+\mrOemReal{}~mIoU). \best{The correction is not specific to SAM~3.} Applied
+unchanged to the nearest published competitor --- a CLIP-based pipeline with its
+own tuned threshold --- it adds \cnCV{}~$\pm$~\cnCVsd{}~mIoU with every fold
+positive, so our method composes with that work rather than competing with it. That exclusion is itself a recommendation: mIoU is an
 unweighted mean, so a catch-all owns $1/N$ of the score however meaningful it is,
 and we observe it moving the headline in both directions.
 Finally, we show the oracle bound is not reachable without labels, and identify
@@ -142,8 +145,10 @@ at
   \item \textbf{A method.} Calibrated per-class thresholds:
         \methodGain{}~$\pm$~\methodSD{}~mIoU on LoveDA, catch-all \methodBg{},
         \oracleShare{} of an oracle bound of \oracleBound{}, verified end-to-end in
-        the pipeline --- and positive on \emph{both} datasets on the
-        catch-all-excluded metric (\mrLoveReal{}, \mrOemReal{}).
+        the pipeline, and positive on \emph{both} datasets on the
+        catch-all-excluded metric (\mrLoveReal{}, \mrOemReal{}). \best{It transfers
+        across backbones}: applied to a CLIP-based competitor at its own operating
+        point it gives \cnCV{}~$\pm$~\cnCVsd{} (Table~\ref{tab:transfer}).
   \item \textbf{A reporting recommendation.} We observe the catch-all moving the
         headline mIoU in both directions, supplying \oemBgGain{}~IoU of an
         apparent gain in one experiment and cancelling a real one in another, and
@@ -209,6 +214,10 @@ report it as an ablation rather than a contribution because we measured it and i
 does not earn its place (Section~\ref{sec:built}). ConInfer's gain should
 \emph{not} be read as evidence that appearance solves the detection problem we
 identify: it performs context modelling, not residual-class detection.
+\best{The two are orthogonal, and we demonstrate it}: ConInfer changes the
+per-class \emph{scores}, our method changes the \emph{decision rule} applied to
+them, and applying ours on top of theirs improves their pipeline
+(Section~\ref{sec:transfer}).
 
 \paragraph{Spatial context as post-processing.} Dense CRFs~\cite{densecrf}, their
 differentiable successors~\cite{crfasrnn} and global-context encodings of the
@@ -742,6 +751,55 @@ control for by computing AUC within size-matched bins.}
 \end{figure}
 
 
+\subsection{Does it transfer to another backbone?}
+\label{sec:transfer}
+
+A correction fitted on one pipeline invites the obvious objection that it exploits
+a quirk of that pipeline. We test it directly on the nearest published competitor,
+which is CLIP-based rather than SAM~3-based and thresholds its per-class scores at
+its own tuned value of \cnTau{}. Nothing about the method changes: we cache its
+per-pixel scores and run the identical fit.
+
+\begin{table}[t]\centering\small
+\caption{The same correction on two architectures. ConInfer is CLIP ViT-B/16 with
+a per-scene visual prior, thresholded at \cnTau{}; ours is SAM~3, thresholded at
+$0.5$. Deltas are five-fold, calibration and evaluation tiles disjoint, each
+baseline recomputed on its own held-out tiles.}
+\label{tab:transfer}
+\begin{tabular}{lrr}
+\toprule
+ & SAM~3 pipeline & CLIP pipeline \\
+\midrule
+$\Delta$ full mIoU, five-fold & \methodGain{} $\pm$ \methodSD{} & \best{\cnCV{} $\pm$ \cnCVsd{}} \\
+worst fold                    & \methodWorst{} & \best{\cnWorst{}} \\
+$\Delta$ excl.\ catch-all     & \mrLoveReal{} & \best{\cnReal{}} \\
+calibration tiles needed      & \calibTiles{} & \best{\cnCalib{}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The correction is \best{larger} on the CLIP pipeline than on the one it was
+developed for: \cnCV{}~$\pm$~\cnCVsd{} against \methodGain{}~$\pm$~\methodSD{},
+with every fold positive and a worst fold of \cnWorst{}. It also needs an eighth of
+the calibration data, \cnCalib{} tiles against \calibTiles{}. Both metrics agree
+(\cnFull{} full, \cnReal{} excluding the catch-all), and \emph{every} class
+improves --- which our own SAM~3 result does not manage. In absolute terms their
+pipeline moves \cnBase{}~$\to$~\cnFit{}~mIoU.
+
+\best{So the finding is not about SAM~3.} A single global threshold serving classes
+with different precision--recall profiles is a property of the design, not of a
+backbone, and correcting it helps wherever that design appears. It also means our
+contribution \emph{composes} with the competitor rather than displacing it.
+
+\paragraph{Two caveats.} The deltas are measured on our own reproduction of their
+pipeline, which reaches \cnRepro{}~mIoU against their published \cnPub{} on the
+full split; a delta is robust to a constant offset, but we report the discrepancy
+rather than only the gain. And their catch-all class gains \cnBg{}~IoU, about a
+third of the full-mIoU movement --- far from the pathological case of
+Table~\ref{tab:oemperclass}, and the catch-all-excluded column is independently
+positive, but we quote both here as everywhere else.
+
+% =====================================================================
 \subsection{The label-free bound, and why it holds}
 \label{sec:bound}
 
