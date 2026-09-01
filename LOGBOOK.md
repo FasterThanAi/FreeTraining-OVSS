@@ -13,6 +13,61 @@ should answer it with a `grep` instead of an archaeology session.
 
 ---
 
+## 2026-09-01 (Tue) — Phase 6 closes, Phase 7 opens, ConInfer begins
+
+**§6.1 vocabulary intervention — the mechanism is now causal.** Catch-all share is set by the
+vocabulary, so it was manipulated directly instead of stratified. CPU-only, because every class is
+an independent forward pass and the only cross-class op is the `argmax`, so dropping a class from
+the vocabulary is *exactly* dropping its channel — 13 arms off one `--cache-full` stack, all
+reading identical model outputs. Faithful arm (prompts dropped, pixels relabelled), share
+0.84%→58.20%: `conf` **0.794→0.582** vs control 0.710 (2.5×), `conf2` **0.913→0.590** vs 0.855
+(5.6×). §7a's "stratification, not a randomised intervention" concession is retired.
+
+⚠️ **Two things I got wrong and had to fix.** The first verdict called it causal off a raw AUC drop
+to 0.208 — but AUC is symmetric, so that is a 0.792 detector *inverted*, not a destroyed one.
+Everything is scored on `det = max(AUC, 1−AUC)` now. And the pre-registered `A` arms merged
+channels by max, which makes the catch-all a *union of well-detected prompts* — unnaturally
+competent, the opposite of a real catch-all. That is why `conf` inverted. The `B` arms (drop the
+prompt, relabel the pixels) are the faithful analogue and were added with their own predictions
+committed first.
+
+**§7c reverse arm — P8 fails, and the failure is worth more.** Removing `background` from LoveDA's
+vocabulary moved detectability 0.592→**0.540**, not up. But it changes the *vocabulary* while
+leaving the *label space* alone. Every arm across both datasets that does that moves ≤0.052; every
+arm that raises GT share moves 0.213–0.323. **The lever is the label space, not the prompt list.**
+Also: the effect saturates by ~35% share, which is why LoveDA's own dose arm is underpowered — and
+means share cannot explain the urban/rural gap.
+
+**§9f — no label-free rule for when calibration pays.** U-shaped on LoveDA (ρ +0.400), opposite
+sign on OEM (−0.500), controls moving nearly as far. Unifies with §9d: one bound covers choosing
+the thresholds *and* deciding whether to choose them.
+
+**§9g — the domain gap is 85% `water`+`forest`.** P−R asymmetry ranks the movers (ρ +0.713,
+p 0.013); precision alone does not (+0.168, p 0.60). ⛔ But `water` — 48% of the gap — has the same
+share and same asymmetry in both domains and an 8× different gain. Half the gap still unexplained,
+and the script now says so rather than claiming otherwise.
+
+**⭐ §9h — OpenEarthMap turns positive.** Reported in both metrics: full **+0.30** decomposes into
+**+1.56** from the eight real classes and **−1.26** from `background` alone. It was written up as
+flat and filed as an artefact; on the catch-all-excluded metric it gains **+1.75**, more than
+LoveDA's +1.36. **The paper gains a second positive dataset.** OEM's published baseline is also
+depressed 3.38 points by one class at 17.13 IoU.
+
+**Paper.** 7,101 words, 26 references, 1 `\todo`. Abstract/contributions/conclusion rewritten for
+the causal framing; bibliography rebuilt (it had malformed author fields that would have rendered
+as garbage); em-dashes 75→47 and 2-dash sentences 25→11. `make_overleaf_bundle.sh` flattens it for
+upload. Two blocks marked SUPPLEMENTARY CANDIDATE — ~2,000 words must *move*, not shrink.
+
+**Timeline reset.** EarthVision 2027 is ~March 2027 (**not officially published — verify**), so the
+horizon is ~6 months, not weeks. ROADMAP Phase 7 written: ConInfer, datasets 3–4, the coupled
+label-free objective. **Content freeze 1 Jan 2027.**
+
+**ConInfer started.** `setup_coninfer.sh` refuses to run while `segov3` is active, builds a separate
+env, and snapshots the package list. ⭐ **Behavioural gate re-run today, before any ConInfer
+install: `eval.py ./configs/cfg_loveda.py` → mIoU 47.3700**, every per-class value within 0.02 of
+record. That is the instrumented segmentor's documented figure (47.37, not the pristine 47.38), and
+it is a dated proof that `segov3` was healthy at the moment the risky work began.
+
 ## 2026-08-28 (Fri) — the project gets a method: calibrated per-class τ, +1.18
 
 **21 commits, 08:32–16:41.** The day per-class thresholds went from an untested idea to an
