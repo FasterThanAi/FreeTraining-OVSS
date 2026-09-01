@@ -339,10 +339,12 @@ package list is *necessary, not sufficient* — the real gate is behavioural: `e
 evaluating on our splits, and report the row in **both metrics**, since a gain concentrated in the
 catch-all is exactly what §9h says to check for.
 
-⭐ **ConInfer runs — see @CONINFER_RESULTS.md (PROVISIONAL) and @CONINFER_RUNBOOK.md.**
-LoveDA **36.99**, OEM **29.90**, on our exact tiles (209×8, 48×8). ⛔ **Not for the paper until
-their published numbers are read** — a competitor 10+ points below their claim, unverified, is
-worse than no row. ⚠️ **Most of the gap is the BACKBONE** (CLIP ViT-B/16 @448 vs SAM 3 @1024); our
+⭐ **ConInfer runs, reproduction IMPERFECT — see @CONINFER_RESULTS.md and @CONINFER_RUNBOOK.md.**
+Published **39.33** LoveDA / **41.95** OEM; ours **36.99** / **29.90**. ⛔ **Drop OEM** (−12.05, and
+we hold only 384 of 500 tiles); ✅ **use LoveDA** (−2.34 on the *full* official split) and **report
+both numbers**, theirs and ours, so the reader sees the reproduction gap. Ruled out as causes:
+label encoding, prompt order, image format, `feature_up` (setting it True changes *nothing*), and
+alphabetical subset bias (73 cities, aachen→zanzibar). Stopped there deliberately. ⚠️ **Most of the gap is the BACKBONE** (CLIP ViT-B/16 @448 vs SAM 3 @1024); our
 contribution is the +1.16 over SegEarth-OV3, and claiming the 11.54 would be §8.1's error in our
 own table. They tune `prob_thd` too (0.8/0.3/0.1) and are ~10× faster at inference — report both.
 ⭐ **The high-value follow-up is §7.1a, not another dataset:** apply per-class τ *to ConInfer*.

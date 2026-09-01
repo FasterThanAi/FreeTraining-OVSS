@@ -1,7 +1,54 @@
 # ConInfer comparison — measured 1 Sep 2026
 
-⚠️ **PROVISIONAL until validated against their published numbers.** See "the open
-gate" below. Do not put these in the paper yet.
+## ⛔ VALIDATED, AND THE REPRODUCTION IS IMPERFECT — read this first
+
+Their published figures (Table 1 of arXiv:2603.29271):
+
+| | published | our reproduction | gap |
+|---|---|---|---|
+| **LoveDA** *(full official split, 1669 tiles)* | **39.33** | 36.99 | **−2.34** |
+| **OpenEarthMap** *(our 384 of 500)* | **41.95** | 29.90 | ⛔ **−12.05** |
+
+**LoveDA is usable, OpenEarthMap is not.** The split that reproduces closely is the
+one we evaluate in full; the one that fails badly is the one we hold only 77% of.
+That is not a coincidence, and it decides which comparison goes in the paper.
+
+⛔ **Drop OpenEarthMap from the ConInfer comparison.** A 12-point gap on a subset we
+cannot complete is not a measurement.
+
+✅ **Report LoveDA with BOTH numbers** — theirs and ours — so the reader sees the
+reproduction gap rather than trusting whichever figure suits us:
+
+| method | LoveDA mIoU |
+|---|---|
+| ConInfer (published) | 39.33 |
+| ConInfer (our reproduction) | 36.99 |
+| SegEarth-OV3 (our baseline) | 47.37 |
+| **+ per-class τ (ours)** | **48.53** |
+
+The conclusion holds under either ConInfer figure.
+
+### What was eliminated as the cause
+
+| hypothesis | verdict |
+|---|---|
+| label encoding | ⛔ values are `uint8` 0–8 with `reduce_zero_label=False`; correct |
+| class-name order | ⛔ their prompts match our label values exactly |
+| image format | ⛔ RGB 8-bit 1000×1000, no 16-bit or alpha |
+| **`feature_up=False`** | ⛔ setting `True` changes **nothing** — identical to the digit, so the flag does not touch the `predict()` path |
+| alphabetical subset bias | ⛔ 73 cities, `aachen`→`zanzibar`, all continents |
+
+What remains — the missing 116 OpenEarthMap tiles, torch 2.4.1 vs their 2.7.1, a
+CLIP weight revision — is unverifiable without the full split. **We stopped here
+deliberately** rather than spend the timebox on it.
+
+### ⭐ Why this does not block §7.1a
+
+Applying per-class τ to ConInfer measures a **delta on our own run**, and a delta is
+robust to a reproduction offset. If per-class τ adds +X to ConInfer's scores as we
+measured them, that is a valid statement about the method generalising to a CLIP
+backbone whether their absolute is 36.99 or 39.33. **The experiment worth more than
+the comparison row is unaffected by the comparison row's imperfection.**
 
 ## What was run
 
