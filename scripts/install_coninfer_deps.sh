@@ -54,9 +54,24 @@ pip install mmengine==0.10.7 "mmsegmentation==1.2.2"
 
 # mmseg 1.2.2 asserts mmcv < 2.2.0 and the wheel is exactly 2.2.0; the ops mmseg
 # calls are unchanged between 2.1 and 2.2.
-SP="$(python -c 'import mmseg, os; print(os.path.dirname(mmseg.__file__))')"
-sed -i "s/MMCV_MAX = '2.2.0'/MMCV_MAX = '2.3.0'/" "$SP/__init__.py"
-python -c "import mmseg; print('  MMCV_MAX patched ->', mmseg.__init__.MMCV_MAX if hasattr(mmseg.__init__,'MMCV_MAX') else 'ok')" 2>/dev/null || true
+#
+# ⚠️ DO NOT locate mmseg by importing it. Importing mmseg is what raises the
+# assertion this patch exists to remove, so `import mmseg` fails and any path
+# derived from it is empty -- the sed then silently patches nothing. Resolve the
+# path from CONDA_PREFIX instead, the way scripts/setup_env.sh does.
+PYVER="$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+INIT="$CONDA_PREFIX/lib/python$PYVER/site-packages/mmseg/__init__.py"
+[ -f "$INIT" ] || { echo "⛔ mmseg __init__.py not at $INIT" >&2; exit 1; }
+sed -i "s/MMCV_MAX = '2.2.0'/MMCV_MAX = '2.3.0'/" "$INIT"
+# Verify the edit LANDED. The first version of this script assumed it had and
+# hid the failure behind `2>/dev/null || true`, so the break surfaced later as a
+# confusing AssertionError from an unrelated command.
+grep -q "MMCV_MAX = '2.3.0'" "$INIT" || {
+  echo "⛔ MMCV_MAX patch did not apply to $INIT" >&2
+  grep -n 'MMCV_MAX' "$INIT" >&2 || true
+  exit 1
+}
+echo "  ✅ MMCV_MAX patched to 2.3.0 in $INIT"
 
 # ---- everything else from their file, untouched -----------------------------
 REST="$(mktemp)"
