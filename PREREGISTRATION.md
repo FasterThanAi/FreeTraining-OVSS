@@ -177,3 +177,27 @@ the intervention reproduces the observational gradient and §7 is causal as writ
 `conf` stays flat in B as it did in A, then **share does not destroy top-score
 detectability at all**, §7a's monotone-in-share table needs another explanation, and that
 is what the paper must say.
+
+## P8 scored — 1 Sep, LoveDA random 500 (gate: 47.43 mIoU vs 47.38)
+
+| # | prediction | outcome |
+|---|---|---|
+| **P8** | removing the catch-all from the vocabulary raises `det` to ≥ 0.65 | ⛔ **FAILS — 0.592 → 0.540** |
+
+**Final tally across all three runs: 9 of 13 predictions pass, 4 fail** (P2, P5, P6-as-written,
+P8; Q2 fails at one of three controls).
+
+⭐ **P8's failure is more informative than its success would have been.** The reverse arm changes
+the *vocabulary* while leaving the *label space* untouched — 35.72% of ground truth is still
+catch-all, those pixels merely become unnameable. Every arm across both datasets that changes the
+vocabulary **without** changing GT share moves ≤ 0.052; every arm that **raises** GT share moves
+0.213–0.323. So the two families together isolate the causal locus as the **label space**, which is
+what §7 claimed from the start. P8 was written on the assumption that the vocabulary was the lever.
+It is not — it was only ever the instrument.
+
+⚠️ It also revealed that the LoveDA arm is **underpowered rather than null**: its dose moves −0.048
+against a control of +0.041. LoveDA begins at 35.72% share, already inside the 0.58–0.64 band where
+four points across both datasets sit, so there is no room for a 9.7-point dose to act. The effect
+is concentrated between 0.84% and roughly a third of the scene. **This bounds the mechanism, and
+means share cannot explain the urban/rural spread in §7a** — that gradient remains unexplained and
+is reported as such.

@@ -354,17 +354,34 @@ def main():
                 ('det', '`conf`', 'The top score is what §7a\'s monotone-in-share table '
                  'used, so it needs its own answer.')):
             de, ce = out[key]
-            if de > 0.05 and de > 2 * abs(ce):
+            # ⚠️ FOUR outcomes, not three. An earlier version had no branch for
+            # "the effect ran the OTHER WAY" and none for "the control moved as
+            # much as the dose", so on LoveDA it reported a +0.048 RISE in
+            # detectability as "share is not the cause" -- which is true but for
+            # entirely the wrong reason, and hides that the arm had no power.
+            powered = abs(de) > 2 * abs(ce)
+            if de > 0.05 and powered:
                 md.append(f'\n✅ **{lab}: share is causal.** {claim} Detectability falls '
                           f'**{de:.3f}** with the dose while the control moves {ce:+.3f} '
                           f'— same merge, same class count, share untouched.')
-            elif abs(de) <= 0.05:
-                md.append(f'\n⛔ **{lab}: share is NOT the cause.** {claim} Detectability '
-                          f'moves only {de:+.3f} across the whole dose range, so raising '
-                          f'the catch-all\'s share does not destroy this signal.')
+            elif de < -0.05 and powered:
+                md.append(f'\n⛔ **{lab}: the effect runs the OTHER WAY.** {claim} '
+                          f'Detectability *rose* {-de:.3f} as the share increased '
+                          f'(control {ce:+.3f}). This contradicts the mechanism and must '
+                          f'be reported as such, not as a null.')
+            elif not powered:
+                md.append(f'\n⚠️ **{lab}: UNDERPOWERED, not null.** {claim} The dose moves '
+                          f'{de:+.3f} and the control moves {ce:+.3f} — the same order of '
+                          f'magnitude, so this arm cannot separate them. Do not read it '
+                          f'as evidence either way.'
+                          + (f' Note the catch-all already starts at '
+                             f'**{base0["share"]:.1f}%** here; if the effect saturates, '
+                             f'there is little room left for a dose to act in.'
+                             if base0['share'] > 25 else ''))
             else:
-                md.append(f'\n⚠️ **{lab}: inconclusive** — dose {de:+.3f} against control '
-                          f'{ce:+.3f}. {claim}')
+                md.append(f'\n⛔ **{lab}: no effect.** {claim} Detectability moves only '
+                          f'{de:+.3f} across the dose range against a control of '
+                          f'{ce:+.3f}.')
 
     fam('B', 'D', 'B / D — the faithful analogue ⭐',
         'The merged classes are absent from the **vocabulary** and their pixels are '
@@ -378,15 +395,32 @@ def main():
     rev = [r for r in rows if r['arm'].name.startswith('R')]
     if rev:
         d = rev[0]['det'] - base0['det']
-        md.append(f'\n### Reverse direction\n\nRemoving the catch-all from the '
-                  f'vocabulary moves `det` {d:+.3f} ({base0["det"]:.3f} → '
-                  f'{rev[0]["det"]:.3f}).'
-                  + (' ✅ Detectability rises when the vocabulary covers the scene — the '
-                     'mechanism pushed the other way and holding.' if d > 0.02 else
-                     ' ⛔ It does not rise, so the mechanism does not survive the reverse '
-                     'intervention.')
-                  + ' ⚠️ mIoU is not comparable for this arm — it has no catch-all class '
-                    'to predict — so only the detection columns mean anything.')
+        # ⭐ R changes the VOCABULARY but not the LABEL SPACE: the catch-all prompt
+        # is removed, yet the same fraction of ground truth is still catch-all --
+        # those pixels simply become unnameable. So R is not "the mechanism run
+        # backwards"; paired with the B arms (which change BOTH) it DISSOCIATES
+        # the two, and says which one carries the effect.
+        md.append(f'\n### Reverse arm — a dissociation, not a reversal\n\n'
+                  f'`R` removes the catch-all from the **vocabulary** while leaving the '
+                  f'**label space** untouched: {base0["share"]:.2f}% of ground truth is '
+                  f'still catch-all, those pixels simply have no prompt that can name '
+                  f'them. It moves `det` **{d:+.3f}** ({base0["det"]:.3f} → '
+                  f'{rev[0]["det"]:.3f}).\n')
+        if d <= 0.02:
+            md.append('⭐ **So the vocabulary is not the lever — the label space is.** The '
+                      '`B` arms change both (a prompt is dropped *and* its pixels are '
+                      'relabelled catch-all) and move detectability; `R` changes only the '
+                      'vocabulary and does not. Read together they isolate the causal '
+                      'locus, which is exactly what §7 claimed from the start: the '
+                      "catch-all's **share of ground truth**. Removing the prompt does "
+                      'not remove the pixels that are genuinely none-of-the-above; it '
+                      'only makes them unnameable, so nothing is recovered.')
+        else:
+            md.append('✅ Detectability rises when the vocabulary covers the scene, even '
+                      'with the label space unchanged — so the prompt list carries part '
+                      'of the effect on its own, which the `B` arms alone could not show.')
+        md.append('\n⚠️ mIoU is not comparable for this arm — it has no catch-all class '
+                  'to predict — so only the detection columns mean anything.')
     md.append('\n⚠️ Score against `PREREGISTRATION.md`, committed before the first run. '
               'The `B`/`D` family and the `det` column were added AFTER seeing that `conf` '
               'inverted; their predictions are pre-registered separately in that file\'s '

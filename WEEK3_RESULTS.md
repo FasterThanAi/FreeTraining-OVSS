@@ -332,6 +332,90 @@ randomly, and a control that is not perfectly inert. It constrains the explanati
 tightly than §7a did; it is not a randomised trial over datasets.
 
 
+
+### 7c. ⭐ The reverse arm — P8 fails, and it identifies the causal locus — 1 Sep
+
+LoveDA, random 500 tiles (`--sample 500 --seed 0`). **Gate passed: 47.43 mIoU** against the split's
+47.38, discard **27.82%** against 29.68%.
+
+| arm | vocabulary | **GT share** | det `conf` | vs A0 |
+|---|---|---|---|---|
+| **A0** published | unchanged | 35.72% | 0.592 | — |
+| **B45** dose | changed | **45.37%** | 0.640 | +0.048 |
+| **D45** control | changed | 35.72% | 0.551 | −0.041 |
+| **C45** control | changed | 35.72% | 0.592 | +0.000 |
+| **R** reverse | changed | 35.72% | 0.540 | −0.052 |
+
+#### ⛔ P8 fails as stated
+
+P8 predicted that removing `background` from LoveDA's vocabulary would lift detectability to
+**≥ 0.65**. It moved to **0.540** — *down* 0.052. The mechanism does not run backwards.
+
+#### ⭐ But `R` is a dissociation, and it is worth more than P8 would have been
+
+`R` changes the **vocabulary** and leaves the **label space** untouched: 35.72% of ground truth is
+still catch-all, those pixels simply have no prompt that can name them. Compare with the `B` arms,
+which change **both** — a prompt is dropped *and* its pixels are relabelled catch-all:
+
+| | vocabulary | GT share | effect |
+|---|---|---|---|
+| OEM `B` arms | changed | **raised** | **0.213 / 0.323** |
+| LoveDA `R` | changed | unchanged | −0.052 |
+| LoveDA `C45`, `D45` | changed | unchanged | +0.000, −0.041 |
+
+> ⭐ **Every arm that changes the vocabulary without changing the label space moves ≤ 0.052. The
+> arms that raise the catch-all's share of ground truth move 0.213–0.323. The causal locus is the
+> LABEL SPACE, not the prompt list.**
+
+That is what §7 claimed from the beginning — *"`background` **share of GT**"* — and the two arms
+together isolate it in a way neither could alone. Removing a catch-all prompt does not remove the
+pixels that are genuinely none-of-the-above; it only makes them unnameable, so nothing is
+recovered. **A practical consequence: you cannot fix a catch-all-heavy benchmark by editing the
+prompt list.**
+
+#### ⚠️ The LoveDA dose arm is UNDERPOWERED, not null
+
+`B45` moves **−0.048** (detectability *rose*) while its own control `D45` moves **+0.041** — the
+same magnitude, the opposite sign. An arm whose control moves as far as its dose cannot separate
+them. **Do not read LoveDA as evidence against the mechanism**; read it as an arm with no power,
+for a reason that is visible in the data:
+
+| | share | det `conf` |
+|---|---|---|
+| OEM `A0` | **0.84%** | **0.794** |
+| OEM `B10` | 10.19% | 0.507 |
+| LoveDA `A0` | 35.72% | 0.592 |
+| OEM `B25` | 39.57% | 0.624 |
+| LoveDA `B45` | 45.37% | 0.640 |
+| OEM `B40` | 58.20% | 0.582 |
+
+**The effect is concentrated at the low-share end.** Above ~35% share, four points across two
+datasets sit in a **0.58–0.64** band and further increases do nothing. LoveDA *starts* at 35.72%,
+already inside that band, so its 9.7-point dose has no room to act in. OpenEarthMap could show the
+effect only because it starts at 0.84%.
+
+#### ⚠️ What this costs §7a, stated plainly
+
+If the effect saturates by ~35%, then **share cannot explain the urban/rural spread** — 0.730 at
+26.0% against 0.524 at 42.9%, both inside the saturated regime. §7a's stratification still
+eliminates *confusability* (it predicts the wrong stratum, decisively), and the intervention
+establishes *share* as causal at low share. **Neither accounts for the within-LoveDA gradient, and
+the paper must say so rather than presenting a single monotone story.** The honest claim is:
+
+> A catch-all class covering a large share of the label space destroys the information that would
+> let a suppressed real class be detected. The damage is done by the time the catch-all reaches
+> roughly a third of the scene, and it is not undone by removing the class from the vocabulary.
+
+That is narrower than "detection is monotone in share" and it is supported by an intervention with
+class count controlled, on two datasets, with predictions committed in advance.
+
+⚠️ **A fourth verdict branch was missing and is now added.** The script could report "causal", "no
+effect", or "inconclusive" — with no branch for *the effect ran the other way* or *the control
+moved as much as the dose*. On LoveDA it therefore printed "share is NOT the cause" for a result
+that was a **rise** in detectability inside an underpowered arm. Both readings are now separate
+branches, and the underpowered branch prints the starting share when it is already high.
+
+
 ---
 
 ## 8. ⛔ Recovery does not improve land-cover segmentation on either dataset
