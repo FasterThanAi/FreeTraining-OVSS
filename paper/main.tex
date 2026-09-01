@@ -675,8 +675,8 @@ control for by computing AUC within size-matched bins.}
 A correction fitted on one pipeline invites the obvious objection that it exploits
 a quirk of that pipeline. We test it on the nearest published competitor, which is
 CLIP-based rather than SAM~3-based and thresholds its per-class scores at its own
-tuned values. Nothing about the method changes: we cache its per-pixel scores and
-run the identical fit.
+tuned values (\cnTau{} on LoveDA). Nothing about the method changes: we cache its
+per-pixel scores and run the identical fit.
 
 \begin{table}[t]\centering\small
 \caption{The same correction, two pipelines and two datasets. $\Delta$ full mIoU,
@@ -701,13 +701,15 @@ CLIP pipeline   & \cnReal{} & \cnOemReal{} \\
 \paragraph{On LoveDA it transfers, and it is larger.} The CLIP pipeline gains
 \cnCV{}~$\pm$~\cnCVsd{}~mIoU against \methodGain{}~$\pm$~\methodSD{} for our own,
 with every fold positive, a worst fold of \cnWorst{}, and \emph{every} class
-improving --- which our SAM~3 result does not manage. It also needs an eighth of
+improving (\cnFull{} full mIoU on one partition) --- which our SAM~3 result does
+not manage. It also needs an eighth of
 the calibration data, \cnCalib{} tiles against \calibTiles{}. In absolute terms
 their pipeline moves \cnBase{}~$\to$~\cnFit{}~mIoU, so \best{our contribution
 composes with the competitor rather than displacing it}.
 
 \paragraph{On OpenEarthMap it transfers to neither, and the failure is shared.}
-The CLIP pipeline gives \cnOemCV{}~$\pm$~\cnOemCVsd{}, one fold of five positive.
+The CLIP pipeline gives \cnOemCV{}~$\pm$~\cnOemCVsd{} across folds, one of five
+positive, and \cnOemFull{} on a single partition.
 But land cover still improves (\cnOemReal{} excluding the catch-all); what cancels
 it is \bg{}, whose IoU falls \cnOemBg{}. \best{Our own pipeline does the same thing
 on the same dataset}, and to a striking degree: the fit drives that class to
