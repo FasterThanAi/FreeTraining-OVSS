@@ -321,6 +321,16 @@ half the gap still has no mechanism. **Say this before quoting the ρ.** `forest
 9.9 vs 68.9, discard 67% vs 12% — opposite regimes). Hypothesis for water, **unmeasured**: §9d's
 coupling — in urban, lowering water's τ takes pixels from dense `building`/`road`.
 
+⏳ **TIMELINE — there is no near deadline.** EarthVision 2027 runs with CVPR 2027; the date is **not
+officially published** and past years put it in **early March 2027**, so plan on **~6 months** and
+verify the CFP when it posts. Phase 6's "submit now" stop rule was calibrated for a two-week horizon
+and **no longer applies**. See @ROADMAP.md Phase 7: ConInfer (§7.1, one week, its own conda env —
+**never touch `segov3`**), datasets 3–4 (§7.2 — **ISPRS registration is the slow path, do it first**;
+pre-register the prediction, then repeat the vocabulary intervention so the causal claim rests on two
+datasets), the coupled label-free objective (§7.3, one CPU day, gated at +0.58), and a writing pass
+(§7.4 — 75 em-dashes, one per 3.6 sentences). ⛔ **Content freeze 1 Jan 2027.** With §7.1–§7.2 done,
+**IEEE TGRS becomes plausible** and it is rolling, so there is no deadline to miss.
+
 Next, in order:
 
 1. **Write.** @PAPER_OUTLINE.md has the skeleton, the section map and the figure list.

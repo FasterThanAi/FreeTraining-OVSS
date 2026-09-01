@@ -538,6 +538,87 @@ better one past the deadline.
 
 ---
 
+---
+
+# PHASE 7 — Six months, not six days (added 1 Sep 2026)
+
+⚠️ **The Phase 6 stop rule was written assuming a near deadline. There isn't one.**
+EarthVision 2027 runs with CVPR 2027; the submission date is **not yet officially published**, and
+past years put it in **early March**. Check the real CFP when it posts (usually with the CVPR
+workshop list, Nov–Dec 2026). Planning assumption: **~6 months from 1 Sep 2026.**
+
+**What that changes.** "Ship the strong workshop paper" was right against a two-week horizon. Against
+six months it is *under*-ambitious: the two objections a reviewer will actually raise — no ConInfer
+comparison, only two datasets — are both fixable in weeks, and fixing them opens venues the paper
+cannot currently reach.
+
+## The realistic venue ladder, given six months
+
+| venue | deadline | fit today | fit after §7.1–§7.2 |
+|---|---|---|---|
+| **IEEE GRSL** | rolling | plausible but 5 pages cannot hold it | — |
+| **IGARSS 2027** | ~Jan 2027 | good | good; a fast second option |
+| **CVPR EarthVision 2027** | ~Mar 2027 *(verify)* | **good** | **strong** |
+| **IEEE TGRS / JSTARS** | rolling | a stretch — wants 4+ datasets, more baselines | **plausible** |
+
+⭐ TGRS is worth naming explicitly: it is a strong journal, it is **rolling** so there is no deadline
+to miss, and it is the natural home for a measurement paper with a causal experiment. Reaching it
+needs exactly the two things below and nothing conceptually new.
+
+## §7.1 The ConInfer comparison — do it first
+
+The nearest published competitor, code public, cited in our paper **without a number**. It is the
+first question a reviewer asks and currently it goes unanswered.
+
+⚠️ **Its own conda environment. Never touch `segov3`** — the three-way version deadlock in
+`WEEK1_RESULTS.md` §2 is the only working combination and rebuilding it costs a day.
+
+**Timebox: one week** (was three days under deadline pressure; there is room now). If it will not run,
+that is still a result: say so in limitations with what was tried.
+
+## §7.2 Datasets three and four
+
+ISPRS **Potsdam** and **Vaihingen**. Their catch-all is `clutter` at roughly 5% — the empty gap
+between OpenEarthMap's 0.84% and LoveDA-urban's 26%.
+
+⚠️ **Registration is the slow path. Submit it this week**, before anything else in this phase.
+
+Two things to run on each, and the order matters:
+1. **Pre-register the prediction first** (`predict_dataset.py`, ground-truth masks only, no GPU),
+   commit it, *then* run the baseline. §6.5.
+2. **Repeat the vocabulary intervention** (§6.1). Establishing the causal claim on a *second*
+   dataset is worth more than a third observational point, and the cache work is already written.
+
+## §7.3 The coupled label-free objective — the one idea still open
+
+§9d bounds every *per-class scalar*. It does not bound a **coupled objective**, and the cache now
+stores each head separately, so fitting the whole τ vector to maximise cross-head agreement is a day
+of CPU. Gate: beat the random control's **+0.58**. Publishable either way — clearing it turns the
+paper's largest negative into a method.
+
+## §7.4 The writing pass
+
+75 em-dashes, one per 3.6 sentences, against a healthy one per 10–15. Four sentences exceed 55
+words. An hour of work that improves every page.
+
+## ⛔ The content freeze
+
+**1 January 2027.** After that date, no new experiments — only writing, figures and revision. Six
+months is enough to do three good things and far too much time to keep finding a fourth. A project
+that misses a March deadline because it was still measuring in February has made an avoidable
+mistake, and this roadmap has warned about it since Phase 4.
+
+| | |
+|---|---|
+| **Sep** | Potsdam registration · ConInfer week · writing pass |
+| **Oct–Nov** | datasets 3–4: pre-register, baseline, intervention |
+| **Dec** | §7.3 coupled objective · assemble the multi-dataset tables |
+| **Jan 1** | ⛔ **content freeze** |
+| **Jan–Feb** | write, cut to length, internal review |
+| **Mar** | submit |
+
+---
+
 ## Milestones — if you miss these, replan immediately
 
 | End of week | Must be true |
