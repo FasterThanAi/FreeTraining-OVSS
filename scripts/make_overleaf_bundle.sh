@@ -14,9 +14,19 @@ rm -rf "$OUT" "$OUT.zip"; mkdir -p "$OUT"
 
 cp "$REPO/paper/numbers.tex" "$REPO/paper/refs.bib" "$OUT/"
 
+# Figures are collected from BOTH documents -- the supplementary is a separate
+# compile that shares numbers.tex and refs.bib, so it must ship in the same
+# project or its \input{numbers} fails.
+TEXFILES="$REPO/paper/main.tex"
+if [ -f "$REPO/paper/supplementary.tex" ]; then
+  sed '/\\graphicspath/d' "$REPO/paper/supplementary.tex" > "$OUT/supplementary.tex"
+  TEXFILES="$TEXFILES $REPO/paper/supplementary.tex"
+  echo "  + supplementary.tex"
+fi
+
 # Only the figures main.tex actually includes -- an unused 33 KB PDF in the
 # upload is a small thing, but a stale one that a caption still points at is not.
-FIGS=$(grep -o 'includegraphics\[[^]]*\]{[^}]*}' "$REPO/paper/main.tex" \
+FIGS=$(grep -ho 'includegraphics\[[^]]*\]{[^}]*}' $TEXFILES \
        | sed 's/.*{//;s/}//' | sort -u)
 for f in $FIGS; do
   if [ -f "$REPO/docs/$f" ]; then cp "$REPO/docs/$f" "$OUT/"; echo "  + $f"
