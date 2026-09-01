@@ -11,8 +11,31 @@ No LaTeX is installed on the Mac. Use Overleaf, or any TeX Live:
 cd paper && pdflatex main && bibtex main && pdflatex main && pdflatex main
 ```
 
-Figures are pulled from `../docs/` via `\graphicspath`. On Overleaf, upload
-`docs/*.pdf` alongside `main.tex` and drop the `\graphicspath` line.
+Figures are pulled from `../docs/` via `\graphicspath`, which works in place but
+not on Overleaf — there is no parent directory there. Do not flatten it by hand:
+
+```bash
+bash scripts/make_overleaf_bundle.sh      # -> ~/Desktop/overleaf_paper.zip
+```
+
+That copies **only the figures `main.tex` actually includes**, strips the
+`\graphicspath` line, and fails loudly if a figure is missing rather than letting
+Overleaf discover it. Then: *New Project → Upload Project → that zip*.
+
+## Where the figures come from
+
+All are generated, none hand-drawn, and all are tracked in `docs/`:
+
+| figure | script |
+|---|---|
+| `fig2_mechanism.pdf` | `scripts/fig_mechanism.py` |
+| `fig3_oem_per_class.pdf`, `fig4_detection_auc.pdf` | `scripts/fig_results.py` |
+| `fig7_method.pdf` | `scripts/fig_method.py` |
+
+Each prints every plotted number against its `WEEK3_RESULTS.md` section on
+render. **A figure that has drifted from its source table is worse than no
+figure**, and that check is why. `fig5_atom_purity.pdf` is still generated but no
+longer used — it supported the component that did not earn its place.
 
 ## ⚠️ `numbers.tex` is the only place a number may be typed
 
