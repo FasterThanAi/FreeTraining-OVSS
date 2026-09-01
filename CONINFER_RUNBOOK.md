@@ -37,13 +37,49 @@ cd ~/FreeTraining-OVSS && git pull
 bash scripts/setup_coninfer.sh
 ```
 
-Then, by hand, **after reading their README** — do not guess their pins:
+⛔ **Do not run their README's install lines verbatim.** They read:
+
+```bash
+conda create -n ConInfer python=3.11
+pip install -r requirements.txt          # ← no `conda activate` between them
+```
+
+There is no `conda activate`, so `pip` installs into whatever environment is
+**currently active**. With `segov3` active that command destroys the environment
+every number in this project rests on. Their env name is also `ConInfer` where ours
+is `coninfer`, and conda names are case-sensitive.
+
+### Their pins do not build on this machine, and the reason is already documented
+
+`requirements.txt` asks for `torch==2.7.1` with `mmcv>=2.1.0`. **No prebuilt mmcv
+wheel exists for torch 2.7**, so pip falls back to a source build of
+`mmcv-2.2.0.tar.gz`, which fails twice over:
+
+1. `ModuleNotFoundError: No module named 'pkg_resources'` — mmcv's `setup.py`
+   imports it and setuptools ≥ 70 removed it;
+2. even patched, torch refuses to compile CUDA extensions because system nvcc is
+   **13.3** against torch's 12.x.
+
+Both are recorded in `WEEK1_RESULTS.md` §2 (lines 95–99) from week one. Their pin
+works on *their* machine because their nvcc matches their torch.
+
+⭐ **ConInfer needs `mmcv` and `mmsegmentation 1.2.2` — the same constraints as
+SegEarth-OV3.** It is CLIP/DINOv3-based and will not need torch-2.7-specific APIs,
+so install the combination this project already proved works:
 
 ```bash
 conda activate coninfer
-cd ~/ConInfer && less README.md
-# install only inside `coninfer`
+which pip                                # MUST show .../envs/coninfer/...
+bash ~/FreeTraining-OVSS/scripts/install_coninfer_deps.sh
 ```
+
+That installs torch 2.4.1+cu121, mmcv 2.2.0 from the **prebuilt** index, mmseg
+1.2.2 with `MMCV_MAX` patched, then everything else from their `requirements.txt`
+unchanged. It refuses to run outside `coninfer` and checks `pip`'s path first.
+
+⚠️ **This is a deviation from their published pin and must be reported.** If their
+numbers do not reproduce, the torch version is the first suspect — which is exactly
+why the next step is to reproduce *their* number before touching our splits.
 
 ## Day 2–3 — reproduce *their* number first
 
