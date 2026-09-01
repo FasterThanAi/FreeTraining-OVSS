@@ -64,10 +64,13 @@ this is the protocol the baseline already uses to tune its single threshold. It
 gives \methodGain{}~$\pm$~\methodSD{}~mIoU on LoveDA, capturing
 \oracleShare{} of an oracle bound of \oracleBound{}, and it is positive on both
 datasets once the catch-all is excluded from the metric (\mrLoveReal{} and
-\mrOemReal{}~mIoU). \best{The correction is not specific to SAM~3.} Applied
-unchanged to the nearest published competitor --- a CLIP-based pipeline with its
-own tuned threshold --- it adds \cnCV{}~$\pm$~\cnCVsd{}~mIoU with every fold
-positive, so our method composes with that work rather than competing with it. That exclusion is itself a recommendation: mIoU is an
+\mrOemReal{}~mIoU). \best{The correction is not specific to SAM~3, but it is specific to the
+dataset.} Applied unchanged to the nearest published competitor --- a CLIP-based
+pipeline with its own tuned threshold --- it adds \cnCV{}~$\pm$~\cnCVsd{}~mIoU on
+LoveDA with every fold positive, so our method composes with that work rather than
+competing with it. On OpenEarthMap it helps neither pipeline's headline, and for
+the same reason in both: the fit must sacrifice a pathologically calibrated
+catch-all that owns a ninth of the metric. That exclusion is itself a recommendation: mIoU is an
 unweighted mean, so a catch-all owns $1/N$ of the score however meaningful it is,
 and we observe it moving the headline in both directions.
 Finally, we show the oracle bound is not reachable without labels, and identify
@@ -146,9 +149,11 @@ at
         \methodGain{}~$\pm$~\methodSD{}~mIoU on LoveDA, catch-all \methodBg{},
         \oracleShare{} of an oracle bound of \oracleBound{}, verified end-to-end in
         the pipeline, and positive on \emph{both} datasets on the
-        catch-all-excluded metric (\mrLoveReal{}, \mrOemReal{}). \best{It transfers
-        across backbones}: applied to a CLIP-based competitor at its own operating
-        point it gives \cnCV{}~$\pm$~\cnCVsd{} (Table~\ref{tab:transfer}).
+        catch-all-excluded metric (\mrLoveReal{}, \mrOemReal{}). \best{It is not
+        backbone-specific but is dataset-specific}: on a CLIP-based competitor at
+        its own operating point it gives \cnCV{}~$\pm$~\cnCVsd{} on LoveDA and
+        nothing on OpenEarthMap, exactly as for our own pipeline
+        (Table~\ref{tab:transfer}).
   \item \textbf{A reporting recommendation.} We observe the catch-all moving the
         headline mIoU in both directions, supplying \oemBgGain{}~IoU of an
         apparent gain in one experiment and cancelling a real one in another, and
@@ -664,53 +669,69 @@ control for by computing AUC within size-matched bins.}
 \label{fig:auc}
 \end{figure}
 
-\subsection{Does it transfer to another backbone?}
+\subsection{Does it transfer to another pipeline?}
 \label{sec:transfer}
 
 A correction fitted on one pipeline invites the obvious objection that it exploits
-a quirk of that pipeline. We test it directly on the nearest published competitor,
-which is CLIP-based rather than SAM~3-based and thresholds its per-class scores at
-its own tuned value of \cnTau{}. Nothing about the method changes: we cache its
-per-pixel scores and run the identical fit.
+a quirk of that pipeline. We test it on the nearest published competitor, which is
+CLIP-based rather than SAM~3-based and thresholds its per-class scores at its own
+tuned values. Nothing about the method changes: we cache its per-pixel scores and
+run the identical fit.
 
 \begin{table}[t]\centering\small
-\caption{The same correction on two architectures. ConInfer is CLIP ViT-B/16 with
-a per-scene visual prior, thresholded at \cnTau{}; ours is SAM~3, thresholded at
-$0.5$. Deltas are five-fold, calibration and evaluation tiles disjoint, each
-baseline recomputed on its own held-out tiles.}
+\caption{The same correction, two pipelines and two datasets. $\Delta$ full mIoU,
+five-fold, calibration and evaluation tiles disjoint, each baseline recomputed on
+its own held-out tiles at its own published threshold. \best{The axis that
+separates success from failure is the dataset, not the backbone.}}
 \label{tab:transfer}
 \begin{tabular}{lrr}
 \toprule
- & SAM~3 pipeline & CLIP pipeline \\
+ & LoveDA & OpenEarthMap \\
 \midrule
-$\Delta$ full mIoU, five-fold & \methodGain{} $\pm$ \methodSD{} & \best{\cnCV{} $\pm$ \cnCVsd{}} \\
-worst fold                    & \methodWorst{} & \best{\cnWorst{}} \\
-$\Delta$ excl.\ catch-all     & \mrLoveReal{} & \best{\cnReal{}} \\
-calibration tiles needed      & \calibTiles{} & \best{\cnCalib{}} \\
+SAM~3 pipeline  & \best{\methodGain{} $\pm$ \methodSD{}} & \mrOemFull{} \\
+CLIP pipeline   & \best{\cnCV{} $\pm$ \cnCVsd{}} & \cnOemCV{} $\pm$ \cnOemCVsd{} \\
+\midrule
+\multicolumn{3}{l}{\emph{excluding the catch-all class}}\\
+SAM~3 pipeline  & \mrLoveReal{} & \mrOemReal{} \\
+CLIP pipeline   & \cnReal{} & \cnOemReal{} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The correction is \best{larger} on the CLIP pipeline than on the one it was
-developed for: \cnCV{}~$\pm$~\cnCVsd{} against \methodGain{}~$\pm$~\methodSD{},
-with every fold positive and a worst fold of \cnWorst{}. It also needs an eighth of
-the calibration data, \cnCalib{} tiles against \calibTiles{}. Both metrics agree
-(\cnFull{} full, \cnReal{} excluding the catch-all), and \emph{every} class
-improves --- which our own SAM~3 result does not manage. In absolute terms their
-pipeline moves \cnBase{}~$\to$~\cnFit{}~mIoU.
+\paragraph{On LoveDA it transfers, and it is larger.} The CLIP pipeline gains
+\cnCV{}~$\pm$~\cnCVsd{}~mIoU against \methodGain{}~$\pm$~\methodSD{} for our own,
+with every fold positive, a worst fold of \cnWorst{}, and \emph{every} class
+improving --- which our SAM~3 result does not manage. It also needs an eighth of
+the calibration data, \cnCalib{} tiles against \calibTiles{}. In absolute terms
+their pipeline moves \cnBase{}~$\to$~\cnFit{}~mIoU, so \best{our contribution
+composes with the competitor rather than displacing it}.
 
-\best{So the finding is not about SAM~3.} A single global threshold serving classes
-with different precision--recall profiles is a property of the design, not of a
-backbone, and correcting it helps wherever that design appears. It also means our
-contribution \emph{composes} with the competitor rather than displacing it.
+\paragraph{On OpenEarthMap it transfers to neither, and the failure is shared.}
+The CLIP pipeline gives \cnOemCV{}~$\pm$~\cnOemCVsd{}, one fold of five positive.
+But land cover still improves (\cnOemReal{} excluding the catch-all); what cancels
+it is \bg{}, whose IoU falls \cnOemBg{}. \best{Our own pipeline does the same thing
+on the same dataset}, and to a striking degree: the fit drives that class to
+\mrOemBgAfter{}~IoU for SAM~3 and \cnOemBgAfter{} for CLIP, from a starting value
+near $17$ in both cases. Two unrelated models, the same sacrifice, the same
+endpoint.
+
+\best{So the correction is not backbone-specific; it is dataset-specific, and the
+axis is how well the catch-all is calibrated.} Where that class is competently
+predicted, the fit improves land cover \emph{and} the headline, on both
+architectures. Where it is pathological --- OpenEarthMap's \bg{} sits at
+\mrOemBgIoU{}~IoU and owns $1/N$ of a nine-class mean --- an optimiser told to
+maximise land cover trades it away, and no headline gain is possible on either
+pipeline. This is the same conclusion Section~\ref{sec:results} reaches from our
+own results, arriving independently through a competitor's code.
 
 \paragraph{Two caveats.} The deltas are measured on our own reproduction of their
-pipeline, which reaches \cnRepro{}~mIoU against their published \cnPub{} on the
-full split; a delta is robust to a constant offset, but we report the discrepancy
-rather than only the gain. And their catch-all class gains \cnBg{}~IoU, about a
-third of the full-mIoU movement --- far from the pathological case of
-Fig.~\ref{fig:oemperclass}, and the catch-all-excluded column is independently
-positive, but we quote both here as everywhere else.
+pipeline, which reaches \cnRepro{}~mIoU on LoveDA against their published \cnPub{}.
+A delta is robust to a constant offset, but we report the discrepancy rather than
+only the gain --- and the OpenEarthMap reproduction is considerably further off, so
+we treat that row as supporting rather than independent evidence. On LoveDA their
+catch-all gains \cnBg{}~IoU, about a third of the full-mIoU movement; far from the
+pathological case of Fig.~\ref{fig:oemperclass}, and the catch-all-excluded column
+is independently positive, but we quote both as everywhere else.
 
 % =====================================================================
 \subsection{The label-free bound, and why it holds}
