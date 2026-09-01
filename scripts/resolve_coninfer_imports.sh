@@ -40,7 +40,11 @@ INSTALLED=()
 cd "$CLONE" || { echo "⛔ no clone at $CLONE" >&2; exit 1; }
 
 for i in $(seq 1 "$MAX"); do
-  ERR="$(python -c 'import segearth_segmentor, ConInfer_segmentor' 2>&1)"
+  # ⚠️ Import EVERYTHING eval.py imports, not just the segmentors. A narrower
+  # test passed while `from utils import append_experiment_result` still failed
+  # on openpyxl -- the same mistake as checking `import mmseg` when the break was
+  # in mmseg.models. Mirror the real entry point's imports exactly.
+  ERR="$(python -c 'import segearth_segmentor, ConInfer_segmentor, utils, custom_datasets' 2>&1)"
   if [ -z "$(printf '%s' "$ERR" | grep -o "No module named '[^']*'")" ]; then
     if printf '%s' "$ERR" | grep -q 'Traceback'; then
       echo
