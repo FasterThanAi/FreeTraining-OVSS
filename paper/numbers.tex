@@ -160,3 +160,20 @@
 \newcommand{\cpGapP}{0.013}        % permutation p
 \newcommand{\cpPrecRho}{+0.168}    % precision ALONE -- explains nothing
 \newcommand{\cpPrecP}{0.60}
+
+% ---- WEEK3_RESULTS.md 9h: both metrics ------------------------------------
+% ⚠️ ALWAYS the per-class MEAN (= catch-all-excluded mIoU), never the aggregate
+% sum. Sections 9b/9e quote sums; +8.30 aggregate IS +1.38 here. Mixing them puts
+% two numbers 6x apart in units next to each other.
+\newcommand{\mrLoveFull}{+1.16}    % LoveDA, full mIoU, 5-fold held out
+\newcommand{\mrLoveReal}{+1.36}    % LoveDA, catch-all-excluded mIoU
+\newcommand{\mrLoveBg}{-0.02}
+\newcommand{\mrOemFull}{+0.30}     % OEM, full mIoU -- looks flat
+\newcommand{\mrOemReal}{+1.75}     % OEM, catch-all-excluded -- LARGER than LoveDA
+\newcommand{\mrOemBg}{-11.30}
+\newcommand{\mrOemLand}{+1.56}     % the real classes' contribution to full mIoU
+\newcommand{\mrOemBgC}{-1.26}      % background's contribution: cancels it
+\newcommand{\mrOemDistort}{3.38}   % OEM's baseline headline depression
+\newcommand{\mrLoveLever}{14.3\%}  % 1/N -- the catch-all's share of the metric
+\newcommand{\mrOemLever}{11.1\%}
+\newcommand{\mrOemBgIoU}{17.13}

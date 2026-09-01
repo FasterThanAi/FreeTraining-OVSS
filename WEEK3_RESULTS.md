@@ -1029,6 +1029,78 @@ domains, that share is reported as still unexplained. Ranking the cells on avera
 as explaining the classes the gap is made of.
 
 
+
+### 9h. ⭐⭐ Both metrics — and OpenEarthMap turns POSITIVE — 1 Sep
+
+`metric_report.py`. The catch-all artefact has now been measured twice in opposite directions
+(§8.1 inflating, §9e deflating), which is enough to make a **recommendation** rather than a
+complaint: a benchmark with a catch-all should report **mIoU over the real classes beside the
+headline**. This computes both from the same held-out folds under the §9b protocol, so nothing is
+transcribed between tables.
+
+#### ⭐ The leverage, which is not obvious
+
+mIoU is an **unweighted** mean over N classes, so **the catch-all owns exactly 1/N of the metric
+however meaningful it is** — **14.3%** on LoveDA for a class the annotation guide defines as
+"everything else", **11.1%** on OpenEarthMap for a class covering **0.84% of the pixels**. A
+22.67-point move in one class is **3.24 mIoU** on a 7-class benchmark before anything real has
+changed.
+
+#### The method in both metrics
+
+| | LoveDA (7 cls) | OpenEarthMap (9 cls) |
+|---|---|---|
+| baseline, full mIoU | 47.37 | 44.16 |
+| baseline, **catch-all-excluded** | 47.68 | **47.54** |
+| *baseline distortion* | *+0.31* | ***+3.38*** |
+| fitted, full mIoU | 48.53 | 44.47 |
+| fitted, **catch-all-excluded** | **49.04** | **49.30** |
+| **Δ full** | **+1.16** | **+0.30** |
+| ⭐ **Δ catch-all-excluded** | **+1.36** | ⭐ **+1.75** |
+| catch-all Δ IoU | −0.02 | **−11.30** |
+
+> ⭐⭐ **The method is positive on BOTH datasets under the recommended metric.** OpenEarthMap was
+> written up as flat (+0.16 full mIoU) and a "benchmark artefact". It is not flat — it gains
+> **+1.75 catch-all-excluded mIoU**, more than LoveDA does. **The paper gains a second positive
+> dataset, which was the thinnest part of the method claim.**
+
+**OEM's headline decomposes exactly:** full **+0.30** = **+1.56 from the eight real classes** and
+**−1.26 from `background` alone** (−11.30 IoU spread over 9 classes). The catch-all *cancels a real
+gain*, so **the headline understates the method** — the mirror of §8.1, where it overstated it.
+`building` +4.34, `road` +2.94, `pavement` +2.71, `cropland` +2.50.
+
+**LoveDA is the clean case:** +1.16 full, +1.36 excluded, catch-all **−0.02**. Both metrics agree,
+so the gain is structurally immune to the artefact — which is what §9b claimed and this confirms on
+the metric itself rather than on a per-class table.
+
+**And OEM's published baseline is depressed by 3.38 points by one class.** `background` sits at
+**17.13** IoU against a real-class mean of **47.54**. SegEarth-OV3's 42.9 and our 44.16 are both
+dragged down by a pathologically calibrated catch-all covering 0.84% of the pixels. That reframes
+"OEM is a hard benchmark" as partly a property of its metric.
+
+#### ⚠️ A units inconsistency across this document — fix before writing
+
+§9b and §9e quote land cover as an **aggregate (sum over classes)**; this section quotes the
+**mean**, which is what "catch-all-excluded mIoU" means and what is comparable to full mIoU.
+**They are the same measurements in different units:**
+
+| quoted | as aggregate | **as catch-all-excluded mIoU** |
+|---|---|---|
+| §9b LoveDA 5-fold | +8.30 | **+1.38** |
+| §9e LoveDA rural | +18.61 | **+3.10** |
+| §9e LoveDA urban | +4.18 | **+0.70** |
+| §9b OEM | +12.45 | **+1.56** |
+
+⛔ **The paper must use the mean everywhere.** An aggregate of +8.30 beside a full mIoU of +1.18
+invites the reader to compare two numbers that are 6× apart in units, and a reviewer will read
++8.30 as an mIoU gain.
+
+⚠️ **A reporting bug was fixed here too.** The verdict expressed the catch-all's role as a
+percentage of the total change, which on OEM printed *"414% of the change is the catch-all"* —
+arithmetically true and unreadable, because the two contributions have **opposite signs**. It is
+now a decomposition that names both parts in mIoU units.
+
+
 ---
 
 ## 10. Where the project stands

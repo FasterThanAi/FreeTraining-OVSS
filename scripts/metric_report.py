@@ -115,12 +115,24 @@ def main():
 
     md += ['\n## Reading\n']
     d_full, d_real, d_bg = ff - fb, rf - rb, gf - gb
-    share = abs(d_bg / nc) / abs(d_full) * 100 if abs(d_full) > 1e-6 else float('inf')
-    if np.isfinite(share) and share >= 50:
-        md.append(f'⛔ **{share:.0f}% of the change in full mIoU is the catch-all class '
-                  f'alone** ({d_bg:+.2f} IoU, worth {d_bg / nc:+.2f} mIoU on its own). '
-                  f'The headline number is not measuring land cover here, and quoting it '
-                  f'without the second column would be misleading.')
+    # ⚠️ Express this as a DECOMPOSITION, not a percentage. When the catch-all moves
+    # against the total, "414% of the change is the catch-all" is arithmetically
+    # true and reads as nonsense; the two contributions simply have opposite signs
+    # and must be named separately.
+    bg_mIoU = d_bg / nc                      # the catch-all's own contribution
+    land_mIoU = d_full - bg_mIoU             # everything else, in the same units
+    if abs(bg_mIoU) >= 0.5 * abs(d_full) and abs(bg_mIoU) > 0.1:
+        md.append(f'⛔ **The headline is not measuring land cover here.** Full mIoU moves '
+                  f'{d_full:+.2f}, and that splits into **{land_mIoU:+.2f} from the '
+                  f'{nc - 1} real classes** and **{bg_mIoU:+.2f} from `{LB.names[bg]}` '
+                  f'alone** ({d_bg:+.2f} IoU spread over {nc} classes). '
+                  + ('The catch-all **cancels most of a real gain**, so the headline '
+                     'understates the method.' if land_mIoU * bg_mIoU < 0 and land_mIoU > 0
+                     else 'The catch-all **supplies most of the headline**, so the '
+                          'headline overstates the method.' if land_mIoU * bg_mIoU < 0
+                     else 'Both move together, so the headline is inflated by a class '
+                          'that is not land cover.')
+                  + ' Quoting full mIoU without the second column would mislead.')
     elif d_real > 0 and d_full <= 0.2 and d_bg < 0:
         md.append(f'⚠️ **Full mIoU is flat ({d_full:+.2f}) while land cover improves '
                   f'({d_real:+.2f}).** The catch-all pays for the gain ({d_bg:+.2f}), which '
