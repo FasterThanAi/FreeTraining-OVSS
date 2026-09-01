@@ -100,7 +100,26 @@ with `journal` options. **Nothing else in the file assumes a document class** �
 no hard-coded column widths, no `\linewidth` gymnastics — except that the two
 wide figures use `figure*`, which is correct in two-column and harmless in one.
 
-### 3. Length — about 2,000 words have to MOVE, not shrink
+### 3. Length — the spine cut is done; judge the rest in the real template
+
+⭐ **The paper now has a stated spine: mechanism → method → transfer → bound.**
+*One global threshold is the wrong design; here is what it costs and what fixes it.*
+Everything off that line moved to `supplementary.tex` — **moved, not deleted**:
+
+| moved | why it is not spine |
+|---|---|
+| the co-occurrence prior, in full | a refuted idea; one paragraph in the main text discharges the honesty duty |
+| domain transfer + the composition decomposition | scope detail; the finding survives in three sentences |
+
+`main.tex` is now ~6,850 words with 5 tables and 4 figures; `supplementary.tex`
+holds ~1,000 words and one table. **Judge whether more must go after the first
+build in the real two-column class**, not before — page count in `article` at
+2.2\,cm margins says very little about page count in CVPR's class.
+
+If more is needed, cut in this order, and keep the principle: **cut a table, not a
+caveat.**
+
+### The old cut list, retained --- and the principle
 
 ~7,100 words, 5 tables, 4 figures. That is roughly 10--11 two-column pages; a
 CVPR workshop paper is **8 pages excluding references**, or about 5,000--5,500

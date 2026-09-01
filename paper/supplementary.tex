@@ -1,0 +1,150 @@
+% =====================================================================
+%  Supplementary material
+%  Everything here was cut from the main paper for length, not for doubt.
+%  Nothing in it is load-bearing for a claim made in the abstract.
+% =====================================================================
+\documentclass[10pt,a4paper]{article}                        % TEMPLATE
+\usepackage[margin=2.2cm]{geometry}                          % TEMPLATE
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+\graphicspath{{../docs/}}
+\input{numbers}
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+\newcommand{\best}[1]{\textbf{#1}}
+\newcommand{\bg}{\texttt{background}}
+\renewcommand{\thesection}{S\arabic{section}}
+\renewcommand{\thetable}{S\arabic{table}}
+\renewcommand{\thefigure}{S\arabic{figure}}
+
+\title{Supplementary material}
+\date{}
+\begin{document}
+\maketitle
+
+\section{The co-occurrence prior, in full}
+\label{sup:prior}
+
+Our original proposal was to recover the residual with a corpus-level semantic
+co-occurrence prior: cut the discarded region into atoms and label each by
+conditioning on its neighbours through a matrix mined from the model's own
+confident predictions. The prior is real: class adjacency carries \pmiSignal{}~bits of mean absolute
+pointwise mutual information against a structure-preserving permutation floor of
+\pmiFloor{}, a factor of \pmiRatio{}. Mining it without labels reproduces the
+ground-truth matrix at Spearman $\rho=\rhoMined{}$, with error that does
+\emph{not} concentrate on the classes the pipeline discards ($\rho=\rhoCirc{}$),
+which retires the circularity objection with a number.
+\best{It still does not earn its place.} Against copying the largest neighbouring
+region it adds \priorGain{} points, and a \emph{perfect} ground-truth matrix adds
+\priorOracle{}. The reason is structural rather than a mining defect: classes
+that are adjacent are also the classes that get confused, so the prior reinforces
+the errors it was meant to fix. We keep it as an ablation.
+
+\paragraph{A null-model correction, which refuted one of our own findings.}
+Pointwise mutual information over class adjacency compares an observed
+distribution against an independence baseline. The observation is a
+\emph{boundary}-frequency distribution; the natural baseline is built from
+\emph{area} marginals. These are different measures, and the mismatch
+systematically inflates classes with high perimeter per unit area. Under the area
+baseline we found, and believed, that \texttt{road} was a hub attracting every
+other class; under the boundary baseline its entire row collapses to near zero
+and five class pairs change sign. We had been measuring road's perimeter. The
+correction generalises to any co-occurrence analysis over segmentation masks.
+
+\paragraph{Atomisation dominates the prior.} Connected components of the
+discarded region reach an oracle-labeller ceiling of \ceilCC{}, because they
+straddle class boundaries --- the largest was an entire tile. SLIC
+superpixels~\cite{slic} reach \ceilSLIC{} (\ceilSLICoem{} on OpenEarthMap).
+Twenty ceiling points from the choice of atom, against \priorOracle{} for a
+perfect prior.
+
+
+\section{Domain transfer and what the gap is made of}
+\label{sup:domain}
+
+\begin{table}[t]\centering\small
+\caption{Where the gain lives, and how far it transfers. Five-fold within each
+LoveDA domain; then three calibration sources at an \emph{identical}
+\calibTiles{}-tile budget, all scored on the same held-out tiles. Equal budget
+matters: the calibration curve shows sample size dominates below
+\calibTiles{} tiles, so an unequal comparison would confound domain shift with
+data quantity.}
+\label{tab:domain}
+\begin{tabular}{lrr}
+\toprule
+ & rural (992) & urban (677) \\
+\midrule
+$\Delta$ mIoU, five-fold        & \best{\DOMr{} $\pm$ \DOMrsd{}} & \DOMu{} $\pm$ \DOMusd{} \\
+folds positive                  & 5/5 & 2/5 \\
+land-cover classes, aggregate   & \best{\DOMrreal{}} & \best{\DOMureal{}} \\
+catch-all class                 & $+0.79$ & \DOMubg{} \\
+\midrule
+calibrate on own domain         & \DOMmr{} & \DOMmu{} \\
+calibrate on the other domain   & \DOMxr{} & \DOMxu{} \\
+calibrate on a pooled draw      & \DOMpr{} & \DOMpu{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{The gain is not uniform, and the thresholds do not transfer.}
+LoveDA's urban and rural splits differ by a factor of two in discard rate and
+flip the sign of ten of fifteen class-adjacency pairs, so fitting within and
+across them is closer to independent replication than to a re-split
+(Table~\ref{tab:domain}). Two things follow, and both narrow the claim.
+First, \best{the gain is a rural result}: \DOMr{}~$\pm$~\DOMrsd{}~mIoU with every
+fold positive, against \DOMu{}~$\pm$~\DOMusd{} on urban, which is not
+distinguishable from zero. The pooled \methodGain{} is carried by the larger
+stratum, and we report it as a result on the benchmark as published rather than
+as a claim about urban imagery. Yet land cover improves in \emph{both} domains
+--- \DOMrreal{} and \DOMureal{}~IoU in aggregate --- and urban's catch-all loses
+\DOMubg{}, which accounts for the flat result exactly. \best{This is the
+OpenEarthMap artefact of the OpenEarthMap per-class figure in the main paper with its sign reversed}, and
+we take it as independent confirmation, arriving from the opposite direction,
+that full mIoU is a poor metric wherever a catch-all class is large.
+
+\paragraph{What the gap is made of.} Because mIoU is an unweighted mean over
+classes, the difference between the domains decomposes exactly into per-class
+contributions, and it is concentrated: \texttt{water} accounts for \cpWater{} of
+it and \texttt{forest} for \cpForest{}, \cpTop{} between them. Across all twelve
+(domain, class) cells, the statistic that ranks which classes move is the
+\best{precision--recall asymmetry} ($\rho=\cpGapRho{}$, permutation
+$p=\cpGapP{}$), not precision itself ($\rho=\cpPrecRho{}$, $p=\cpPrecP{}$) --- the
+same lesson as the label-free bound in the main paper, arriving independently. This is the
+mechanism the method assumes, measured rather than argued: a class that is right
+far more often than it fires can afford a lower threshold. \texttt{forest} is the
+clean case, with the two domains in opposite regimes (recall $9.9$ against
+$68.9$, discard $67\%$ against $12\%$).
+
+\best{It does not, however, explain \texttt{water}}, which is the largest single
+contributor. Its share of each domain ($11.6\%$ against $11.8\%$) and its
+precision--recall gap ($+35.0$ against $+34.4$) are effectively identical, yet its
+IoU gain differs eightfold. So the asymmetry ranks the classes on average while
+roughly half of the gap still lacks a mechanism. We suspect the coupling described in the main paper: in the urban domain, lowering
+\texttt{water}'s threshold takes pixels from the dense \texttt{building} and
+\texttt{road} classes, so the same move buys less. We have not measured this and
+do not claim it.
+
+Second, the two domains want genuinely different thresholds. The mean absolute
+difference is \DOMtaudiff{}, rising to \DOMtaumax{} on \texttt{road}
+($0.725$ rural against $0.225$ urban), and calibrating on the wrong one is
+\best{worse than not calibrating at all}: \DOMxr{} and \DOMxu{}, both below the
+published $\tau$. Pooling is not a safe default either, retaining \DOMpr{} of
+\DOMmr{} on rural. \best{A calibration set spanning two domains fits one
+threshold vector to two optima, which is the same failure as the global $\tau$ it
+replaces, one level up.} The practitioner-facing rule is therefore narrow and
+concrete: calibrate on the distribution you will evaluate on, and do not pool
+across domains that differ this much.
+
+
+
+
+
+
+
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}
