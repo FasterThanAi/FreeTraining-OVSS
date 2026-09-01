@@ -331,6 +331,14 @@ datasets), the coupled label-free objective (§7.3, one CPU day, gated at +0.58)
 (§7.4 — 75 em-dashes, one per 3.6 sentences). ⛔ **Content freeze 1 Jan 2027.** With §7.1–§7.2 done,
 **IEEE TGRS becomes plausible** and it is rolling, so there is no deadline to miss.
 
+⛔ **ConInfer work is governed by @CONINFER_RUNBOOK.md — read it before installing anything.**
+`scripts/setup_coninfer.sh` **refuses to run while `segov3` is active**, creates a separate
+`coninfer` env, and snapshots `segov3`'s package list; `--verify` diffs it afterwards. A matching
+package list is *necessary, not sufficient* — the real gate is behavioural: `eval.py
+./configs/cfg_loveda.py` must still give **47.38**. ⚠️ Reproduce *their* published number before
+evaluating on our splits, and report the row in **both metrics**, since a gain concentrated in the
+catch-all is exactly what §9h says to check for.
+
 Next, in order:
 
 1. **Write.** @PAPER_OUTLINE.md has the skeleton, the section map and the figure list.
