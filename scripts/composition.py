@@ -187,7 +187,21 @@ def main():
         rho, (pv, how) = spearman(x, y), perm_p(x, y)
         md.append(f'| {lab} | **{rho:+.3f}** | {pv:.4f} *({how})* |')
         if best is None or abs(rho) > abs(best[1]):
-            best = (lab, rho, pv, how)
+            best = (lab, rho, pv, how, key)
+
+    # ⚠️ A statistic that RANKS the cells on average has not necessarily explained
+    # the classes the gap is MADE OF. Check the top contributors individually: if
+    # a class carries a large share of the gap while its winning statistic is
+    # nearly the same in both domains, that share is still unexplained and the
+    # verdict must not claim otherwise.
+    unexplained = []
+    for nm, diff, sh in contrib[:3]:
+        c = LB.names.index(nm)
+        if c == bg or abs(sh) / total < 0.10:
+            continue
+        va, vb = base[hi][c][best[4]], base[lo][c][best[4]]
+        if abs(va - vb) / (abs(va) + abs(vb) + 1e-9) < 0.15:
+            unexplained.append((nm, sh / total * 100, va, vb, dIoU[hi][c], dIoU[lo][c]))
 
     md += ['\n## Verdict\n']
     strong = abs(best[1]) >= 0.6 and best[2] <= 0.05
@@ -202,6 +216,18 @@ def main():
                     f'⚠️ This is an *explanation*, not a predictor. The statistic is '
                     f'label-derived, so it does not resurrect the label-free rule §9f ruled '
                     f'out — it says what the gain is made of, not how to know in advance.')
+        if unexplained:
+            worst = sum(u[1] for u in unexplained)
+            md.append(f'\n⛔ **But it does not explain the largest contributor'
+                      f'{"s" if len(unexplained) > 1 else ""}, and that must be stated '
+                      f'beside the ρ.** ' + ' '.join(
+                          f'`{nm}` carries **{sh:.0f}%** of the gap, yet its {best[0]} is '
+                          f'{va * 100:+.1f} in {hi} against {vb * 100:+.1f} in {lo} — '
+                          f'effectively the same — while its Δ IoU is {dh:+.2f} against '
+                          f'{dl:+.2f}.' for nm, sh, va, vb, dh, dl in unexplained)
+                      + f' So the statistic ranks the cells on average and **{worst:.0f}% '
+                        f'of the gap still has no mechanism.** A reviewer comparing those '
+                        f'two rows will see it immediately; say it first.')
     else:
         md.append(f'⛔ **Composition does not explain it either.** The best candidate is '
                   f'{best[0]} at ρ = {best[1]:+.3f} ({best[3]} p = '

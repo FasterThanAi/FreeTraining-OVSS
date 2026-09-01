@@ -310,6 +310,17 @@ datasets). **The ~200-tile cost is irreducible — it buys the answer and the qu
 composition** (the gain lives in `water`/`forest`, which have the large P−R asymmetries and which
 rural has more of) — untested, and a cheap CPU check if it is worth closing.
 
+⭐/⚠️ **§9e's rural/urban gap is HALF explained — WEEK3 §9g.** Decomposition (arithmetic, since
+mIoU is an unweighted mean): **`water` 48% + `forest` 37% = 85% of the 2.68-point gap.** Across the
+12 (domain, class) cells the **precision−recall GAP** ranks which classes move (ρ **+0.713**,
+p 0.013) — a measured confirmation of the method's stated mechanism — while ⭐ **precision alone
+explains nothing (+0.168, p 0.60)**, the same lesson as §9d arriving independently.
+⛔ **But `water`, the largest contributor at 48%, is NOT explained**: share 11.6% vs 11.8%, P−R gap
++35.0 vs +34.4 — effectively identical — yet Δ IoU +10.15 vs +1.22, an **8× difference**. Roughly
+half the gap still has no mechanism. **Say this before quoting the ρ.** `forest` *is* clean (recall
+9.9 vs 68.9, discard 67% vs 12% — opposite regimes). Hypothesis for water, **unmeasured**: §9d's
+coupling — in urban, lowering water's τ takes pixels from dense `building`/`road`.
+
 Next, in order:
 
 1. **Write.** @PAPER_OUTLINE.md has the skeleton, the section map and the figure list.

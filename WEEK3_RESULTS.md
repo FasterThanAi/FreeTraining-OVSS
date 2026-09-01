@@ -947,6 +947,88 @@ the threshold**, because the objective is coupled across classes.
 which is what "no signal" looks like; without it, +0.51 / −0.08 / +0.47 might have been written up
 as a pattern.
 
+\n
+### 9g. ⭐/⚠️ What the rural/urban gap is made of — half explained, half not — 1 Sep
+
+`composition.py`. §7c ruled out catch-all share (the effect saturates, both strata are past it);
+§9f ruled out residual size (the gain is U-shaped in it and nothing replicates). Class composition
+was what remained.
+
+#### The decomposition — arithmetic, not inference
+
+mIoU is the **unweighted** mean over classes, so the gap is exactly the mean of the per-class
+differences. A domain does not gain by *containing* more of a class; it gains when that class's own
+IoU improves more there.
+
+| class | Δ IoU rural | Δ IoU urban | difference | share of the gap |
+|---|---|---|---|---|
+| **water** | +10.15 | +1.22 | **+8.93** | **48%** |
+| **forest** | +6.95 | −0.01 | **+6.96** | **37%** |
+| `background` | +0.79 | −3.51 | +4.29 | 23% |
+| building | −0.14 | +0.70 | −0.84 | −4% |
+| agricultural | +0.73 | +1.38 | −0.65 | −3% |
+| barren | +0.61 | +0.48 | +0.13 | 1% |
+| road | +0.31 | +0.42 | −0.11 | −1% |
+
+⭐ **`water` and `forest` carry 85% of the 2.68-point gap.**
+
+#### ⭐ The precision–recall *gap* ranks the cells; precision alone does not
+
+Over all 12 (domain, class) cells, permutation p-values:
+
+| candidate | ρ vs Δ IoU | p |
+|---|---|---|
+| **precision − recall gap** | **+0.713** | **0.013** |
+| recall | −0.608 | 0.041 |
+| class share of the domain | +0.497 | 0.102 |
+| fraction discarded | +0.490 | 0.113 |
+| **precision** | **+0.168** | **0.600** |
+
+**This is a measured confirmation of the method's stated mechanism**, which until now rested on
+`water` as an anecdote: a class that is right far more often than it fires can afford a lower
+threshold, and calibration collects exactly that. ⭐ **And precision *alone* explains nothing
+(+0.168, p 0.60)** — it is the *asymmetry* that matters, which is the same lesson as §9d, arriving
+independently: precision is measurable and is still the wrong single quantity.
+
+`forest` is the clean case, and the two domains are in different regimes entirely:
+
+| | discard | precision | recall | P−R gap | Δ IoU |
+|---|---|---|---|---|---|
+| rural forest | **67.0%** | 35.4 | **9.9** | **+25.5** | **+6.95** |
+| urban forest | 12.1% | 61.8 | 68.9 | −7.1 | −0.01 |
+
+#### ⛔ But the largest contributor is NOT explained — state this first
+
+| | share | discard | P−R gap | Δ IoU |
+|---|---|---|---|---|
+| rural water | 11.6% | 36.7% | **+35.0** | **+10.15** |
+| urban water | 11.8% | 25.6% | **+34.4** | **+1.22** |
+
+**Same share to within 0.2 points, same precision–recall gap to within 0.6 points — and an 8×
+different gain.** `water` is **48% of the gap**, so the winning statistic ranks the cells on
+average while failing on the single largest thing it is meant to explain. A reviewer comparing
+those two rows sees it immediately; the paper says it before they do.
+
+The likely residual factor is the **coupling** of §9d — in urban, lowering `water`'s threshold
+takes pixels from the dense `building` and `road` classes, so the same threshold move buys less.
+That is consistent with everything else here, and it is **not measured**. Treat it as a hypothesis.
+
+> **The honest summary.** The gap is class composition: 85% of it is `water` and `forest`, and
+> across the 12 cells the precision–recall asymmetry predicts which classes move (ρ +0.713,
+> p 0.013) while precision alone does not. `forest` is fully explained by two domains being in
+> opposite regimes. **`water`, at 48% of the gap, is not** — and roughly half the gap therefore
+> still lacks a mechanism.
+
+⚠️ **This is an explanation, not a predictor.** Every statistic here is label-derived, so it does
+not resurrect the label-free rule §9f ruled out. It says what the gain is made of, not how to know
+in advance — and §9d/§9f already say why the second is unreachable.
+
+⚠️ **A verdict guard was added because the first version overclaimed.** The script reported "no
+longer unexplained" on the strength of ρ alone. It now checks the top contributors individually:
+if a class carries ≥10% of the gap while its winning statistic is effectively identical across
+domains, that share is reported as still unexplained. Ranking the cells on average is not the same
+as explaining the classes the gap is made of.
+
 
 ---
 
