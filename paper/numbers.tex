@@ -178,3 +178,19 @@
 \newcommand{\mrOemLever}{11.1\%}
 \newcommand{\mrOemBgIoU}{17.13}
 \newcommand{\methodLandMean}{+1.38}  % 9b's +8.30 aggregate, in mIoU units
+
+% ---- CONINFER_RESULTS.md 7.1a: per-class tau on a CLIP backbone -------------
+% ⚠️ Deltas measured on OUR reproduction (36.99), not their published 39.33. A
+% delta is robust to a constant offset, but the text must say so.
+\newcommand{\cnPub}{39.33}         % ConInfer's published LoveDA mIoU
+\newcommand{\cnRepro}{36.99}       % our reproduction -- gap -2.34, full split
+\newcommand{\cnTau}{0.8}           % THEIR published LoveDA threshold
+\newcommand{\cnBase}{37.00}        % held-out baseline at their tau
+\newcommand{\cnFit}{39.52}         % held out, per-class tau
+\newcommand{\cnFull}{+2.52}
+\newcommand{\cnReal}{+1.94}        % catch-all-excluded -- above SAM 3's +1.36
+\newcommand{\cnBg}{+6.01}
+\newcommand{\cnCV}{+2.51}          % five-fold mean
+\newcommand{\cnCVsd}{0.34}
+\newcommand{\cnWorst}{+2.22}       % every fold positive
+\newcommand{\cnCalib}{25}          % tiles for a reliable gain -- 8x cheaper here

@@ -139,3 +139,59 @@ after building a whole paper on catching it.
    manually renaming `predict1` → `predict`; there are three `predict*` methods and
    no dispatch between them. **Not pursued** — that is a logic edit, and validating
    against their published ConInfer number serves the same purpose.
+
+
+---
+
+# ⭐⭐ §7.1a — per-class τ TRANSFERS to a CLIP backbone
+
+Both gates passed: the instrumented run printed **36.99**, identical to the
+un-instrumented one, and `conf` was observed in **[0.1601, 0.9611]**, inside the
+[0,1] grid the threshold search assumes.
+
+Fitted at **their** operating point (`prob_thd = 0.8`), five-fold, calibration and
+evaluation tiles always disjoint, baseline recomputed on the same held-out tiles.
+
+| | SAM 3 (SegEarth-OV3) | **CLIP+GMM (ConInfer)** |
+|---|---|---|
+| five-fold Δ full mIoU | +1.18 ± 0.45 | ⭐ **+2.51 ± 0.34** |
+| worst fold | +0.84 | **+2.22** |
+| Δ catch-all-excluded mIoU | +1.36 | ⭐ **+1.94** |
+| Δ catch-all IoU | −0.02 | +6.01 |
+| calibration tiles for a reliable gain | ~200 | ⭐ **~25** |
+
+**Held-out, one partition, both metrics:** 37.00 → **39.52** full, 39.06 → **41.00**
+excluding the catch-all, `background` 24.61 → 30.61.
+
+**Every class improves**, which our own SAM 3 result does not manage:
+`water` +4.20, `road` +2.52, `forest` +2.04, `agricultural` +1.69, `barren` +0.78,
+`building` +0.43, `background` +6.01.
+
+## What this changes
+
+> ⭐ **The claim is no longer about SAM 3.** Per-class thresholding is a property of
+> **any pipeline that thresholds per-class scores**: +1.18 on a SAM 3 pipeline at
+> τ=0.5, +2.51 on a CLIP+GMM pipeline at τ=0.8. Two architectures, two methods, two
+> operating points, same correction.
+
+That answers *"is this a SAM 3 quirk?"* — a question the paper could not answer this
+morning, and the first one a reviewer would ask of a single-backbone result.
+
+⭐ **And ConInfer stops being a competitor.** Our method *composes* with it: their
+pipeline goes 36.99 → **39.52** with our calibration on top. We do not beat the
+nearest published work, we improve it. That is a better answer to *"how is this
+different from ConInfer?"* than any margin would have been.
+
+## Honest notes
+
+- ⚠️ **`background` gains +6.01, a third of the full-mIoU gain.** Not the 110%
+  artefact of §8.1, and the catch-all-excluded column is independently positive at
+  **+1.94** — but quote both, as everywhere else in this paper.
+- ⚠️ **Measured on our reproduction (36.99), not their published 39.33.** This is a
+  *delta*, which is robust to a constant offset, but say so.
+- ⚠️ `tau_cv.py`'s closing verdict repeats the "LoveDA train → val gives −0.12"
+  caveat. That is **boilerplate from the SAM 3 run** and was never tested here.
+  Do not quote it for this result.
+- ⚠️ ConInfer's baseline is *itself* depressed 2.07 points by its catch-all
+  (`background` 24.61 against a real-class mean of 39.06) — the same metric
+  distortion this paper documents, appearing in a competitor's published setup.

@@ -347,11 +347,17 @@ label encoding, prompt order, image format, `feature_up` (setting it True change
 alphabetical subset bias (73 cities, aachen→zanzibar). Stopped there deliberately. ⚠️ **Most of the gap is the BACKBONE** (CLIP ViT-B/16 @448 vs SAM 3 @1024); our
 contribution is the +1.16 over SegEarth-OV3, and claiming the 11.54 would be §8.1's error in our
 own table. They tune `prob_thd` too (0.8/0.3/0.1) and are ~10× faster at inference — report both.
-⭐ **The high-value follow-up is §7.1a, not another dataset:** apply per-class τ *to ConInfer*.
-They threshold per-class scores globally, our fit needs only `(gt, pred, conf)`, and the cache
-format plus `tau_cv.py` already exist. It turns "worth +1.18 on SAM 3" into "a property of any
-pipeline that thresholds per-class scores" — and answers *"is this a SAM 3 quirk?"*, which the
-paper currently cannot.
+⭐⭐ **§7.1a DONE — per-class τ TRANSFERS TO A CLIP BACKBONE.** Fitted at *their* τ=0.8 on the
+ConInfer cache (both gates passed: instrumented run 36.99 exactly, `conf` in [0.16, 0.96]):
+**+2.51 ± 0.34 five-fold, every fold positive (worst +2.22), catch-all-excluded +1.94** — *larger*
+than SAM 3's +1.18/+1.36 — and **every one of the 7 classes improves**, which our SAM 3 result does
+not manage. Calibration needs only **~25 tiles** here against ~200. ⭐ **The claim is no longer
+about SAM 3**: it is a property of *any pipeline that thresholds per-class scores*, demonstrated on
+two architectures, two methods and two operating points. ⭐ **And our method COMPOSES with the
+nearest competitor** — their 36.99 → 39.52 — so we improve ConInfer rather than beat it.
+⚠️ `background` +6.01 is a third of the full gain (not §8.1's 110%, and the excluded column is
+independently positive) — quote both. ⚠️ It is a **delta on our reproduction**, not on their 39.33.
+⚠️ `tau_cv.py`'s closing "train→val −0.12" line is SAM 3 boilerplate, never tested here.
 
 Next, in order:
 
