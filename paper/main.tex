@@ -360,8 +360,31 @@ the observational regime rather than merely correlating with it. Against the
 weakest of the three controls rather than the matched one, the runner-up effect
 is still \ivRatioWorst{}.
 
+\paragraph{The label space is the lever, not the prompt list.} A second
+intervention separates the two things the dose arms change together. Removing the
+catch-all from LoveDA's \emph{vocabulary} while leaving its \emph{label space}
+untouched --- \ivSatShare{} of ground truth is still catch-all, those pixels
+merely become unnameable --- moves detectability from \ivRevBase{} to \ivRev{},
+i.e.\ not at all. Across both datasets, \best{every arm that changes the
+vocabulary without changing the catch-all's share of ground truth moves at most
+\ivVocabMax{}, while every arm that raises that share moves \ivB{}--\ivBtwo{}}.
+The practical consequence is that a catch-all-heavy benchmark cannot be repaired
+by editing the prompt list.
+
+\paragraph{The effect saturates, which bounds the claim.} It is concentrated at
+the low-share end: above roughly \ivSatShare{} of the scene, four points across
+both datasets sit within \ivSatLo{}--\ivSatHi{}, and further increases do nothing.
+LoveDA \emph{begins} inside that band, so its own dose arm is underpowered rather
+than null --- its dose and its control move by the same magnitude in opposite
+directions. Two consequences follow, and we state both. The mechanism is
+established where a catch-all grows from rare to roughly a third of the scene, and
+not beyond. And \best{share therefore cannot explain the urban--rural gap} in the
+stratified evidence, since both strata already lie in the saturated regime; that
+stratification eliminates confusability, but the gradient within LoveDA remains
+unexplained.
+
 Predictions were registered in the repository before each run and are scored
-against the outcome, including three that failed. The effect is
+against the outcome, including four that failed. The effect is
 \emph{not} monotone in the interior of the dose range --- the smallest dose is the
 minimum --- so we quote the endpoints. Point predictions from a line fitted to the
 observational data missed at two of three doses, so the direction transfers and
