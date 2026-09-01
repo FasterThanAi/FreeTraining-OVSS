@@ -947,7 +947,6 @@ the threshold**, because the objective is coupled across classes.
 which is what "no signal" looks like; without it, +0.51 / −0.08 / +0.47 might have been written up
 as a pattern.
 
-\n
 ### 9g. ⭐/⚠️ What the rural/urban gap is made of — half explained, half not — 1 Sep
 
 `composition.py`. §7c ruled out catch-all share (the effect saturates, both strata are past it);

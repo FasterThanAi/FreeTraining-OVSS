@@ -565,6 +565,28 @@ OpenEarthMap artefact of Table~\ref{tab:oemperclass} with its sign reversed}, an
 we take it as independent confirmation, arriving from the opposite direction,
 that full mIoU is a poor metric wherever a catch-all class is large.
 
+\paragraph{What the gap is made of.} Because mIoU is an unweighted mean over
+classes, the difference between the domains decomposes exactly into per-class
+contributions, and it is concentrated: \texttt{water} accounts for \cpWater{} of
+it and \texttt{forest} for \cpForest{}, \cpTop{} between them. Across all twelve
+(domain, class) cells, the statistic that ranks which classes move is the
+\best{precision--recall asymmetry} ($\rho=\cpGapRho{}$, permutation
+$p=\cpGapP{}$), not precision itself ($\rho=\cpPrecRho{}$, $p=\cpPrecP{}$) --- the
+same lesson as Section~\ref{sec:bound}, arriving independently. This is the
+mechanism the method assumes, measured rather than argued: a class that is right
+far more often than it fires can afford a lower threshold. \texttt{forest} is the
+clean case, with the two domains in opposite regimes (recall $9.9$ against
+$68.9$, discard $67\%$ against $12\%$).
+
+\best{It does not, however, explain \texttt{water}}, which is the largest single
+contributor. Its share of each domain ($11.6\%$ against $11.8\%$) and its
+precision--recall gap ($+35.0$ against $+34.4$) are effectively identical, yet its
+IoU gain differs eightfold. So the asymmetry ranks the classes on average while
+roughly half of the gap still lacks a mechanism. We suspect the coupling of
+Section~\ref{sec:bound} --- in the urban domain, lowering \texttt{water}'s
+threshold takes pixels from the dense \texttt{building} and \texttt{road} classes,
+so the same move buys less --- but we have not measured it and do not claim it.
+
 Second, the two domains want genuinely different thresholds --- mean absolute
 difference \DOMtaudiff{}, and \DOMtaumax{} on \texttt{road}
 ($0.725$ rural against $0.225$ urban) --- and calibrating on the wrong one is
