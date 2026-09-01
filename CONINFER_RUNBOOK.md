@@ -235,3 +235,67 @@ requires a second large pretrained backbone with gated weights; our method
 requires ~200 labelled tiles and no additional weights. That is a real difference
 in deployment cost, discovered only by attempting the reproduction, and it belongs
 in the related-work positioning either way.
+
+
+---
+
+# §7.1a — does per-class τ transfer to a CLIP backbone?
+
+**The question the comparison row cannot answer:** *is per-class thresholding a
+SAM 3 quirk?* ConInfer thresholds per-class scores with a single global `prob_thd`
+— precisely the design our method replaces — so it is the natural test.
+
+⭐ **The reproduction gap does not block this.** We measure a **delta on our own
+run**, and a delta is robust to a constant offset. If per-class τ adds +X to their
+scores as we measured them, that is a valid statement about transfer whether their
+absolute is 36.99 or 39.33.
+
+## Step 1 — cache their scores (LoveDA only; OpenEarthMap is dropped)
+
+```bash
+cd ~/ConInfer
+python ~/FreeTraining-OVSS/scripts/coninfer_cache.py \
+  --config configs_ConInfer/cfg_loveda_1gpu.py \
+  --out ~/outputs/coninfer_loveda/cache
+```
+
+⭐ **No edits to their source.** mmseg leaves `seg_logits`, `pred_sem_seg` and
+`gt_sem_seg` on every `SegDataSample` at original resolution, so the script wraps
+`predict()`, calls it unmodified, and reads the result. Observation-only is
+structural here, not something to verify by diffing.
+
+⚠️ **Two gates before the cache is used:**
+
+1. **mIoU must print 36.99**, matching the un-instrumented run. A read-only wrapper
+   cannot change it; if it moved, something is wrong.
+2. **`conf` must lie in [0, 1]** — the script reports the observed range. Our
+   threshold grid is over [0, 1], so a raw-logit score would be binned wrongly and
+   every fitted τ would be meaningless. If it warns, stop and check whether their
+   `postprocess_result` applies a sigmoid before `prob_thd`.
+
+## Step 2 — fit per-class τ with the existing scripts, unchanged
+
+```bash
+cd ~/FreeTraining-OVSS
+python scripts/tau_oracle.py    --cache ~/outputs/coninfer_loveda/cache --tau 0.8 \
+  --md ~/outputs/week4/coninfer_tau_oracle.md
+python scripts/tau_cv.py        --cache ~/outputs/coninfer_loveda/cache --tau 0.8 \
+  --objective real --md ~/outputs/week4/coninfer_tau_cv.md
+python scripts/metric_report.py --cache ~/outputs/coninfer_loveda/cache --tau 0.8 \
+  --md ~/outputs/week4/coninfer_metric.md
+```
+
+⚠️ **`--tau 0.8`, not 0.5.** That is ConInfer's own published LoveDA threshold. The
+baseline every gain is measured against must be *their* operating point, or the
+comparison is against a strawman.
+
+## What each outcome means
+
+| outcome | what the paper says |
+|---|---|
+| **clearly positive** | ⭐ per-class τ is a property of **thresholded per-class scores**, not of a backbone. Demonstrated on two architectures (SAM 3, CLIP ViT-B/16) and two methods. The strongest form of the claim. |
+| **near zero** | the effect needs SAM 3's particular per-class calibration asymmetry. **Report it** — it sharpens the mechanism and pre-empts the reviewer who assumes generality we did not test. |
+| **negative** | ConInfer's GMM already equalises per-class calibration, so there is nothing left to correct. That is an *interesting* negative and a compliment to their method. |
+
+**Every outcome is publishable**, which is why this is worth a day and a third
+dataset is not, until it is done.
