@@ -136,15 +136,16 @@ at
 
 \paragraph{Contributions.}
 \begin{enumerate}\itemsep2pt
-  \item \textbf{A mechanism, established causally.} The catch-all's share of
-        ground truth (\bgShareLove{} vs \bgShareOEM{}) tracks the residual's size,
-        its detectability, the presence--discard correlation and the
-        catastrophic-tile count across two datasets
-        (Table~\ref{tab:mechanism}). We then manipulate that share through the
-        vocabulary, with class count controlled and predictions registered before
-        each run, and show the effect follows the share
-        (Table~\ref{tab:intervention}). A further intervention localises it to the
-        label space rather than the prompt list.
+  \item \textbf{A mechanism for the residual's size, tested as a forecast.} The
+        catch-all's share of ground truth orders how much real land cover a
+        presence-gated pipeline discards, monotonically across three datasets
+        (Table~\ref{tab:mechanism}); we computed the third from ground-truth masks
+        alone and registered it before running the pipeline. We then manipulate
+        that share through the vocabulary, with class count controlled, and the
+        effect follows the share (Table~\ref{tab:intervention}); a further
+        intervention localises it to the label space rather than the prompt list.
+        \best{We also report a registered prediction of ours that failed}: the same
+        variable does \emph{not} order detectability across datasets.
   \item \textbf{A method.} Calibrated per-class thresholds:
         \methodGain{}~$\pm$~\methodSD{}~mIoU on LoveDA, catch-all \methodBg{},
         \oracleShare{} of an oracle bound of \oracleBound{}, verified end-to-end in
@@ -323,57 +324,81 @@ catch-all. The gate's largest measured effect is therefore \emph{suppressing
 which inverts the motivation the baseline paper gives for it.
 
 % =====================================================================
-\section{The mechanism: two datasets}
+\section{The mechanism, and what it does not explain}
 \label{sec:mechanism}
 
 \begin{table}[t]\centering\small
-\caption{Every measured quantity moves with the catch-all class's share of ground
-truth. Same pipeline, same code, two datasets.}
+\caption{Three datasets, same pipeline, same code. The catch-all's share of ground
+truth orders the residual's \emph{size}. It does \best{not} order the residual's
+\emph{detectability}: Potsdam has a small catch-all and detects like LoveDA, which
+has a large one. Detection figures are the best cached signal in each case.}
 \label{tab:mechanism}
-\begin{tabular}{lrr}
+\begin{tabular}{lrrr}
 \toprule
- & LoveDA & OpenEarthMap \\
+ & LoveDA & OpenEarthMap & Potsdam \\
 \midrule
-baseline mIoU (published)         & \loveBase{} (\lovePub{}) & \oemBase{} (\oemPub{}) \\
-\best{\bg{} share of ground truth} & \best{\bgShareLove{}} & \best{\bgShareOEM{}} \\
-real-class pixels discarded       & \discardPct{}   & \discardOEM{} \\
-catastrophic tiles ($\ge$99\%)    & \catTilesLove{} & \catTilesOEM{} \\
-corr(presence, discard)           & \presCorrLove{} & \presCorrOEM{} \\
-best detection AUC                & \aucLove{}      & \aucOEM{} \\
+baseline mIoU (published) & \loveBase{} (\lovePub{}) & \oemBase{} (\oemPub{}) & \potsBase{} (\potsPub{}) \\
+\best{\bg{} share of GT}  & \best{\bgShareLove{}} & \best{\bgShareOEM{}} & \best{\potsShare{}} \\
+real-class pixels discarded & \discardPct{} & \discardOEM{} & \potsDiscard{} \\
+\midrule
+best detection AUC        & \aucLoveCached{} & \best{\aucOemCached{}} & \potsAuc{} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{figure*}[t]\centering
 \includegraphics[width=\textwidth]{fig2_mechanism.pdf}
-\caption{The catch-all class's share of ground truth as a common cause. Six
-independently measured quantities --- residual size, detection AUC, the
-presence--discard correlation, the catastrophic-tile count, the fraction of
-pixels the model commits to, and the achievable recovery --- separate the two
-datasets in the same direction.}
+\caption{The catch-all class's share of ground truth as a common cause across our
+first two datasets. \best{A third dataset later separated these quantities}: the
+residual's size continues to follow the share, and its detectability does not
+(Table~\ref{tab:mechanism}). We retain the figure for the two datasets it
+describes and state the limitation in the text rather than in a caption.}
 \label{fig:mechanism}
 \end{figure*}
 
-Table~\ref{tab:mechanism} and Fig.~\ref{fig:mechanism} are the paper's central
-observation. Six quantities
-measured independently, by the same code on the same pipeline, separate the two
-datasets in the same direction, and they are ordered by a single property of the
-\emph{annotation scheme}: whether the vocabulary covers the scene.
+\paragraph{The residual's size follows the catch-all's share.} Across three
+datasets the ordering is monotone: \bgShareOEM{} of ground truth gives
+\discardOEM{} discarded, \potsShare{} gives \potsDiscard{}, and \bgShareLove{}
+gives \discardPct{}. \best{The third point was predicted before it was measured.}
+From ground-truth masks alone --- no model, no inference --- we computed Potsdam's
+catch-all share and registered a bracket of $3.78$--$10.88\%$ with a point estimate
+of \potsPoint{} in the repository, then ran the pipeline. The measured value is
+\potsDiscard{}.
 
-The explanation is direct. LoveDA's \bg{} absorbs a third of every image, so the
-model always has a plausible answer available, and a strong runner-up score means
-nothing --- it could indicate a suppressed real class, or a background region that
-merely resembles one. Its runner-up AUC is $0.541$. OpenEarthMap's \bg{} is a rare
-marker for genuinely unlabelable pixels, so a strong runner-up does indicate a
-suppressed real class, and the same signal reaches \aucOEM{}.
+\paragraph{Detectability does not.} The same pre-registration predicted a detection
+AUC above \aucLoveCached{}, and named the alternative as disqualifying: a dataset
+near $5\%$ background behaving like LoveDA would mean the mechanism was wrong. That
+is what happened. Potsdam's best cached signal reaches \potsAuc{}, against
+\aucLoveCached{} on LoveDA, whose catch-all is eight times larger. The base rate
+among catch-all-assigned pixels is $75.1\%$ on Potsdam, between LoveDA's $43.1\%$
+and OpenEarthMap's $82.7\%$, so this is not an artefact of class balance.
+
+\best{We therefore split the claim.} The catch-all's share of the label space
+governs how much real land cover a presence-gated pipeline discards --- three
+datasets, monotone, one of them forecast in advance. It does \emph{not} determine
+whether that residual can be detected: OpenEarthMap at \bgShareOEM{} reaches
+\aucOemCached{} while Potsdam at \potsShare{} reaches \potsAuc{}. Something else
+governs detectability across datasets, and we do not know what it is.
+
+\paragraph{This does not overturn the intervention.} Section~\ref{sec:intervention}
+manipulates the catch-all's share \emph{within} OpenEarthMap and reduces
+detectability, against a control that changes the class count without changing the
+share. Both results stand: share is \emph{a} cause of detectability inside a
+dataset, and is \emph{not} what determines it between datasets. We state that
+distinction rather than choosing whichever reading is more convenient.
+
+\best{We have deliberately not gone looking for a variable that fits three
+points.} Any account constructed now would be fitted to the observations it must
+explain, and the value of the confirmed half of this prediction rests entirely on
+its not having been.
 
 \paragraph{Two of our own claims do not generalise, and we label them.} The
 presence-collapse correlation of Section~\ref{sec:anatomy} (\presCorrLove{} on
 LoveDA, \catTilesLove{} catastrophic tiles) becomes \presCorrOEM{} with
 \catTilesOEM{} catastrophic tiles on OpenEarthMap. It is a property of LoveDA's
 annotation scheme, not of SAM~3. Likewise \best{\discardPct{} is not a general
-figure} --- the identical pipeline discards \discardOEM{} on OpenEarthMap. Both
-are stated here rather than left for a reader to discover.
+figure} --- the identical pipeline discards \discardOEM{} on OpenEarthMap and
+\potsDiscard{} on Potsdam.
 
 % =====================================================================
 \paragraph{Confusability is not the driver.} Across two datasets the catch-all's
@@ -572,6 +597,13 @@ the result structurally immune to the artefact described below, and it captures
 table. It is driven by \texttt{water}, which gains \methodWater{}~IoU alone at a
 fitted threshold of \methodWaterTau{} against a global $0.5$.
 
+\best{The headroom is smaller than it looks, which makes the gain larger than it
+looks.} The baseline paper reports a fully supervised SegFormer-b0, trained on the
+full LoveDA training set, at \oracleSup{}~mIoU. The training-free pipeline starts
+\loveInstr{} and our fit reaches \eeFit{}, so \best{\gapClosed{} of the gap between
+training-free and fully supervised is closed by \calibTiles{} labelled tiles and no
+trained weights}.
+
 \paragraph{OpenEarthMap is positive too, once the catch-all is separated.} Read
 as full mIoU the method looks flat there, \mrOemFull{}. Read as
 catch-all-excluded mIoU it gains \best{\mrOemReal{}} --- more than LoveDA does.
@@ -612,6 +644,21 @@ eliminated our own most favourable number before it removed anyone else's}, and 
 also declines to credit the per-class threshold fit with a headline gain on
 OpenEarthMap for either pipeline (Table~\ref{tab:transfer}). We adopted it because
 it changed our conclusions, not because it confirmed them.
+
+\paragraph{A third dataset.} On Potsdam (\potsTiles{} tiles, \potsBase{} baseline
+against a published \potsPub{}) the fit gives \potsFull{}~$\pm$~\potsFullSd{} full
+mIoU across folds --- four of five positive, but a spread that covers zero, so we
+report it as \emph{marginal} --- and \potsReal{} on the catch-all-excluded metric,
+with land cover gaining $5.22$~IoU in aggregate. \best{Land cover improves on all
+three datasets; the headline follows only where the catch-all is competently
+predicted}, which is the same pattern Section~\ref{sec:transfer} finds across
+pipelines. Potsdam's \texttt{clutter} sits at $16.96$~IoU against a real-class mean
+of $66.05$, depressing its published headline by \potsDistort{} points before any
+method is applied --- against $3.38$ on OpenEarthMap and $0.31$ on LoveDA. One
+result cuts against us: \texttt{car} carries the gain at $+3.70$ while
+\texttt{tree} gains $0.32$ despite a precision--recall gap of $+54.7$, larger than
+the \texttt{water} asymmetry that drives the entire LoveDA result. The
+precision--recall statistic did not predict which class would move here.
 
 \paragraph{End-to-end verification.} The results above are computed from the
 cached histogram. To confirm that this is a measurement instrument rather than
