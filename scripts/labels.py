@@ -34,7 +34,10 @@ CATCH_ALL_ALIASES = ['background', 'clutter', 'unlabeled', 'unlabelled',
 class Labels:
     """names[i] is the class at mask value i+1. Mask value 0 is always no-data."""
 
-    def __init__(self, names, bg_name=None):
+    def __init__(self, names, bg_name=None, discard_idx=None):
+        """`discard_idx` is the segmentor's ACTUAL `bg_idx` (0-indexed), where it
+        is known. Pass it and the catch-all/discard-target check becomes a real
+        comparison instead of an assumption -- see the note below."""
         self.names = [str(n) for n in names]
         self.n = len(self.names)
         self.nc = self.n + 1                      # mask-space width incl. no-data
@@ -52,15 +55,28 @@ class Labels:
                   f'Pass bg_name= explicitly if that is wrong — getting this '
                   f'backwards invalidates every number silently.')
         elif self.bg != 1:
-            # Worth saying out loud: SegEarth-OV3's segmentor hardcodes
-            # bg_idx=0, so sub-tau pixels land in the FIRST class regardless of
-            # which one is the catch-all. Where those differ, the dataset's
-            # discard target is not its catch-all and the two must not be
-            # conflated.
-            print(f'  !! catch-all `{self.names[self.bg - 1]}` is at mask value '
-                  f'{self.bg}, not 1. The segmentor assigns sub-τ pixels to '
-                  f'bg_idx=0 (`{self.names[0]}`), so the DISCARD TARGET and the '
-                  f'CATCH-ALL CLASS are different here. Check which one you mean.')
+            # The segmentor's `bg_idx` decides where sub-tau pixels go. Its
+            # DEFAULT is 0, so on a dataset whose catch-all is not first the
+            # discard target and the catch-all can differ -- and conflating them
+            # invalidates every number silently.
+            #
+            # ⚠️ But the config can override it, and Potsdam's does (`bg_idx=5`,
+            # `clutter`). An earlier version warned unconditionally whenever
+            # `bg != 1`, so it cried wolf on every Potsdam run while the two
+            # actually agreed. A check that fires when nothing is wrong stops
+            # being read, which is worse than no check. Compare the real value.
+            if discard_idx is None:
+                print(f'  note: catch-all `{self.names[self.bg - 1]}` is at mask '
+                      f'value {self.bg}, not 1. Could not read the segmentor\'s '
+                      f'`bg_idx` here, so the discard target is unverified -- '
+                      f'confirm the config sets bg_idx={self.bg - 1}.')
+            elif discard_idx + 1 != self.bg:
+                print(f'  !! MISMATCH: the catch-all is `{self.names[self.bg - 1]}` '
+                      f'(mask value {self.bg}) but the segmentor sends sub-τ pixels '
+                      f'to bg_idx={discard_idx} '
+                      f'(`{self.names[discard_idx]}`). The DISCARD TARGET and the '
+                      f'CATCH-ALL CLASS are different, and every discard number '
+                      f'below is measuring the wrong class.')
         self.real = [c for c in range(1, self.nc) if c != self.bg]
 
     def name(self, mask_value):
@@ -71,17 +87,22 @@ class Labels:
                 f'{", ".join(self.names)})')
 
 
-def from_cache(cache_dir, bg_name=None):
-    """Read the class list written into the .npz cache."""
+def from_cache(cache_dir, bg_name=None, discard_idx=None):
+    """Read the class list written into the .npz cache.
+
+    `discard_idx` is not stored in the cache, so callers that know it (from the
+    config that produced the cache) should pass it; otherwise the catch-all check
+    reports itself as unverified rather than guessing.
+    """
     files = sorted(Path(cache_dir).expanduser().glob('*.npz'))
     if not files:
         raise SystemExit(f'no .npz under {cache_dir}')
     z = np.load(files[0], allow_pickle=True)
     if 'classes' in z.files:
-        return Labels([str(x) for x in z['classes']], bg_name)
+        return Labels([str(x) for x in z['classes']], bg_name, discard_idx)
     print('  !! cache has no `classes` key (written before this was recorded); '
           'falling back to LoveDA. Re-run measure_discard_rate.py to fix.')
-    return Labels(LOVEDA_FALLBACK, bg_name)
+    return Labels(LOVEDA_FALLBACK, bg_name, discard_idx)
 
 
 def from_model(model, cfg=None):
@@ -91,9 +112,12 @@ def from_model(model, cfg=None):
     is one class and commas separate synonyms of it -- `building,house` is one
     class, not two. The first synonym is taken as the display name.
     """
+    # The segmentor carries the value that actually decides where sub-tau pixels
+    # go, so read it rather than assuming the class default.
+    bgi = getattr(model, 'bg_idx', None)
     meta = getattr(model, 'dataset_meta', None) or {}
     if meta.get('classes'):
-        return Labels(list(meta['classes']))
+        return Labels(list(meta['classes']), None, bgi)
 
     path = None
     for src in (cfg, getattr(model, 'cfg', None)):
@@ -110,8 +134,8 @@ def from_model(model, cfg=None):
             if line:
                 names.append(line.split(',')[0].strip())
         if names:
-            return Labels(names)
+            return Labels(names, None, bgi)
 
     print('  !! could not resolve class names from model or config; '
           'falling back to LoveDA. Verify before trusting any output.')
-    return Labels(LOVEDA_FALLBACK)
+    return Labels(LOVEDA_FALLBACK, None, bgi)

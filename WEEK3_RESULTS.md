@@ -1167,6 +1167,24 @@ from the data.** `labels.py` locates the catch-all by name precisely so this can
 was still hardcoded twice, twenty lines apart, in the script `labels.py` serves. **A dataset whose
 catch-all is not first was always going to find them.**
 
+**⚠️ A check that fires when nothing is wrong stops being read.** `labels.py` warned
+*"the segmentor assigns sub-τ pixels to bg_idx=0, so the discard target and the catch-all are
+different"* whenever the catch-all was not mask value 1. On Potsdam that fired on **every run** —
+and it was **wrong**: `cfg_potsdam.py` sets `bg_idx=5` explicitly, so the two agree. The check
+compared against the segmentor's *default* rather than the config's actual value. It now takes the
+real `bg_idx` (read off the model in `from_model`), stays **silent when they agree**, prints a
+*note* when it cannot verify, and reserves the loud warning for a genuine mismatch. Verified on all
+four cases.
+
+**⚠️ Generated verdict text must not contain dataset-specific numbers.** `tau_cv.py`'s null verdict
+cited *"the single-split +1.44 was a favourable draw"* — a LoveDA figure — and printed it verbatim
+on OpenEarthMap, ConInfer and Potsdam caches. **Four occurrences before it was caught.** Its
+scope-limit paragraph likewise quoted LoveDA's −0.12 train→val result as though it had been
+measured on whatever cache was loaded. Both are now either computed from the run or explicitly
+labelled as a LoveDA measurement that has not been repeated. ⭐ **The tables were correct every
+time; only the prose was wrong** — which is the recurring failure mode of this whole codebase and
+the reason every verdict now gets read against its own table.
+
 **A symlink loop damaged the dataset directory.** `ln -s target dest` creates the link *inside*
 `dest` when `dest` already exists, producing `images/val/val → images/val`. Use `ln -sfn`. The
 tell was a file count of 385 where 384 was expected.

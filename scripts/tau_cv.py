@@ -206,10 +206,16 @@ def main():
     md += ['\n## Verdict\n']
     lo = gains.mean() - 2 * gains.std(ddof=1) if len(gains) > 1 else gains.mean()
     if lo <= 0:
+        # ⚠️ No dataset-specific numbers in generated verdict text. An earlier
+        # version cited "the single-split +1.44", a LoveDA figure, and printed it
+        # on OpenEarthMap, ConInfer and Potsdam caches -- four times before it was
+        # caught. The tables were right every time; only the prose was wrong.
+        pos = int((gains > 0).sum())
         md.append(f'⛔ **Not distinguishable from zero.** Mean {gains.mean():+.2f} with sd '
-                  f'{gains.std(ddof=1):.2f} over {args.folds} folds, so the spread covers '
-                  'no gain at all. The single-split +1.44 was a favourable draw. Report '
-                  'the oracle bound only.')
+                  f'{gains.std(ddof=1):.2f} over {args.folds} folds ({pos}/{len(gains)} '
+                  f'positive), so the spread covers no gain at all. Any single favourable '
+                  f'split is a draw from this spread, not a result. Report the oracle '
+                  f'bound, and the per-class table below, rather than the mean alone.')
     elif realsum <= 0:
         md.append(f'⚠️ **{gains.mean():+.2f} mIoU, but the real classes lose '
                   f'{realsum:+.2f}** — background unwinding again, not better land cover.')
@@ -224,10 +230,11 @@ def main():
                   f'{args.folds} folds** (worst {gains.min():+.2f}), with the real classes '
                   f'gaining {realsum:+.2f}.{note}\n\n'
                   '⚠️ Calibration tiles must come from the SAME distribution as the '
-                  'evaluation tiles. Fitting on LoveDA *train* and evaluating on val gives '
-                  '−0.12, because those splits differ sharply (discard 14.54% vs 29.68% at '
-                  'identical background share). State that limitation beside the gain — it '
-                  'is the honest scope of the result.')
+                  'evaluation tiles. Measured **on LoveDA** (WEEK3 §9b): fitting on its '
+                  '*train* split and evaluating on *val* gives −0.12, because those splits '
+                  'differ 2× in discard rate at identical background share. That figure is '
+                  'LoveDA-specific and has not been re-measured on this cache — the '
+                  'limitation is general, the number is not.')
 
     text = '\n'.join(md)
     print('\n' + text)
