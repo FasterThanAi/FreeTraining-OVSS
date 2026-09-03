@@ -202,3 +202,14 @@
 \newcommand{\cnOemBg}{-10.94}      % catch-all sacrificed: 17.00 -> 6.06
 \newcommand{\cnOemBgAfter}{6.06}
 \newcommand{\mrOemBgAfter}{5.83}   % SAM 3 drives it to almost the same value
+
+% ---- third dataset + the supervised-gap framing ----------------------------
+\newcommand{\potsBase}{57.83}      % our Potsdam reproduction
+\newcommand{\potsPub}{57.8}        % SegEarth-OV3 published -- matches to 0.03
+\newcommand{\potsTiles}{2016}      % val tiles, 512^2, stride 512
+\newcommand{\potsBgShare}{4.29\%}  % `clutter` share of GT -- pre-registered
+% ⭐ The oracle is a fully supervised SegFormer-b0 with full training data,
+% reported in SegEarth-OV3's own Table 2. Framing the gain as a share of the
+% supervised gap is far more legible than a raw delta.
+\newcommand{\oracleSup}{50.0}      % LoveDA, fully supervised
+\newcommand{\gapClosed}{44\%}      % (48.53-47.37)/(50.0-47.37)
