@@ -109,18 +109,68 @@ These were decided by measurement, not preference. Rationale in the cited sectio
 
 ## Where the project stands
 
-Weeks 1–3 complete. Baseline reproduced; premise confirmed and quantified; the proposed
-contribution measured and **refuted**, with an oracle bound naming what blocks it (see the
-Week 3 block at the end of this section):
+*Last rewritten 3 Sep. The dated blocks below carry the detail; this is the orientation.*
 
-- **29.68%** of real-class pixels discarded to background at τ=0.5 (323M pixels).
-- τ-sweep: recovering ⅔ of that residual by lowering τ to 0.1 costs **5.54 mIoU**. Threshold
-  relaxation buys 1 correct pixel per 1.73 wrong ones. This is the paper's motivation.
-- Discard outnumbers real-class confusion **3:1** — the baseline's dominant error is silence,
-  not error.
+**The project has a method, a causally-established mechanism, and a drafted paper.** The
+co-occurrence prior it was founded on is dead and stays dead (+0.2 over a neighbour vote, +0.3
+with a *perfect* matrix — WEEK3 §6). Do not revive it.
 
-Roadmap phase gates 1, 3 and 5 are all cleared — roughly **three roadmap-weeks ahead of
-schedule**. Phase 3 (Build) has not begun: no `M_global`, no RAG, no scoring function.
+**The claim, in one sentence:** a single confidence threshold is the wrong *shape* for a
+multi-class open-vocabulary pipeline, and fitting one threshold per class — on the same
+supervision budget the baseline already spends tuning its single τ, with no weights trained —
+recovers a real gain.
+
+| | SAM 3 (SegEarth-OV3) | ConInfer (CLIP) |
+|---|---|---|
+| 5-fold Δ mIoU | **+1.18 ± 0.45** (worst fold +0.80) | **+2.51 ± 0.34** (worst +2.22) |
+| Δ excluding catch-all | +1.36 | **+1.94** |
+| calibration tiles | ~200 | **~25** |
+
+Confirmed end-to-end, not just as cache arithmetic: predicted 47.16 → 48.35 on 1469 held-out
+tiles, `eval.py` measured 47.16 → 48.35, per-class within 0.04 (WEEK3 §9c). **The gain is larger
+on the pipeline it was not developed for, and all seven ConInfer classes improve** — so the claim
+is about *any* pipeline thresholding per-class scores, not about SAM 3. It **composes with**
+ConInfer rather than beating it.
+
+**Three things that are settled and must not be re-argued:**
+
+1. **The mechanism is causal, and the lever is the label space — not the prompt list.**
+   A 13-arm vocabulary intervention moved the catch-all's share 0.84% → 58.20% and detection
+   0.794 → 0.582 against an arity-matched control at 0.710. Every arm that changes the vocabulary
+   while leaving GT share alone moves ≤ 0.052; every arm that raises GT share moves 0.213–0.323.
+   Effect saturates by ~35% share. (WEEK3 §7b/§7c)
+2. **Share drives detectability; confusability does not.** Broken without a third dataset —
+   LoveDA rural has higher share (42.9% vs 26.0%) but *lower* confusability (25.5% vs 43.3%) and
+   *worse* detection (0.524 vs 0.730). (WEEK3 §7a)
+3. **No label-free rule reaches the oracle, and the reason is coupling, not measurability.**
+   Eleven attempts; best proxy +0.42 against a random control's p95 of +0.58. ⚠️ Precision **is**
+   label-free (`mean_conf` ranks it at ρ +0.943, p 0.017) — the earlier "precision needs labels"
+   argument is **false**. The real bound: ρ(precision, oracle τ) = −0.429, p = 0.419, so the right
+   threshold solves a **coupled multi-class IoU objective** no per-class scalar can express.
+   (WEEK3 §9d, §9f)
+
+**Report both metrics, always.** Full mIoU is levered by the catch-all (1/N ≈ 14.3% LoveDA,
+11.1% OEM). OEM's full **+0.30** is **+1.75** on the catch-all-excluded metric — *larger* than
+LoveDA's +1.36. Quoting only full mIoU filed a positive dataset as flat for four days. (WEEK3 §9h)
+
+**Known limits — state them, do not discover them again.** Per-class τ does **not** transfer
+across a domain shift (rural +2.77 vs urban +0.10; mismatched calibration lands *below* the
+published τ) or to ConInfer-on-OEM (−0.39). Calibration must match the evaluation distribution
+(LoveDA train→val = −0.12). Half the rural/urban gap is unexplained — it is 85% `water`+`forest`,
+but `water` has identical share and asymmetry in both domains and an 8× different gain.
+
+**Motivation numbers, still load-bearing and still quoted in the paper:**
+
+- **29.68%** of real-class pixels assigned to background at τ=0.5 (323M px) — ⚠️ a LoveDA-**val**
+  figure, not a LoveDA figure, and not general: OEM discards 3.78%.
+- τ→0.1 recovers ⅔ of it and costs **5.54 mIoU** — 1 right per 1.73 wrong.
+- Discard outnumbers real-class confusion **3:1** — the dominant error is silence, not error.
+
+**Status.** ROADMAP Phases 1–6 closed; Phase 7 running. Paper drafted (7,101 words, 26 refs,
+1 `\todo`) with an Overleaf bundle script; ~2,000 words must **move** to supplementary, not
+shrink. ConInfer's reproduction gate **failed** — report LoveDA with both numbers (published
+39.33, ours 36.99), drop their OEM row. Potsdam pre-registered at 4.29% catch-all.
+Target EarthVision 2027 (~March 2027, **unverified**); **content freeze 1 Jan 2027.**
 
 ### Instrumentation complete — 21 Aug
 
