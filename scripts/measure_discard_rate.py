@@ -270,7 +270,12 @@ def main():
         g, p = gt[valid], pred[valid]
         np.add.at(conf, (g - 1, p - 1), 1)
 
-        real = g > BACKGROUND                     # carries a real land-cover label
+        # ⚠️ NOT `g > BACKGROUND`. That assumed the catch-all is the LOWEST class
+        # value, which holds for LoveDA and OpenEarthMap (both mask value 1) and
+        # FAILS on Potsdam, where `clutter` is mask value 6 -- the highest. There
+        # `g > 6` matches nothing, every tile reports 0.00% discard, and the
+        # catch-all is counted as a real class losing pixels to itself.
+        real = (g > 0) & (g != BACKGROUND)        # carries a real land-cover label
         discarded = real & (p == BACKGROUND)
         per_image.append({
             'image': name,
@@ -379,11 +384,16 @@ def main():
 
     # ---- derived numbers -------------------------------------------------
     total_valid = conf.sum()
-    total_real = conf[1:, :].sum()
-    total_discarded = conf[1:, BACKGROUND - 1].sum()
+    # ⚠️ Rows are 0-indexed classes, so the catch-all is row BACKGROUND-1 -- NOT
+    # row 0. `conf[1:]` skipped row 0 unconditionally, which silently kept the
+    # catch-all in the real-class total on any dataset whose catch-all is not
+    # first. Same bug as the `g > BACKGROUND` line above.
+    real_rows = [c for c in range(N) if c != BACKGROUND - 1]
+    total_real = conf[real_rows, :].sum()
+    total_discarded = conf[real_rows, BACKGROUND - 1].sum()
 
     rows = []
-    for c in range(1, N):                          # skip background as a true class
+    for c in real_rows:                            # skip the catch-all as a true class
         tot = conf[c, :].sum()
         lost = conf[c, BACKGROUND - 1]
         rows.append({

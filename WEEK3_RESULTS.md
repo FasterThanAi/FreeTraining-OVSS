@@ -1149,6 +1149,24 @@ the domain split had already been measured; without §9e it would have looked li
 bug and cost a day. `--sample n --seed k` now draws at random, `--limit` prints a warning, and the
 two are mutually exclusive.
 
+**⛔ The catch-all was assumed to be the LOWEST class value.** `measure_discard_rate.py` had
+`real = g > BACKGROUND` and `total_real = conf[1:, :]`, both of which quietly encode *"the catch-all
+is mask value 1"*. True for LoveDA and OpenEarthMap; **false for Potsdam, where `clutter` is mask
+value 6 — the highest.** There `g > 6` matches nothing, so every tile reported **0.00% discard**
+while the aggregate still produced a plausible-looking **5.55%** — computed over the wrong row set,
+with the catch-all counted as a real class losing 34.68% of its pixels to itself.
+
+The tell was not the headline, which looked reasonable and even fell inside the pre-registered
+bracket. It was **`mean 0.00%, median 0.00%, max 0.00%` sitting next to a non-zero total**, and
+`clutter` appearing in a table of classes that lose pixels *to* `clutter`. Fixed to
+`real = (g > 0) & (g != BACKGROUND)` and an explicit `real_rows` list; verified to be a **bit-exact
+no-op** where the catch-all is first, so no LoveDA or OpenEarthMap number changes.
+
+⚠️ **This is the fourth dataset-specific assumption to survive in code that reads its class list
+from the data.** `labels.py` locates the catch-all by name precisely so this cannot happen, and it
+was still hardcoded twice, twenty lines apart, in the script `labels.py` serves. **A dataset whose
+catch-all is not first was always going to find them.**
+
 **A symlink loop damaged the dataset directory.** `ln -s target dest` creates the link *inside*
 `dest` when `dest` already exists, producing `images/val/val → images/val`. Use `ln -sfn`. The
 tell was a file count of 385 where 384 was expected.
