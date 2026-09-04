@@ -154,7 +154,9 @@ at
         backbone-specific but is dataset-specific}: on a CLIP-based competitor at
         its own operating point it gives \cnCV{}~$\pm$~\cnCVsd{} on LoveDA and
         nothing on OpenEarthMap, exactly as for our own pipeline
-        (Table~\ref{tab:transfer}).
+        (Table~\ref{tab:transfer}). \best{The rule is also the complete family for
+        this decision}: any per-class monotone recalibration composed with a global
+        threshold reduces to it exactly (Sec.~\ref{sec:method}).
   \item \textbf{A reporting recommendation.} We observe the catch-all moving the
         headline mIoU in both directions, supplying \oemBgGain{}~IoU of an
         apparent gain in one experiment and cancelling a real one in another, and
@@ -546,6 +548,30 @@ to buy the metric by repairing an over-predicted background at land cover's
 expense, which on OpenEarthMap trades \texttt{road} and \texttt{building} away for
 a large \bg{} gain. Full mIoU is still what we report.
 
+\paragraph{Per-class thresholds are the complete family, not one option within it.}
+It is natural to ask why we do not instead \emph{calibrate} the scores --- Platt
+scaling, isotonic regression, a per-class temperature --- and keep the single
+threshold. The answer is that this would be the same method. Let $g_c$ be any
+strictly increasing per-class recalibration map. Applying it and then thresholding
+globally keeps a pixel predicted as class $c$ with score $s$ when $g_c(s)\ge\tau$,
+which holds exactly when $s\ge g_c^{-1}(\tau)$. Setting $\tau_c=g_c^{-1}(\tau)$
+recovers our rule, and setting $g_c$ to any monotone map carrying $\tau_c$ to $\tau$
+recovers theirs. \best{Every per-class monotone recalibration, composed with a global
+threshold, collapses to a per-class threshold vector, and conversely.} Fitting a full
+calibration curve therefore spends parameters this decision cannot use: the threshold
+sees only the single level set $g_c^{-1}(\tau)$, never the shape of $g_c$. Per-class
+thresholds are the minimal sufficient parameterisation of the decision, not a
+heuristic substitute for calibrating it.
+
+\paragraph{And exactly where that argument stops.} The equivalence holds \emph{given
+the argmax}. A recalibration applied \emph{before} the argmax can reorder classes,
+which is a strictly larger family that our rule cannot reach --- and we can say how
+much lives there, because it is precisely the argmax-loss mass of
+Sec.~\ref{sec:anatomy}: \mechB{} of the residual on LoveDA and \mechBpots{} on
+Potsdam. That bounds what any argmax-changing recalibration could recover from the
+part of the residual thresholds cannot touch, and on both datasets it is small. We
+regard closing it as the natural next step rather than as a defect of the rule.
+
 \begin{figure*}[t]\centering
 \includegraphics[width=\textwidth]{fig7_method.pdf}
 \caption{The method. \textbf{(a)}~The fitted thresholds span \eeSpread{} against
@@ -768,7 +794,13 @@ composes with the competitor rather than displacing it}.
 
 \paragraph{On OpenEarthMap it transfers to neither, and the failure is shared.}
 The CLIP pipeline gives \cnOemCV{}~$\pm$~\cnOemCVsd{} across folds, one of five
-positive, and \cnOemFull{} on a single partition.
+positive, and \cnOemFull{} on a single partition. One caveat belongs with that row
+before it is read as a like-for-like test: on this dataset the competitor's
+published threshold never fires, because the lowest score their pipeline produces,
+\cnOemFloor{}, lies above their published $\tau=\cnOemTau{}$. Their OpenEarthMap
+baseline is therefore an unthresholded argmax, and a fit starting from it can only
+raise thresholds, never lower them --- the opposite regime from every other cell in
+Table~\ref{tab:transfer}.
 But land cover still improves (\cnOemReal{} excluding the catch-all); what cancels
 it is \bg{}, whose IoU falls \cnOemBg{}. \best{Our own pipeline does the same thing
 on the same dataset}, and to a striking degree: the fit drives that class to
