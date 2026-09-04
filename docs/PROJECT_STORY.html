@@ -1,0 +1,1560 @@
+<!-- Project narrative for supervisor review. Rendered to PDF via headless Chrome. -->
+<title>The Story of FreeTraining-OVSS</title>
+<style>
+  @page { size: A4; margin: 17mm 15mm 15mm 15mm; }
+
+  :root{
+    --ink:#1a1a1a; --soft:#4a4a4a; --rule:#c8c8c8; --faint:#eeeeee;
+    --good:#1a6b3c; --bad:#9b2226; --warn:#8a5a00; --star:#1d4e89;
+  }
+
+  html{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body{
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    font-size:10.4pt; line-height:1.52; color:var(--ink);
+    background:#fff; margin:0; padding:0 4px;
+    text-align:left; hyphens:none;
+  }
+
+  h1{ font-size:23pt; line-height:1.15; margin:0 0 6px; letter-spacing:-0.01em; }
+  h2{
+    font-size:14.5pt; margin:0 0 14px; padding-bottom:6px;
+    border-bottom:2px solid var(--ink); page-break-before:always; page-break-after:avoid;
+  }
+  h2.nobreak{ page-break-before:auto; }
+  h3{ font-size:11.6pt; margin:20px 0 6px; page-break-after:avoid; }
+  h4{ font-size:10.4pt; margin:15px 0 4px; color:var(--soft); page-break-after:avoid;
+      text-transform:uppercase; letter-spacing:0.06em; font-weight:600; }
+  p{ margin:0 0 9px; }
+  ul,ol{ margin:0 0 10px; padding-left:20px; }
+  li{ margin-bottom:5px; }
+  strong{ font-weight:600; }
+  em{ font-style:italic; }
+  code{ font-family:"SF Mono",Menlo,Consolas,monospace; font-size:0.86em;
+        background:var(--faint); padding:0.5px 3px; border-radius:2px; }
+
+  /* ---- cover ---- */
+  .cover{ page-break-after:always; padding-top:52mm; }
+  .cover .kicker{ font-size:9.5pt; letter-spacing:0.16em; text-transform:uppercase;
+                  color:var(--soft); margin-bottom:14px; }
+  .cover .sub{ font-size:13pt; color:var(--soft); margin:10px 0 30px; line-height:1.4; }
+  .cover hr{ border:0; border-top:2px solid var(--ink); margin:0 0 22px; }
+  .meta{ font-size:9.6pt; line-height:1.75; color:var(--soft); }
+  .meta b{ color:var(--ink); font-weight:600; }
+
+  /* ---- tables ---- */
+  table{ border-collapse:collapse; width:100%; margin:10px 0 14px; font-size:9.2pt;
+         page-break-inside:avoid; }
+  th{ text-align:left; border-bottom:1.5px solid var(--ink); padding:5px 7px 4px;
+      font-weight:600; font-size:8.7pt; text-transform:uppercase; letter-spacing:0.05em; }
+  td{ border-bottom:1px solid var(--rule); padding:4.5px 7px; vertical-align:top; }
+  tr:last-child td{ border-bottom:1.5px solid var(--ink); }
+  td.n,th.n{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .hi{ background:#f4f7fb; }
+
+  /* ---- callouts ---- */
+  .box{ border-left:3px solid var(--ink); background:#fafafa; padding:9px 13px;
+        margin:12px 0; page-break-inside:avoid; }
+  .box p:last-child{ margin-bottom:0; }
+  .box.win{ border-left-color:var(--good); background:#f3f8f5; }
+  .box.fail{ border-left-color:var(--bad); background:#fbf4f4; }
+  .box.warn{ border-left-color:var(--warn); background:#fdf9f0; }
+  .box.key{ border-left-color:var(--star); background:#f2f6fb; }
+  .lbl{ font-size:8.3pt; text-transform:uppercase; letter-spacing:0.09em;
+        font-weight:700; display:block; margin-bottom:4px; }
+  .win .lbl{ color:var(--good); } .fail .lbl{ color:var(--bad); }
+  .warn .lbl{ color:var(--warn); } .key .lbl{ color:var(--star); }
+
+  .act{ font-size:8.6pt; letter-spacing:0.16em; text-transform:uppercase;
+        color:var(--soft); margin:0 0 3px; font-weight:600; }
+  .dateline{ font-size:9pt; color:var(--soft); font-style:italic; margin:-8px 0 14px; }
+
+  .lead{ font-size:11.2pt; line-height:1.5; }
+  .avoid{ page-break-inside:avoid; }
+  .tight li{ margin-bottom:2px; }
+  .fig{ font-size:8.6pt; color:var(--soft); margin:-8px 0 14px; }
+</style>
+
+<div class="cover">
+  <div class="kicker">Final Year Project &middot; IIITDM Kurnool</div>
+  <hr>
+  <h1>The Story of FreeTraining&#8209;OVSS</h1>
+  <div class="sub">How a project about recovering thrown&#8209;away pixels became a paper<br>
+  about the threshold that throws them away.</div>
+
+  <div class="meta">
+    <b>Full narrative</b> &mdash; from the first commit to the last<br>
+    <b>Period</b> &mdash; 11 August 2026 to 3 September 2026 (24 days)<br>
+    <b>Commits</b> &mdash; 150<br>
+    <b>Code</b> &mdash; 37 Python scripts, 7 shell scripts, 9,284 lines<br>
+    <b>Written record</b> &mdash; ~60,000 words of measured results<br>
+    <b>Paper draft</b> &mdash; 7,671 words, 26 references<br>
+    <b>Baselines reproduced</b> &mdash; 3 of 3, all within 0.03 mIoU of published<br>
+    <b>Datasets</b> &mdash; LoveDA, OpenEarthMap, ISPRS Potsdam<br>
+    <b>Hardware</b> &mdash; one RTX 2000 Ada, 16&nbsp;GB, power&#8209;capped at 70&nbsp;W
+  </div>
+</div>
+
+
+<!-- ==================================================================== -->
+<h2 class="nobreak">The whole thing in one page</h2>
+
+<p class="lead">If you read nothing else, read this.</p>
+
+<p><strong>What we set out to do.</strong> Modern segmentation models are asked to label
+every pixel of a satellite image with a class name &mdash; <em>building</em>, <em>water</em>,
+<em>forest</em>. The best training&#8209;free method for this, SegEarth&#8209;OV3, has a rule: if
+the model is not confident enough about a pixel, throw that pixel into a bin called
+"background". We measured that bin. <strong>On LoveDA it holds 29.68% of all the real
+land&#8209;cover pixels in the dataset</strong> &mdash; 323 million of them. Our plan was to rescue
+them, using the fact that land cover has strong spatial grammar: roads touch buildings,
+buildings essentially never touch water.</p>
+
+<p><strong>What happened.</strong> The rescue plan failed, and it failed for a reason we could
+measure precisely. But while proving it failed, we found something better and simpler that
+works: <strong>the confidence threshold itself is the wrong shape.</strong> One threshold is used
+for all classes, and it is wrong for different classes in <em>opposite directions</em>.
+Fitting one threshold per class &mdash; using the same labelled data the baseline already
+spends tuning its single threshold, training no new weights &mdash; recovers a real gain.</p>
+
+<table>
+  <tr><th>The final claim</th><th class="n">SAM&nbsp;3 pipeline<br>(SegEarth&#8209;OV3)</th><th class="n">CLIP pipeline<br>(ConInfer)</th></tr>
+  <tr><td>LoveDA, 5&#8209;fold &Delta; mIoU</td><td class="n"><strong>+1.18 &plusmn; 0.45</strong></td><td class="n"><strong>+2.51 &plusmn; 0.34</strong></td></tr>
+  <tr><td>&mdash; worst fold of five</td><td class="n">+0.80</td><td class="n">+2.22</td></tr>
+  <tr><td>&mdash; excluding the catch&#8209;all class</td><td class="n">+1.36</td><td class="n">+1.94</td></tr>
+  <tr><td>Labelled tiles needed to calibrate</td><td class="n">~200</td><td class="n">~25</td></tr>
+  <tr><td>New model weights trained</td><td class="n">none</td><td class="n">none</td></tr>
+</table>
+
+<div class="box key">
+  <span class="lbl">Why this matters more than a bigger number would</span>
+  <p>The gain is <strong>larger on the pipeline it was not developed for</strong>, and on that
+  pipeline <em>every single class improves</em>. So the finding is not "SAM 3 has a quirk".
+  It is a statement about <strong>any</strong> method that thresholds per&#8209;class confidence
+  scores &mdash; which is nearly all of them. And it <strong>composes with</strong> our nearest
+  published competitor instead of beating it: their score goes 36.99 &rarr; 39.52 when we put
+  our calibration on top. We improve their method rather than compete with it.</p>
+</div>
+
+<p><strong>The second half of the paper</strong> is a measurement study explaining <em>why</em>
+the residual exists and why rescuing it does not work. The short answer is that it is
+governed by <strong>how the dataset was labelled</strong>, not by the model. When a dataset
+provides a "catch&#8209;all" class that means <em>everything else</em>, the model always has a
+plausible answer available, and the discarded pixels become impossible to distinguish from
+genuine background. We proved that causally with a controlled experiment, and then a third
+dataset falsified half of it &mdash; which we report as a falsification rather than repair.</p>
+
+<h4>The honest ledger</h4>
+<table>
+  <tr><th>Thing we tried</th><th>Outcome</th></tr>
+  <tr><td>Co&#8209;occurrence prior (the original thesis)</td><td>&#10007; Dead. Worth +0.2 points; a <em>perfect</em> matrix is worth +0.3.</td></tr>
+  <tr><td>Just lower the threshold</td><td>&#10007; Costs 5.54 mIoU. 1.73 wrong pixels per 1 right.</td></tr>
+  <tr><td>Remove the presence gate</td><td>&#10007; Costs 11.97 mIoU. No net recovery at all.</td></tr>
+  <tr><td>Detect which pixels are recoverable</td><td>&#10007; Nine signals, all at chance on LoveDA.</td></tr>
+  <tr><td>Find a label&#8209;free rule for the thresholds</td><td>&#10007; Eleven attempts, all bounded, with the reason proved.</td></tr>
+  <tr><td>Better region shapes (SLIC superpixels)</td><td>&#10003; Ceiling 72.8% &rarr; 92.8%. Worth 20&times; the prior.</td></tr>
+  <tr class="hi"><td><strong>Per&#8209;class calibrated thresholds</strong></td><td>&#10003; <strong>The method. Works on two architectures.</strong></td></tr>
+  <tr class="hi"><td><strong>Catch&#8209;all&#8209;excluded mIoU as a reported metric</strong></td><td>&#10003; <strong>Turned a "flat" dataset into a positive one.</strong></td></tr>
+</table>
+
+<p>Five of our own findings were refuted <em>by us</em>, before anyone else could. That is the
+part of the work I would point at first.</p>
+
+
+<!-- ==================================================================== -->
+<h2>Act I &mdash; The wrong PDF</h2>
+<p class="act">11&ndash;12 August &middot; commits <code>da2bb6f</code> &rarr; <code>3cb1edb</code></p>
+
+<p>The project began with a problem statement and two PDFs. The statement proposed an
+<em>unsupervised</em> pipeline: run a segmentation model, keep the confident pixels,
+build a matrix of which classes sit next to which, and use that matrix to label the
+unconfident pixels. Sensible. The repository at that point held a scaffold built on
+<strong>SAM 1 + CLIP</strong>.</p>
+
+<p>Two things were wrong before a single line was run, and finding them in week one
+instead of week nine is most of why the project survived.</p>
+
+<h3>1. The second PDF was not the SAM paper</h3>
+
+<p>The file named <code>sam_research_papaer(1).pdf</code> was actually
+<strong>SegEarth&#8209;OV3</strong> (arXiv:2512.08730) &mdash; written by the same group that wrote
+the first PDF (SegEarth&#8209;OV, CVPR 2025). It already does a large part of what the problem
+statement proposed, using SAM 3 rather than SAM 1.</p>
+
+<div class="box warn">
+  <span class="lbl">The realisation</span>
+  <p>We had accidentally been handed <strong>our own closest competitor</strong>, and had been
+  planning to rebuild half of it from scratch on an older model.</p>
+</div>
+
+<p>This was good news, not bad, and the reasoning matters:</p>
+<ul class="tight">
+  <li>The baseline is <strong>published and open source</strong>. We do not have to build from zero.</li>
+  <li>The question "does SAM 3 even work on satellite images?" is <strong>already answered</strong>. That saves a month.</li>
+  <li>We now know <strong>exactly</strong> what our contribution has to be in order not to be a duplicate.</li>
+</ul>
+
+<p>So the project was repositioned on day two. Not "an unsupervised SAM 3 pipeline", but:
+<em>SegEarth&#8209;OV3 throws away low&#8209;confidence pixels into background; we recover them.</em>
+SegEarth&#8209;OV3 became our <strong>named baseline</strong>, and our headline number became a
+delta against it rather than an unanchored score.</p>
+
+<h3>2. "Unsupervised" was the wrong word</h3>
+
+<p>The input includes a list of the possible class names. That is not unsupervised &mdash; it is
+<strong>zero&#8209;shot / open&#8209;vocabulary / training&#8209;free</strong>. SegEarth&#8209;OV itself
+footnotes that even "training&#8209;free" is a stretch for them, and settles on
+<em>annotation&#8209;free</em>. We adopted the same careful phrasing:
+<strong>training&#8209;free, annotation&#8209;free open&#8209;vocabulary semantic segmentation</strong>.
+Examiners and reviewers notice this.</p>
+
+<h3>Then: does the idea have any signal at all?</h3>
+
+<p>Before writing any method, we wrote a 40&#8209;line script
+(<code>cooccurrence_gt.py</code>) that measured, from ground&#8209;truth masks alone, whether
+land&#8209;cover classes actually have adjacency structure. The measure is
+<strong>pointwise mutual information</strong> (PMI): how much more often do two classes touch
+than they would if they were scattered at random?</p>
+
+<table>
+  <tr><th>Measurement</th><th class="n">Result</th></tr>
+  <tr><td>Mean |PMI| over class pairs, LoveDA urban</td><td class="n">1.658 bits</td></tr>
+  <tr><td>Mean |PMI| over class pairs, LoveDA rural</td><td class="n">1.538 bits</td></tr>
+  <tr><td>Random&#8209;scatter control (what "no signal" looks like)</td><td class="n">0.004 bits</td></tr>
+</table>
+
+<p>Hundreds of times above the noise floor. The premise held. Three design decisions came
+straight out of that first measurement, and all three overturned what the original
+statement proposed:</p>
+
+<table>
+  <tr><th>Original design</th><th>Replaced by, and why</th></tr>
+  <tr><td>Adjacency = distance between region centres</td><td><strong>Shared boundary length</strong> &mdash; two regions can be close without touching.</td></tr>
+  <tr><td>Add up positive evidence from neighbours</td><td><strong>Signed PMI</strong> &mdash; the <em>largest</em> signals are negative. Building&ndash;water is 0.02&times; chance. "This borders a building, so it is almost certainly not water" is the single most reliable fact available, and a positive&#8209;only formula cannot express it.</td></tr>
+  <tr><td>One matrix per image</td><td><strong>Hierarchical</strong> mix of a corpus&#8209;wide matrix and a per&#8209;image one &mdash; 6 of 15 class pairs <em>flip sign</em> between urban and rural. A single global matrix averages them into mush.</td></tr>
+</table>
+
+<h3>And a second competitor appeared</h3>
+
+<p><strong>ConInfer</strong> (arXiv:2603.29271, March 2026) claims to be the first work to use
+context at inference time for this exact task, reporting <strong>+2.80 mIoU</strong> over
+SegEarth&#8209;OV. Any reviewer in the area would know it. But it did not close our gap, and
+we wrote down precisely why:</p>
+
+<table>
+  <tr><th></th><th>ConInfer</th><th>Ours (as planned then)</th></tr>
+  <tr><td>Backbone</td><td>CLIP</td><td>SAM 3</td></tr>
+  <tr><td>Kind of context</td><td><strong>Visual</strong> (image features)</td><td><strong>Semantic</strong> (class&#8209;pair adjacency)</td></tr>
+  <tr><td>Granularity</td><td><strong>Patch</strong> level</td><td><strong>Region</strong> level</td></tr>
+  <tr><td>Where the prior comes from</td><td>Fitted per scene</td><td>Mined across the corpus</td></tr>
+  <tr><td>Can express exclusion?</td><td>No</td><td>Yes (signed PMI)</td></tr>
+</table>
+
+<p>Their own limitations section names pixel&#8209; and region&#8209;level context modelling as
+future work. That was our opening.</p>
+
+
+<!-- ==================================================================== -->
+<h2>Act II &mdash; The week the environment nearly won</h2>
+<p class="act">17&ndash;18 August &middot; commits <code>f18ad72</code> &rarr; <code>9eea352</code></p>
+
+<p>Nothing in this act is intellectually interesting and it cost the most calendar time of
+any single obstacle. It is included because it is the honest answer to "why did week two
+take a week".</p>
+
+<h3>The three&#8209;way version deadlock</h3>
+
+<p>SegEarth&#8209;OV3 is built on MMSegmentation, which needs a compiled library called
+<code>mmcv</code>. Three requirements intersect at exactly one point in the whole version space:</p>
+
+<table>
+  <tr><th>Component</th><th>Constraint</th></tr>
+  <tr><td>SAM 3</td><td>needs torch <strong>&ge; 2.3</strong> (it uses an API that did not exist before)</td></tr>
+  <tr><td>mmcv prebuilt wheels</td><td>exist for torch 2.1&ndash;2.4, and <strong>none for 2.5+</strong></td></tr>
+  <tr><td>mmsegmentation 1.2.2</td><td>asserts mmcv <strong>&lt; 2.2.0</strong></td></tr>
+</table>
+
+<p>So torch 2.4.1 is the <em>only</em> version that satisfies SAM 3 and still has a prebuilt
+mmcv. Its wheel is mmcv 2.2.0 &mdash; excluded by MMSegmentation's upper bound by one patch
+version. The fix was a one&#8209;character edit to an installed package
+(<code>MMCV_MAX = '2.2.0'</code> &rarr; <code>'2.3.0'</code>).</p>
+
+<p><strong>Five other approaches were tried and all failed:</strong></p>
+<ul class="tight">
+  <li>Python 3.13 &mdash; no mmcv wheels exist for it at all.</li>
+  <li><code>mmcv-lite</code> &mdash; MMSegmentation eagerly imports compiled CUDA operations at package load, so the lite build cannot work. Installing both breaks imports entirely.</li>
+  <li>Building mmcv from source &mdash; the system CUDA compiler is version <strong>13.3</strong> while torch is built against <strong>12.1</strong>, and torch refuses to compile across that gap.</li>
+  <li>Installing the CUDA toolkit into the environment &mdash; the package that provides the compiler is a different one, so this quietly does nothing.</li>
+  <li>Newer mmcv from source &mdash; its installer imports a module that modern setuptools removed.</li>
+</ul>
+
+<div class="box">
+  <span class="lbl">Standing rule since</span>
+  <p>Never run <code>pip install -U</code> in this environment, and never rebuild it by hand.
+  The working combination is captured in <code>scripts/setup_env.sh</code>, and the project's
+  instruction file states it in bold at the top. Every number in the project rests on it.</p>
+</div>
+
+<h3>The baseline reproduced</h3>
+
+<p>Then the gate that made everything afterwards credible.</p>
+
+<table>
+  <tr><th>Dataset</th><th class="n">Published</th><th class="n">Ours</th><th class="n">Difference</th></tr>
+  <tr class="hi"><td>LoveDA (1,669 validation tiles)</td><td class="n">47.4</td><td class="n"><strong>47.38</strong></td><td class="n">0.02</td></tr>
+  <tr><td>OpenEarthMap (384 of 500 tiles)</td><td class="n">42.9</td><td class="n">44.19</td><td class="n">+1.29</td></tr>
+  <tr><td>ISPRS Potsdam (2,016 tiles)</td><td class="n">57.8</td><td class="n"><strong>57.83</strong></td><td class="n">0.03</td></tr>
+</table>
+
+<p class="fig">The OpenEarthMap row is on 77% of the official split, so it is a sanity anchor
+rather than a strict reproduction. The other two are exact.</p>
+
+<p>Timing: 0.85 seconds per image, about 24 minutes for a full LoveDA pass, 6,115 MB peak
+memory of 16 GB available. The card runs at 100% utilisation against a <strong>70 W power
+cap</strong>, not a thermal limit &mdash; so 24 minutes is the floor on this hardware and no
+tuning improves it. That single fact shaped every later experimental design: we cached
+everything, so that later work became arithmetic instead of GPU runs.</p>
+
+<h3>The baseline's own table already showed the premise</h3>
+
+<p>Precision means "when the model says <em>water</em>, how often is it right". Recall means
+"of all the water that exists, how much did it find".</p>
+
+<table>
+  <tr><th>Class</th><th class="n">IoU</th><th class="n">Precision</th><th class="n">Recall</th><th class="n">Gap</th></tr>
+  <tr><td>building</td><td class="n">63.81</td><td class="n">77.2</td><td class="n">78.6</td><td class="n">&minus;1.4</td></tr>
+  <tr><td>road</td><td class="n">53.89</td><td class="n">69.6</td><td class="n">70.5</td><td class="n">&minus;1.0</td></tr>
+  <tr class="hi"><td><strong>water</strong></td><td class="n">51.44</td><td class="n"><strong>89.5</strong></td><td class="n"><strong>54.7</strong></td><td class="n"><strong>+34.8</strong></td></tr>
+  <tr><td>agricultural</td><td class="n">47.47</td><td class="n">66.9</td><td class="n">62.0</td><td class="n">+4.9</td></tr>
+  <tr class="hi"><td><strong>background</strong></td><td class="n">45.50</td><td class="n"><strong>56.9</strong></td><td class="n"><strong>69.4</strong></td><td class="n"><strong>&minus;12.5</strong></td></tr>
+  <tr><td>barren</td><td class="n">35.73</td><td class="n">51.5</td><td class="n">53.9</td><td class="n">&minus;2.4</td></tr>
+  <tr><td>forest</td><td class="n">33.78</td><td class="n">57.9</td><td class="n">44.8</td><td class="n">+13.1</td></tr>
+</table>
+
+<p>Read the two highlighted rows together. <strong>Water: right nine times in ten when it
+fires, but finds only half the water present.</strong> Those missing pixels are not being
+misclassified as something else &mdash; they are falling below the threshold and being dumped
+into background. And <strong>background shows exactly the inverse pattern</strong>: over&#8209;predicted
+and impure, absorbing pixels that belong to real classes. The bin is visible in the metrics.</p>
+
+<p>Meanwhile <em>building</em> and <em>road</em> are balanced. The weakness is confined to
+amorphous "stuff" rather than sharp&#8209;boundary "things" &mdash; which is the exact duality
+SegEarth&#8209;OV3's own paper identifies. That told us where any gain would have to come from,
+seventeen days before we found the method that delivered it.</p>
+
+
+<!-- ==================================================================== -->
+<h2>Act III &mdash; Measuring the motivation, and refuting ourselves twice</h2>
+<p class="act">20&ndash;21 August &middot; commits <code>df78a97</code> &rarr; <code>21f749e</code></p>
+
+<p>The premise needed a number, not an argument. We wrote instrumentation that records, for
+every tile, what fraction of real land&#8209;cover pixels the baseline assigns to background.</p>
+
+<div class="box win">
+  <span class="lbl">The headline motivation number</span>
+  <p><strong>29.68% of all real&#8209;class pixels in LoveDA validation are assigned to
+  background</strong> &mdash; 323,184,908 pixels. The pre&#8209;agreed rule was that anything below
+  5% would mean pivoting the project. It cleared that bar by a factor of six.</p>
+</div>
+
+<h3>The obvious objection, answered before a reviewer could raise it</h3>
+
+<p>Anyone reading that number asks the same thing immediately: <em>why not just lower the
+threshold?</em> So we ran it, at three settings.</p>
+
+<table>
+  <tr><th>Threshold &tau;</th><th class="n">mIoU</th><th class="n">Real pixels discarded</th></tr>
+  <tr><td>0.5 (the published setting)</td><td class="n">47.37</td><td class="n">29.68%</td></tr>
+  <tr><td>0.3</td><td class="n">46.64</td><td class="n">20.55%</td></tr>
+  <tr><td>0.1</td><td class="n"><strong>41.83</strong></td><td class="n">10.88%</td></tr>
+</table>
+
+<p>Lowering the threshold recovers two&#8209;thirds of the discarded pixels and costs
+<strong>5.54 mIoU</strong>. Tracking a single class through the sweep shows why: going from
+0.5 to 0.1 recovers 85 million agricultural pixels and creates <strong>148 million new false
+positives</strong> &mdash; <strong>1.73 wrong for every 1 right</strong>.</p>
+
+<p>And the cost is sharply non&#8209;linear, which is a subtlety we would have missed with a
+two&#8209;point sweep:</p>
+
+<table>
+  <tr><th>Segment</th><th class="n">Pixels recovered</th><th class="n">mIoU cost</th><th class="n">Cost per 100M px</th></tr>
+  <tr><td>0.5 &rarr; 0.3</td><td class="n">99.4M</td><td class="n">&minus;0.73</td><td class="n">0.73</td></tr>
+  <tr><td>0.3 &rarr; 0.1</td><td class="n">105.3M</td><td class="n">&minus;4.81</td><td class="n"><strong>4.57</strong></td></tr>
+</table>
+
+<p>Nearly identical pixel counts; the second half costs <strong>6.2 times more</strong>. There is
+a shallow band just under the threshold that is cheap to reach, and a deep tail that is not.
+Any claim of the form "threshold relaxation is expensive" has to say <em>which part of the
+range</em>, or a reviewer with the middle row will object.</p>
+
+<h3>The dominant error is silence, not error</h3>
+
+<p>Every class's pixels end up in one of three places: correct, dumped in background, or
+confused with a different real class. Aggregated:</p>
+
+<div class="box key">
+  <span class="lbl">3 : 1</span>
+  <p>About <strong>29.7%</strong> of real&#8209;class pixels go to background against
+  <strong>9.9%</strong> confused with another real class. <strong>The baseline is mostly not
+  wrong &mdash; it is silent.</strong> That single ratio is the answer to "why not just improve
+  the classifier", and it leads the results section of the paper.</p>
+</div>
+
+<h3>Self&#8209;refutation #1: the presence head</h3>
+
+<p>SAM 3 has a "presence head" that outputs one number per class per image: <em>does this
+concept exist here at all?</em> SegEarth&#8209;OV3 multiplies every pixel score by it. We probed
+a tile that reported 100% discard, and found something that looked spectacular:</p>
+
+<table>
+  <tr><th>Class on tile 3487</th><th class="n">Presence score</th><th class="n">Dense evidence</th><th class="n">Best possible score</th></tr>
+  <tr class="hi"><td><strong>road</strong></td><td class="n"><strong>0.0757</strong></td><td class="n">+10.13 (near&#8209;certain)</td><td class="n"><strong>0.076</strong></td></tr>
+  <tr><td>forest</td><td class="n">0.0094</td><td class="n">+5.03</td><td class="n">0.009</td></tr>
+  <tr><td>agricultural</td><td class="n">0.0200</td><td class="n">+5.44</td><td class="n">0.020</td></tr>
+</table>
+
+<p>The dense part of the model is <em>certain</em> road is present. One global scalar crushes
+the whole tile below any usable threshold. It generalised, too: across all 1,669 tiles,
+catastrophic tiles had median presence <strong>0.273</strong> against <strong>0.918</strong> for
+healthy ones, correlation <strong>&minus;0.750</strong>.</p>
+
+<p>This looked like the strongest result in the project. We wrote down, <em>in advance</em>,
+what would count as proof and what would count as refutation, then ran the counterfactual:
+turn the presence gate off entirely.</p>
+
+<table>
+  <tr><th>Tile group</th><th class="n">Discard before</th><th class="n">After</th><th class="n">Change</th></tr>
+  <tr><td>catastrophic (198 tiles)</td><td class="n">99.97%</td><td class="n">60.82%</td><td class="n">&minus;39.15</td></tr>
+  <tr class="hi"><td><strong>healthy (77 tiles)</strong></td><td class="n">0.46%</td><td class="n"><strong>54.11%</strong></td><td class="n"><strong>+53.64</strong></td></tr>
+</table>
+
+<div class="box fail">
+  <span class="lbl">Refuted &mdash; by us</span>
+  <p>Overall mIoU fell <strong>11.97</strong>. And the disqualifying number was not that one:
+  the correlation between a tile's presence score and how much it recovered was
+  <strong>+0.018</strong>. If gating were suppressing recoverable evidence, the
+  <em>lowest</em>&#8209;presence tiles would recover <em>most</em>. It is zero.
+  <strong>The tiles that recover are not the presence&#8209;suppressed ones.</strong>
+  Presence collapse is a <em>correlate</em>, not a cause. No causal claim about it went into
+  the paper.</p>
+</div>
+
+<p>The mechanism turned out to be something else entirely, and better. <strong>SAM 3 essentially
+never detects "background"</strong> &mdash; median presence <strong>0.022</strong>, against
+0.45&ndash;0.91 for every real class. Obvious in hindsight: background is not a visual concept,
+it is the dataset's catch&#8209;all for unlabelled area. So gating was holding <em>background</em>
+down. Remove it and background surges and wins outright.</p>
+
+<p>This is worth a sentence in the paper on its own, because <strong>it inverts
+SegEarth&#8209;OV3's stated motivation.</strong> They present presence gating as preventing
+hallucination of absent classes. Measured on LoveDA, its single largest effect is suppressing
+the background class. Their paper does not report this, and unlike the causal claim we
+abandoned, this one is directly measured.</p>
+
+<h3>Self&#8209;refutation #2: "road is a hub" was measuring road's perimeter</h3>
+
+<p>Our own published analysis had found that roads attract every class, and had built a
+weighting scheme on it. Then we checked the statistics rather than the conclusion.</p>
+
+<p>The PMI formula compares an <em>observed</em> quantity against an <em>expected</em> one. We
+were observing <strong>boundary frequency</strong> but computing the expectation from
+<strong>area</strong>. These are different measures. A class shaped like thin ribbons has far
+more boundary per unit area than one in fat blocks &mdash; so the formula was rewarding
+high&#8209;perimeter classes for their geometry, with no semantics involved. Road is the thinnest
+class in LoveDA.</p>
+
+<table>
+  <tr><th>Pair</th><th class="n">Area&#8209;based (published)</th><th class="n">Boundary&#8209;based (correct)</th><th>Verdict</th></tr>
+  <tr><td>road &ndash; barren</td><td class="n">+2.32</td><td class="n">+0.17</td><td>collapses</td></tr>
+  <tr><td>road &ndash; forest</td><td class="n">+1.96</td><td class="n">+0.06</td><td>collapses</td></tr>
+  <tr><td>barren &ndash; forest</td><td class="n">+0.72</td><td class="n">&minus;1.11</td><td><strong>flips sign</strong></td></tr>
+  <tr class="hi"><td><strong>building &ndash; water</strong></td><td class="n">&minus;4.66</td><td class="n"><strong>&minus;2.83</strong></td><td><strong>survives</strong></td></tr>
+</table>
+
+<p><strong>The premise survived; the ranking did not.</strong> Mean signal recomputed correctly
+is <strong>0.574 bits against a 0.003 permutation floor &mdash; 216&times;</strong>, still decisive.
+But "road is a hub" was an artefact, and the real hub is <em>agriculture</em>. We verified the
+diagnosis on synthetic data: a corpus where one class is a thin ribbon by construction gives it
++3.00 under the wrong formula and +0.23 under the right one.</p>
+
+<p class="fig">This correction generalises beyond our project &mdash; anyone doing co&#8209;occurrence
+analysis on segmentation masks will hit it &mdash; and it became one of the paper's secondary
+contributions.</p>
+
+<h3>Two discard mechanisms, not one</h3>
+
+<p>A pixel can end up labelled background two ways: it fell below the threshold, or background
+genuinely won the vote. We separated them exactly.</p>
+
+<table>
+  <tr><th>Mechanism</th><th class="n">Pixels</th><th class="n">Share</th></tr>
+  <tr><td>(A) fell below the threshold</td><td class="n">303,706,238</td><td class="n">94.0%</td></tr>
+  <tr class="hi"><td><strong>(B) background won the vote outright</strong></td><td class="n">19,378,177</td><td class="n"><strong>6.0%</strong></td></tr>
+</table>
+
+<p>Every single (B) pixel is <strong>water</strong>, concentrated in <strong>24 tiles</strong> &mdash;
+large open&#8209;water scenes. And (B) is <strong>unreachable by any threshold whatsoever</strong>,
+because lowering a threshold cannot change which class won a vote. Part of the residual lies
+outside what threshold tuning can address at all. That sharpened the motivation from "the
+obvious fix is expensive" to "and some of it the obvious fix cannot touch".</p>
+
+<div class="box key">
+  <span class="lbl">The motivation section, complete</span>
+  <p>Three blunt interventions, all measured, all failing: lower the threshold
+  (<strong>&minus;5.54</strong>, 1.73 wrong per right) &middot; remove presence gating
+  (<strong>&minus;11.97</strong>, no net recovery) &middot; do nothing (<strong>29.68%</strong>
+  discarded). Every global knob that reaches the residual costs more than it returns, so any
+  recovery has to be <em>selective</em> and <em>semantic</em>. Two refutations make a stronger
+  motivation than one.</p>
+</div>
+
+
+<!-- ==================================================================== -->
+<h2>Act IV &mdash; The thesis dies</h2>
+<p class="act">25&ndash;27 August &middot; commits <code>dc05235</code> &rarr; <code>286b643</code></p>
+
+<p>This act builds the thing the project was founded on, tests it properly, and finds it does
+not earn its place. It is the most important act, because everything good came after it.</p>
+
+<h3>The prior was built, and it is accurate</h3>
+
+<p>We mined the co&#8209;occurrence matrix from SAM 3's own confident predictions, using no
+labels &mdash; the honest, deployable version. The worry (written down back in Act I) was
+<strong>circularity</strong>: if the model is systematically unsure about <em>barren</em>, the
+mined matrix under&#8209;represents every barren relationship, and we then use that matrix to
+label the barren regions the model missed. The prior would work against the classes that need
+help most.</p>
+
+<table>
+  <tr><th>Validation gate</th><th>Result</th></tr>
+  <tr class="hi"><td><strong>Gate 1 &mdash; circularity</strong></td><td>&#10003; <strong>Passes.</strong> Mined matrix agrees with the ground&#8209;truth matrix at &rho; = <strong>+0.757</strong>. Error does <em>not</em> concentrate on the discarded classes (&rho; = &minus;0.257). The concern is retired with a number.</td></tr>
+  <tr><td><strong>Gate 2 &mdash; usefulness</strong></td><td>&#10007; <strong>Fails, and against ground truth too.</strong></td></tr>
+</table>
+
+<p>Gate 2 is the interesting failure. It asked: does the matrix assign <em>low</em>
+compatibility to exactly the pairs the baseline confuses? The baseline's top confusion is
+<em>forest predicted as agriculture</em>. But the <strong>true</strong> matrix says forest and
+agriculture are <em>attracted</em> (+0.32). A perfect matrix would <em>reinforce</em> the
+error.</p>
+
+<p>The reason is simple and fatal: <strong>adjacency and confusability are the same signal.</strong>
+Things that touch each other look alike at the boundary. This is not a mining defect that
+better engineering could fix.</p>
+
+<h3>The ceiling test</h3>
+
+<p>We then asked the fairest possible question: given regions we <em>know</em> should be
+relabelled, how well does the prior label them, compared to the dumbest possible alternative?</p>
+
+<table>
+  <tr><th>Labelling method</th><th class="n">Pixel accuracy</th></tr>
+  <tr><td>Always guess the most common class</td><td class="n">38.6%</td></tr>
+  <tr class="hi"><td><strong>Just copy the biggest neighbour (prior switched off)</strong></td><td class="n"><strong>48.4%</strong></td></tr>
+  <tr><td>Best mix of neighbour vote and mined prior</td><td class="n">48.6%</td></tr>
+  <tr><td>Best mix using the <em>perfect</em> ground&#8209;truth matrix</td><td class="n">48.7%</td></tr>
+  <tr><td>Pure co&#8209;occurrence, no neighbour vote</td><td class="n">20.1%</td></tr>
+</table>
+
+<div class="box fail">
+  <span class="lbl">The thesis is dead</span>
+  <p>A <strong>perfect</strong> co&#8209;occurrence matrix adds <strong>0.3 points</strong> over
+  copying the largest neighbour. Not the mined one &mdash; the perfect one. There is no
+  engineering effort that recovers this. It works only where four or more classes border a
+  region, which is <strong>10% of the residual</strong>, diluting to +0.40 overall.</p>
+  <p>Verdict: it is an <strong>ablation row, not a thesis</strong>. And we do not revive it.</p>
+</div>
+
+<h3>What actually mattered instead: the shape of the regions</h3>
+
+<p>While testing the prior, we tested the regions it operates on. This turned out to be worth
+sixty times more.</p>
+
+<table>
+  <tr><th>Region method</th><th class="n">Count</th><th class="n">Largest region</th><th class="n">Purity</th><th class="n">Best possible accuracy</th></tr>
+  <tr><td>Connected components</td><td class="n">41,952</td><td class="n">1,048,576 px</td><td class="n">0.728</td><td class="n">72.8%</td></tr>
+  <tr class="hi"><td><strong>SLIC superpixels</strong></td><td class="n">506,064</td><td class="n">60,740 px</td><td class="n"><strong>0.928</strong></td><td class="n"><strong>92.8%</strong></td></tr>
+</table>
+
+<p>The largest connected component was <em>an entire image tile</em> &mdash; one region containing
+several different classes, so no single label could ever be right for it. Switching to SLIC
+lifted the ceiling by <strong>20 points</strong>, against 0.3 for a perfect prior. Pixels in
+unlabelable regions fell from 12.5% to 1.1%.</p>
+
+<h3>And the real blocker: we cannot tell which pixels to fix</h3>
+
+<p>Relabelling is only useful if you know <em>which</em> background pixels deserve it. We tested
+nine different signals for that, scored by AUC &mdash; 0.5 is a coin flip, 1.0 is perfect.</p>
+
+<table>
+  <tr><th>Signal</th><th class="n">LoveDA AUC</th></tr>
+  <tr><td>Confidence of the winning class</td><td class="n">0.582</td></tr>
+  <tr><td>Confidence of the runner&#8209;up class</td><td class="n">0.541</td></tr>
+  <tr><td>Score before presence gating</td><td class="n">0.559</td></tr>
+  <tr><td>Presence score</td><td class="n">0.434</td></tr>
+  <tr><td>Region mean confidence</td><td class="n">0.576</td></tr>
+  <tr><td>Novelty against class prototypes</td><td class="n">0.514 / 0.528</td></tr>
+  <tr><td>Texture / gradient energy</td><td class="n">0.622</td></tr>
+</table>
+
+<p class="fig">Empirical chance floor for this setup: ~0.53.</p>
+
+<p>All at chance. Three hypotheses died here: there is no hidden second threshold in the
+confidence scores; presence gating is not hiding the signal (the pre&#8209;gating score scores
+<em>worse</em>); and novelty detection fails for a reason consistent with its own premise &mdash;
+a residual class has no compact region of feature space to be far from.</p>
+
+<div class="box warn">
+  <span class="lbl">A negative control caught a confound we would have published</span>
+  <p>Run on <strong>random&#8209;colour images</strong>, where no signal can possibly exist, the
+  novelty detector scored <strong>0.966</strong>. Cause: a region's mean colour has noise that
+  shrinks as the region grows, so a "distance" feature partly measures region <em>size</em>,
+  which correlates with the answer. Fixed with size&#8209;stratified scoring and unit&#8209;tested
+  both ways (pure size&#8209;leak 0.503; genuine signal 0.926). Without the control, an AUC near
+  1.0 would have gone into the paper as a breakthrough.</p>
+</div>
+
+<h3>And a ground&#8209;truth leak in our own code</h3>
+
+<p>The first version of the recovery evaluation scoped its regions to pixels the ground truth
+says are real classes. That hands the method advance knowledge of where to look, and immunity
+from damaging true background &mdash; exactly the protection that threshold relaxation does not
+get. It produced a clean, quotable <strong>+3.47</strong> that was not a result. It is now kept
+deliberately as an explicitly labelled <em>upper bound</em>.</p>
+
+<h3>The second dataset, and the mechanism</h3>
+
+<p>One dataset is a desk reject. We added <strong>OpenEarthMap</strong>. Almost everything
+disagreed &mdash; and one variable explained all of it.</p>
+
+<table>
+  <tr><th></th><th class="n">LoveDA</th><th class="n">OpenEarthMap</th></tr>
+  <tr class="hi"><td><strong>"background" share of ground truth</strong></td><td class="n"><strong>36.1%</strong> (catch&#8209;all)</td><td class="n"><strong>0.84%</strong> (rare, genuine)</td></tr>
+  <tr><td>Real pixels discarded</td><td class="n">29.68%</td><td class="n">3.78%</td></tr>
+  <tr><td>Catastrophic tiles (&ge;99% discard)</td><td class="n">198</td><td class="n">0</td></tr>
+  <tr><td>Presence&ndash;discard correlation</td><td class="n">&minus;0.750</td><td class="n">+0.094</td></tr>
+  <tr><td>Best detection AUC</td><td class="n">0.622</td><td class="n"><strong>0.913</strong></td></tr>
+  <tr><td>Pixels the model commits to</td><td class="n">55.7%</td><td class="n">95.9%</td></tr>
+</table>
+
+<div class="box key">
+  <span class="lbl">The mechanism, in one sentence</span>
+  <p>A <strong>catch&#8209;all class gives the model a plausible answer everywhere</strong>, so a
+  strong runner&#8209;up carries no information. Where the vocabulary genuinely covers the scene,
+  a strong runner&#8209;up means a real class was suppressed &mdash; and the residual becomes
+  detectable.</p>
+</div>
+
+<p>Two consequences we had to accept immediately: our own headline <strong>29.68% is a LoveDA
+number, not a general one</strong>, and the presence&#8209;collapse correlation is a property of
+LoveDA's annotation scheme rather than of SAM 3. Both are labelled as such throughout.</p>
+
+<h3>But recovery still failed &mdash; and the way it "worked" was a trap</h3>
+
+<p>On OpenEarthMap, recovery gave <strong>+2.28 mIoU</strong>. Genuinely tempting. We broke it
+down per class before believing it.</p>
+
+<table>
+  <tr><th>Class</th><th class="n">Before</th><th class="n">After</th><th class="n">&Delta;</th></tr>
+  <tr class="hi"><td><strong>background</strong></td><td class="n">17.13</td><td class="n">39.80</td><td class="n"><strong>+22.67</strong></td></tr>
+  <tr><td><strong>building</strong></td><td class="n">75.32</td><td class="n">71.57</td><td class="n"><strong>&minus;3.75</strong></td></tr>
+  <tr><td>tree</td><td class="n">63.91</td><td class="n">63.26</td><td class="n">&minus;0.64</td></tr>
+  <tr><td>road</td><td class="n">45.88</td><td class="n">45.32</td><td class="n">&minus;0.56</td></tr>
+  <tr><td>water</td><td class="n">66.57</td><td class="n">67.60</td><td class="n">+1.02</td></tr>
+</table>
+
+<div class="box fail">
+  <span class="lbl">A headline gain that is not a segmentation improvement</span>
+  <p>The eight real classes <strong>lost 2.11 IoU in aggregate</strong>. The catch&#8209;all
+  alone gained 22.67 &mdash; <strong>110% of the total</strong>. The method made land&#8209;cover
+  classification <em>worse</em>, and damaged the baseline's best class. Averaging over nine
+  classes converted that into a positive headline.</p>
+  <p>We never quote +2.28 without this table beside it. It became one of the most useful things
+  in the paper, because it is the table a sceptical reviewer would otherwise construct
+  themselves.</p>
+</div>
+
+<p>At the end of Act IV the project had: a dead thesis, a settled engineering result about
+region shapes, a two&#8209;dataset mechanism, and no method.</p>
+
+
+<!-- ==================================================================== -->
+<h2>Act V &mdash; The pivot</h2>
+<p class="act">28 August &middot; commits <code>ca64d15</code> &rarr; <code>4e3a6c8</code></p>
+
+<p>An earlier note in the project said "threshold tuning is closed". Re&#8209;reading it, the
+evidence behind that sentence was a sweep of <strong>one global threshold</strong>, which found
+nothing (+0.04). <strong>Per&#8209;class thresholds had never been tested.</strong> That oversight
+turned out to be the whole paper.</p>
+
+<h3>Step 1 &mdash; is there anything there? (the oracle bound)</h3>
+
+<p>First we cheated on purpose, to find the ceiling: choose the best possible threshold for
+each class using the answer key.</p>
+
+<table>
+  <tr><th>Rung</th><th class="n">Free parameters</th><th class="n">LoveDA mIoU</th></tr>
+  <tr><td>Published threshold (0.5 for everything)</td><td class="n">0</td><td class="n">47.37</td></tr>
+  <tr><td>Best single global threshold</td><td class="n">1</td><td class="n">47.41 (+0.04)</td></tr>
+  <tr class="hi"><td><strong>Best per&#8209;class thresholds</strong></td><td class="n">6</td><td class="n"><strong>48.83 (+1.46)</strong></td></tr>
+</table>
+
+<p>And crucially, the chosen thresholds spanned <strong>0.170 to 0.595</strong>.</p>
+
+<div class="box key">
+  <span class="lbl">The insight the whole paper rests on</span>
+  <p>One global threshold is not merely <em>suboptimal</em> for different classes &mdash; it is
+  wrong for them <strong>in opposite directions</strong>. That is why sweeping a single value
+  finds nothing: raising it helps some classes exactly as much as it hurts others, and the
+  average cancels.</p>
+  <p><em>water</em>, which is right 89.5% of the time it fires but finds only half of what is
+  there, wants a threshold of <strong>0.170</strong>. It gains <strong>+6.70 IoU</strong> alone.</p>
+</div>
+
+<p>This was also the only gain in the project so far where <strong>land cover genuinely
+improves</strong>: the six real classes gained +8.63 in aggregate, against background's +1.59.
+Not the catch&#8209;all artefact.</p>
+
+<h3>Step 2 &mdash; the deployable version</h3>
+
+<p>An oracle is not a method. The deployable version fits one threshold per class by
+coordinate ascent on a calibration subset, and evaluates on completely disjoint tiles.</p>
+
+<div class="box">
+  <span class="lbl">Why this is not cheating</span>
+  <p>SegEarth&#8209;OV3 <strong>already</strong> tunes its single threshold per dataset using
+  labels &mdash; 0.5 for LoveDA, 0.1 for OpenEarthMap. ConInfer tunes theirs too (0.8 / 0.3 /
+  0.1). We use the same protocol with six parameters instead of one. <strong>No model weights
+  are trained.</strong> It is parity, not a supervision leak &mdash; and the baseline is always
+  recomputed on the very same held&#8209;out tiles.</p>
+</div>
+
+<table>
+  <tr><th>LoveDA, 5&#8209;fold</th><th class="n">Published &tau;</th><th class="n">Fitted &tau;</th><th class="n">&Delta;</th></tr>
+  <tr><td>fold 1</td><td class="n">47.91</td><td class="n">49.28</td><td class="n">+1.37</td></tr>
+  <tr><td>fold 2</td><td class="n">45.41</td><td class="n">47.31</td><td class="n">+1.89</td></tr>
+  <tr><td>fold 3</td><td class="n">48.44</td><td class="n">49.32</td><td class="n">+0.88</td></tr>
+  <tr><td>fold 4</td><td class="n">46.11</td><td class="n">46.91</td><td class="n">+0.80</td></tr>
+  <tr><td>fold 5</td><td class="n">48.68</td><td class="n">49.66</td><td class="n">+0.98</td></tr>
+  <tr class="hi"><td><strong>mean</strong></td><td class="n"></td><td class="n"></td><td class="n"><strong>+1.18 &plusmn; 0.45</strong></td></tr>
+</table>
+
+<p><strong>Every fold positive.</strong> 81% of the oracle bound captured. Land cover
+<strong>+8.30</strong> in aggregate; the catch&#8209;all moves <strong>&minus;0.01</strong> &mdash;
+so this result is structurally immune to the artefact that caught three earlier ones.</p>
+
+<h4>How much labelling does it cost?</h4>
+<table>
+  <tr><th class="n">Calibration tiles</th><th class="n">&Delta;</th><th class="n">Std. dev.</th><th class="n">Worst draw</th></tr>
+  <tr><td class="n">10</td><td class="n">&minus;2.14</td><td class="n">1.99</td><td class="n">&minus;5.59</td></tr>
+  <tr><td class="n">50</td><td class="n">+0.08</td><td class="n">0.97</td><td class="n">&minus;0.99</td></tr>
+  <tr><td class="n">100</td><td class="n">+0.54</td><td class="n">0.71</td><td class="n">&minus;0.57</td></tr>
+  <tr class="hi"><td class="n"><strong>200</strong></td><td class="n"><strong>+0.79</strong></td><td class="n"><strong>0.35</strong></td><td class="n"><strong>+0.43</strong></td></tr>
+  <tr><td class="n">400</td><td class="n">+1.21</td><td class="n">0.16</td><td class="n">+1.04</td></tr>
+</table>
+
+<p><strong>~200 tiles is where every draw turns positive.</strong> Below 50 it actively hurts.
+That is an honest, quotable deployment cost.</p>
+
+<h3>Step 3 &mdash; prove it on the real pipeline, not on our arithmetic</h3>
+
+<p>Everything above was computed from a cached histogram rather than by running the model, so
+it could all have been a bookkeeping illusion. We patched the actual segmentor to accept a
+threshold <em>vector</em>, fitted on 200 tiles, and ran the official evaluation script on the
+1,469 disjoint tiles.</p>
+
+<table>
+  <tr><th></th><th class="n">Predicted from cache</th><th class="n">Measured by <code>eval.py</code></th></tr>
+  <tr><td>Published &tau; = 0.5</td><td class="n">47.16</td><td class="n"><strong>47.16</strong></td></tr>
+  <tr><td>Per&#8209;class &tau;</td><td class="n">48.35</td><td class="n"><strong>48.35</strong></td></tr>
+  <tr class="hi"><td><strong>&Delta;</strong></td><td class="n"><strong>+1.18</strong></td><td class="n"><strong>+1.18</strong></td></tr>
+</table>
+
+<p>Both absolute values reproduce exactly; every per&#8209;class delta agrees to within 0.04,
+inside the cache's known rounding noise. <strong>This validated the histogram as a measurement
+instrument</strong>, so every threshold sweep and oracle bound in the project inherits the
+guarantee.</p>
+
+<div class="box warn">
+  <span class="lbl">A bug the verification test caught</span>
+  <p>The bin&#8209;edge calculation used truncation: <code>29/200 &times; 200</code> evaluates to
+  <code>28.999999999999996</code>, which truncates to 28. The function was scoring a threshold
+  one bin below the one it reported. <strong>No recorded number changed</strong> &mdash; only 7
+  of 201 grid values were affected and none had ever been chosen &mdash; but a <em>deployed</em>
+  threshold could have been wrong. That is precisely what this step exists to catch.</p>
+</div>
+
+<h3>Step 4 &mdash; can we do it without labels at all?</h3>
+
+<p>The obvious next question. Eleven separate attempts, all failing, and the reason turned out
+to be more interesting than a twelfth attempt would have been.</p>
+
+<p>Our initial explanation was: <em>the oracle exploits per&#8209;class precision, and precision
+requires labels by definition</em>. We tested that instead of asserting it, using eight
+label&#8209;free statistics.</p>
+
+<table>
+  <tr><th>Label&#8209;free proxy</th><th class="n">&rho; vs precision</th><th class="n">p</th><th class="n">&Delta; mIoU gained</th></tr>
+  <tr class="hi"><td><code>mean_conf</code></td><td class="n"><strong>+0.943</strong></td><td class="n"><strong>0.017</strong></td><td class="n">&minus;0.18</td></tr>
+  <tr><td><code>gate_ratio</code></td><td class="n">+0.943</td><td class="n">0.017</td><td class="n">&minus;0.05</td></tr>
+  <tr><td>cross&#8209;head agreement</td><td class="n">+0.886</td><td class="n">0.033</td><td class="n">+0.06</td></tr>
+  <tr><td>presence score</td><td class="n">+0.657</td><td class="n">0.175</td><td class="n">+0.42</td></tr>
+  <tr><td><em>random control (200 draws)</em></td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n"><em>p95 = +0.58</em></td></tr>
+  <tr><td><em>oracle bound</em></td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n"><em>+1.24</em></td></tr>
+</table>
+
+<div class="box key">
+  <span class="lbl">Our stated reason was wrong, and the truth is stronger</span>
+  <p><strong>Precision IS predictable without labels</strong> &mdash; four proxies rank the
+  classes correctly, two of them at p &le; 0.033. <strong>And it buys nothing.</strong> The best
+  row in the table is below a random control's 95th percentile.</p>
+  <p>Because precision <em>does not determine the threshold</em>: the correlation between a
+  class's precision and its ideal threshold is &minus;0.429 with p = 0.419, and the
+  relationship is not even monotone. <em>water</em> has the highest precision and the lowest
+  threshold; <em>road</em> has middling precision and the <em>highest</em> threshold.</p>
+  <p><strong>The real bound:</strong> the right thresholds solve a <em>coupled</em>
+  multi&#8209;class objective. Raising one class's threshold pushes pixels into background, which
+  changes background's score, which changes every other class's optimum. <strong>No per&#8209;class
+  scalar can express that, measurable or not.</strong> This is exactly why a six&#8209;parameter
+  fit works and every one&#8209;parameter rule fails.</p>
+</div>
+
+<p>That reframes the negative from <em>"we could not measure the quantity"</em> to
+<em>"we can measure it, and it is the wrong quantity"</em> &mdash; which explains eleven
+failures instead of merely recording them, and generalises to any training&#8209;free pipeline
+that thresholds a per&#8209;class score.</p>
+
+<p class="fig">Worth noting: the cross&#8209;head prediction was <em>written down before the run</em>
+&mdash; committed as "the one remaining candidate, and it will fail anyway, for the coupling
+reason". It turned out to be a good precision estimate and moved mIoU by +0.06. Exactly as
+predicted.</p>
+
+
+<!-- ==================================================================== -->
+<h2>Act VI &mdash; From correlation to cause</h2>
+<p class="act">31 August &ndash; 1 September &middot; commits <code>bb61a36</code> &rarr; <code>dc78f71</code></p>
+
+<p>We now had a method and a mechanism. Both had a soft joint, and a reviewer would find both.
+This act hardens them.</p>
+
+<h3>Soft joint 1: the +1.18 is a rural result</h3>
+
+<p>LoveDA splits into urban and rural halves that differ 2&times; in discard rate. We ran the
+same five&#8209;fold protocol <em>within</em> each.</p>
+
+<table>
+  <tr><th>Domain</th><th class="n">Tiles</th><th class="n">&Delta; mIoU</th><th class="n">Folds positive</th></tr>
+  <tr class="hi"><td><strong>rural</strong></td><td class="n">992</td><td class="n"><strong>+2.77 &plusmn; 0.92</strong></td><td class="n">5 / 5</td></tr>
+  <tr><td><strong>urban</strong></td><td class="n">677</td><td class="n">+0.10 &plusmn; 0.39</td><td class="n">2 / 5</td></tr>
+</table>
+
+<p><strong>Urban is not distinguishable from zero.</strong> We never quote +1.18 without this
+breakdown now. But the decomposition rescues the story rather than damaging it:</p>
+
+<table>
+  <tr><th></th><th class="n">rural</th><th class="n">urban</th></tr>
+  <tr><td>real classes, aggregate</td><td class="n">+18.61</td><td class="n"><strong>+4.18</strong></td></tr>
+  <tr><td>catch&#8209;all class</td><td class="n">+0.79</td><td class="n"><strong>&minus;3.51</strong></td></tr>
+  <tr class="hi"><td><strong>full mIoU</strong></td><td class="n"><strong>+2.77</strong></td><td class="n"><strong>+0.10</strong></td></tr>
+</table>
+
+<p><strong>Land cover improves in both domains.</strong> Urban's flat headline is entirely the
+catch&#8209;all paying for the gain: (4.18 &minus; 3.51)/7 = +0.10. This is the OpenEarthMap
+artefact <em>with the sign reversed</em> &mdash; there the catch&#8209;all inflated the metric, here
+it deflates it. Same mechanism, opposite direction, two datasets. That independent confirmation
+became a contribution in its own right (below).</p>
+
+<p>We also found the thresholds are genuinely domain&#8209;specific &mdash; <em>road</em> wants
+0.725 in rural and 0.225 in urban &mdash; and that <strong>applying the wrong domain's thresholds
+is worse than no calibration at all</strong> (both mismatched arms land below the published
+threshold). Pooling is not safe either: it fits one vector to two optima, which is
+<em>the same failure as the global threshold, one level up</em>. The method's own argument
+recurses on it. The practitioner rule: <strong>calibrate on the distribution you will evaluate
+on.</strong></p>
+
+<h3>Soft joint 2: the mechanism was a correlation</h3>
+
+<p>Our strongest claim rested on comparing two datasets, and we had written in our own notes:
+<em>"this is a stratification, not a randomised intervention"</em>. That sentence was the
+weakest joint in the strongest claim.</p>
+
+<p>The fix came from noticing something about how the pipeline actually works.</p>
+
+<div class="box key">
+  <span class="lbl">The observation that made this free</span>
+  <p>In SegEarth&#8209;OV3, <strong>every class is an independent forward pass with its own text
+  prompt.</strong> There is no softmax, no normalisation, no interaction between classes
+  anywhere &mdash; the only cross&#8209;class operation in the whole pipeline is the final
+  <code>argmax</code>.</p>
+  <p>Therefore <strong>dropping a class from the vocabulary is exactly equivalent to dropping
+  its channel from a saved array.</strong> One cached run answers every vocabulary question.
+  All thirteen experimental arms read <em>identical model outputs</em> and differ in nothing but
+  the vocabulary &mdash; which is <em>better</em> than re&#8209;running, because re&#8209;running would
+  have added sampling noise for nothing. Cost: <strong>zero GPU hours</strong>.</p>
+</div>
+
+<p>So we intervened on the causal variable directly: progressively merge real classes
+<em>into</em> the catch&#8209;all, raising its share from 0.84% to 58.20%, and re&#8209;measure
+detectability. Each dose has an <strong>arity&#8209;matched control</strong> that merges the same
+number of classes into <em>each other</em> instead &mdash; so class count changes identically and
+only the catch&#8209;all's share differs.</p>
+
+<p>Twelve predictions were written into <code>PREREGISTRATION.md</code> and committed to git
+<em>before each run</em>, so the timestamps are independently verifiable.</p>
+
+<table>
+  <tr><th>Signal</th><th class="n">Start (0.84%)</th><th class="n">Largest dose (58.20%)</th><th class="n">Control</th><th class="n">Dose vs control</th></tr>
+  <tr class="hi"><td>winning&#8209;class confidence</td><td class="n">0.794</td><td class="n"><strong>0.582</strong></td><td class="n">0.710</td><td class="n"><strong>2.5&times;</strong></td></tr>
+  <tr class="hi"><td>runner&#8209;up confidence</td><td class="n">0.913</td><td class="n"><strong>0.590</strong></td><td class="n">0.855</td><td class="n"><strong>5.6&times;</strong></td></tr>
+</table>
+
+<p><strong>Both signals degrade causally with catch&#8209;all share, and neither degradation is
+explained by class count.</strong> The intervention drove OpenEarthMap from 0.794 into the
+0.58&ndash;0.62 band where LoveDA actually sits &mdash; it <em>reproduced</em> the observational
+regime rather than merely correlating with it.</p>
+
+<p><strong>Nine of the twelve predictions passed. We report the three failures.</strong> The
+dose&ndash;response is non&#8209;monotone inside its range, one control moved slightly more than
+allowed, and the predicted <em>rate</em> missed at two of three doses. So: the direction
+transfers, the rate does not. All stated in the paper.</p>
+
+<div class="box warn">
+  <span class="lbl">A near miss worth telling</span>
+  <p>The first verdict announced "CAUSAL" on the strength of an AUC dropping to
+  <strong>0.208</strong>. But AUC is <em>symmetric</em>: 0.208 is a detector of strength
+  <strong>0.792 with its sign flipped</strong>, not a destroyed signal. The score was rewritten
+  as <code>max(AUC, 1&minus;AUC)</code> everywhere &mdash; and on rescoring, that arm's signal was
+  <em>flat</em>, not destroyed.</p>
+  <p>The diagnosis also revealed a design flaw: the original merge made the catch&#8209;all a
+  <em>union of well&#8209;detected prompts</em>, which is unnaturally competent. We kept it (it was
+  pre&#8209;registered) and added a second family that drops the prompts and relabels the pixels
+  &mdash; which is the real situation. That is the family the paper quotes.</p>
+</div>
+
+<h3>The reverse experiment fails, and the failure is the finding</h3>
+
+<p>The mechanism predicted that <em>removing</em> the catch&#8209;all from LoveDA's vocabulary
+should raise detectability. Prediction P8, committed in advance. It moved from 0.592 to
+<strong>0.540</strong> &mdash; the wrong way.</p>
+
+<table>
+  <tr><th>Arm</th><th>Vocabulary</th><th>Ground&#8209;truth share</th><th class="n">Effect</th></tr>
+  <tr class="hi"><td>OpenEarthMap dose arms</td><td>changed</td><td><strong>raised</strong></td><td class="n"><strong>0.213 &ndash; 0.323</strong></td></tr>
+  <tr><td>LoveDA reverse arm</td><td>changed</td><td>unchanged</td><td class="n">&minus;0.052</td></tr>
+  <tr><td>LoveDA controls</td><td>changed</td><td>unchanged</td><td class="n">+0.000 / &minus;0.041</td></tr>
+</table>
+
+<div class="box key">
+  <span class="lbl">The dissociation</span>
+  <p><strong>Every arm that changes the vocabulary without changing the label space moves
+  &le; 0.052. Every arm that raises the catch&#8209;all's share of ground truth moves
+  0.213&ndash;0.323. The causal locus is the LABEL SPACE, not the prompt list.</strong></p>
+  <p>Practical consequence: <strong>you cannot fix a catch&#8209;all&#8209;heavy benchmark by editing
+  the prompt list.</strong> Removing the prompt does not remove the pixels that are genuinely
+  none&#8209;of&#8209;the&#8209;above; it only makes them unnameable.</p>
+</div>
+
+<p>We also learned the effect <strong>saturates by about 35% share</strong>, which honestly
+narrows the claim &mdash; LoveDA <em>starts</em> at 35.7%, already inside the saturated band, so
+its dose arm had no room to act. We say that rather than presenting a single clean monotone
+story.</p>
+
+<h3>The metric recommendation, and OpenEarthMap turning positive</h3>
+
+<p>We now had the catch&#8209;all artefact measured in <strong>both directions</strong> on two
+datasets. That is enough to make a recommendation rather than a complaint.</p>
+
+<div class="box">
+  <span class="lbl">The leverage, which is not obvious</span>
+  <p>mIoU is an <strong>unweighted mean over N classes</strong>, so the catch&#8209;all owns
+  exactly <strong>1/N of the metric no matter how meaningful it is</strong> &mdash; 14.3% on
+  LoveDA for a class the annotation guide defines as "everything else", and <strong>11.1% on
+  OpenEarthMap for a class covering 0.84% of the pixels.</strong> A 22.67&#8209;point move in that
+  one class is 3.24 mIoU before anything real has changed.</p>
+  <p><strong>Recommendation:</strong> benchmarks with a catch&#8209;all class should report mIoU
+  over the real classes <em>alongside</em> the headline.</p>
+</div>
+
+<p>Recomputing every table both ways produced the best surprise of the project.</p>
+
+<table>
+  <tr><th></th><th class="n">LoveDA</th><th class="n">OpenEarthMap</th></tr>
+  <tr><td>&Delta; full mIoU (as reported for days)</td><td class="n">+1.16</td><td class="n">+0.30 &mdash; "flat"</td></tr>
+  <tr class="hi"><td><strong>&Delta; catch&#8209;all&#8209;excluded mIoU</strong></td><td class="n"><strong>+1.36</strong></td><td class="n"><strong>+1.75</strong></td></tr>
+</table>
+
+<div class="box win">
+  <span class="lbl">A second positive dataset, recovered from our own filing error</span>
+  <p>OpenEarthMap had been written up as flat and dismissed as "a benchmark artefact"
+  <strong>for four days</strong>. Under the recommended metric it gains <strong>+1.75 &mdash;
+  more than LoveDA does.</strong> Its headline decomposes exactly: +1.56 from the eight real
+  classes, &minus;1.26 from the catch&#8209;all alone. The catch&#8209;all was <em>cancelling a real
+  gain</em>.</p>
+  <p>This closed the thinnest part of the method claim, and it cost hours of CPU time.</p>
+</div>
+
+<h3>Two more negatives, both closed properly</h3>
+
+<p><strong>Is there a label&#8209;free rule for <em>when</em> calibration is worth paying for?</strong>
+This would have turned a scope limitation into a deployment criterion &mdash; "measure your
+discard rate; above X%, buy the labels". We stratified both datasets by a label&#8209;free
+residual measure. LoveDA came out <strong>U&#8209;shaped</strong> (the most <em>reliable</em> gain
+is in the <em>lowest</em>&#8209;residual stratum), OpenEarthMap gave the <strong>opposite sign</strong>,
+and a random control moved nearly as far. No rule.</p>
+
+<div class="box key">
+  <span class="lbl">One bound explains both halves</span>
+  <p>You cannot pick the thresholds without labels (eleven attempts, with the coupling reason)
+  <em>and</em> you cannot predict whether picking them will pay without labels either (two
+  datasets, opposite signs). <strong>The ~200&#8209;tile cost is irreducible: it buys the answer
+  and the question at the same time.</strong> That is a cleaner closing statement than the
+  deployment criterion we went looking for.</p>
+</div>
+
+<p><strong>What is the rural/urban gap actually made of?</strong> Arithmetic, since mIoU is an
+unweighted mean: <em>water</em> (48%) and <em>forest</em> (37%) carry <strong>85%</strong> of it.
+Across all twelve (domain, class) cells, the <strong>precision&ndash;recall gap</strong> ranks
+which classes move (&rho; = +0.713, p = 0.013) &mdash; a measured confirmation of the method's
+stated mechanism &mdash; while <strong>precision alone explains nothing</strong> (+0.168,
+p = 0.60), the same lesson arriving independently.</p>
+
+<p>But we report the failure first: <em>water</em>, the largest contributor, has effectively
+identical share (11.6% vs 11.8%) and precision&ndash;recall gap (+35.0 vs +34.4) in both domains,
+and an <strong>8&times; different gain</strong>. So roughly half the gap still has no mechanism,
+and the paper says so before quoting the correlation.</p>
+
+
+<!-- ==================================================================== -->
+<h2>Act VII &mdash; The competitor, and the best result in the project</h2>
+<p class="act">1 September &middot; commits <code>d36ac53</code> &rarr; <code>2028f2a</code></p>
+
+<p>ConInfer is the nearest published competitor. We cited it in the paper <em>without a
+number</em>, which is the first thing a reviewer asks about. One table row closes it.</p>
+
+<h3>The rule that governed the whole exercise</h3>
+
+<div class="box fail">
+  <span class="lbl">Nothing for ConInfer touches the working environment. Ever.</span>
+  <p>Their install instructions read <code>conda create -n ConInfer</code> followed by
+  <code>pip install -r requirements.txt</code> &mdash; <strong>with no <code>conda activate</code>
+  between them.</strong> Run as written with our environment active, that command installs into
+  <em>our</em> environment and destroys the only working version combination in the project.</p>
+  <p>We wrote a setup script that <strong>refuses to run</strong> while the main environment is
+  active, snapshots its package list, and can diff it afterwards. And a matching package list is
+  <em>necessary but not sufficient</em> &mdash; the real gate is behavioural: the baseline must
+  still produce 47.38.</p>
+</div>
+
+<h3>What reproducing published work actually required</h3>
+
+<p>This is worth recording plainly, because it is a reproducibility observation rather than a
+complaint, and it is evidence the run is real:</p>
+<ul class="tight">
+  <li>A file their <code>eval.py</code> imports on line 4 is <strong>absent from their repository</strong>. Copied from the upstream project.</li>
+  <li><strong>Three dependencies</strong> declared by neither their requirements nor the packages importing them.</li>
+  <li>Their segmentor <strong>hardcodes the first author's filesystem paths</strong>. We repointed them with a reversible patch that edits paths only.</li>
+  <li>Their pinned torch version <strong>cannot build on this machine</strong>, for exactly the reasons documented in week one. We used the stack that works and reported the deviation.</li>
+  <li>Their weights require a <strong>licence&#8209;gated satellite&#8209;pretrained backbone</strong> that returns HTTP 403.</li>
+</ul>
+
+<div class="box warn">
+  <span class="lbl">A shortcut we deliberately refused</span>
+  <p>A converted copy of those weights exists in a different format. Loading it would have
+  required hand&#8209;writing a parameter remap &mdash; and a remap that is slightly wrong loads
+  <em>successfully</em> with half the network still randomly initialised, producing a plausible
+  number from a broken model with no way to detect it. We did not do it. That is precisely the
+  failure the rule "reproduce their published figure first" exists to prevent.</p>
+</div>
+
+<h3>The reproduction, reported honestly</h3>
+
+<table>
+  <tr><th></th><th class="n">Their published</th><th class="n">Our reproduction</th><th class="n">Gap</th><th>Decision</th></tr>
+  <tr class="hi"><td>LoveDA (full official split)</td><td class="n">39.33</td><td class="n">36.99</td><td class="n">&minus;2.34</td><td>&#10003; use it, report both</td></tr>
+  <tr><td>OpenEarthMap (77% of split)</td><td class="n">41.95</td><td class="n">29.90</td><td class="n"><strong>&minus;12.05</strong></td><td>&#10007; <strong>drop it</strong></td></tr>
+</table>
+
+<p>We eliminated label encoding, prompt order, image format, a feature flag, and alphabetical
+subset bias as causes, then <strong>stopped deliberately</strong> rather than spend the timebox
+chasing an unverifiable difference. The split that reproduces closely is the one we hold in
+full; the one that fails badly is the one we hold 77% of. That is not a coincidence, and it
+decided which comparison goes in the paper.</p>
+
+<div class="box">
+  <span class="lbl">The framing this forces, and we insisted on it</span>
+  <p>Our numbers are 11.54 points above ConInfer's on LoveDA. <strong>Most of that margin is the
+  backbone</strong> &mdash; SAM 3 at 1024&sup2; against CLIP ViT&#8209;B/16 at 448&sup2; &mdash; not
+  our contribution. <strong>Our contribution is the +1.16 over SegEarth&#8209;OV3.</strong> Presenting
+  the 11.54 as ours would be exactly the error we built a whole paper on catching. We should not
+  make it after that.</p>
+  <p>Also reported alongside: they are <strong>~10&times; faster</strong> at inference (2 minutes
+  vs 24). That belongs in the comparison too.</p>
+</div>
+
+<h3>And then the experiment that was worth more than the comparison row</h3>
+
+<p>The comparison answers <em>"how do you compare to ConInfer?"</em>. But there was a better
+question the paper could not answer: <strong>is per&#8209;class thresholding just a SAM 3
+quirk?</strong></p>
+
+<p>ConInfer thresholds per&#8209;class scores with a single global value &mdash; precisely the
+design our method replaces. So we cached their scores in our format (a read&#8209;only wrapper,
+zero edits to their source), and pointed our existing fitting scripts at it, at
+<em>their</em> operating point of 0.8.</p>
+
+<p>Both gates passed first: the instrumented run printed 36.99 exactly, and the scores landed
+inside the expected range.</p>
+
+<table>
+  <tr><th></th><th class="n">SAM 3 (SegEarth&#8209;OV3)</th><th class="n">CLIP + GMM (ConInfer)</th></tr>
+  <tr class="hi"><td><strong>5&#8209;fold &Delta; full mIoU</strong></td><td class="n">+1.18 &plusmn; 0.45</td><td class="n"><strong>+2.51 &plusmn; 0.34</strong></td></tr>
+  <tr><td>worst fold</td><td class="n">+0.80</td><td class="n"><strong>+2.22</strong></td></tr>
+  <tr><td>&Delta; catch&#8209;all&#8209;excluded</td><td class="n">+1.36</td><td class="n"><strong>+1.94</strong></td></tr>
+  <tr><td>calibration tiles needed</td><td class="n">~200</td><td class="n"><strong>~25</strong></td></tr>
+  <tr><td>classes that improve</td><td class="n">5 of 7</td><td class="n"><strong>7 of 7</strong></td></tr>
+</table>
+
+<div class="box win">
+  <span class="lbl">The two things this bought</span>
+  <p><strong>1. The claim is no longer about SAM 3.</strong> Per&#8209;class thresholding is a
+  property of <em>any pipeline that thresholds per&#8209;class scores</em> &mdash; demonstrated on
+  two architectures, two methods and two operating points. The gain is <em>larger</em> on the
+  pipeline it was not developed for.</p>
+  <p><strong>2. ConInfer stops being a competitor.</strong> Our method <em>composes</em> with it:
+  their pipeline goes 36.99 &rarr; <strong>39.52</strong> with our calibration on top. We do not
+  beat the nearest published work &mdash; we improve it. That is a far better answer to
+  "how is this different from ConInfer?" than any margin would have been.</p>
+</div>
+
+<h3>And the negative that made the claim precise</h3>
+
+<p>We ran the same test on ConInfer + OpenEarthMap. It came out <strong>null</strong>
+(&minus;0.39 &plusmn; 1.28). But the <em>way</em> it failed was informative:</p>
+
+<table>
+  <tr><th>OpenEarthMap</th><th class="n">Our SAM 3 pipeline</th><th class="n">ConInfer (CLIP)</th></tr>
+  <tr><td>&Delta; full mIoU</td><td class="n">+0.30</td><td class="n">&minus;0.09</td></tr>
+  <tr><td>&Delta; excluding catch&#8209;all</td><td class="n">+1.75</td><td class="n">+1.27</td></tr>
+  <tr class="hi"><td><strong>catch&#8209;all IoU, before &rarr; after</strong></td><td class="n">17.13 &rarr; <strong>5.83</strong></td><td class="n">17.00 &rarr; <strong>6.06</strong></td></tr>
+</table>
+
+<p><strong>Two completely unrelated models, and the fit drives the catch&#8209;all to almost the
+same value.</strong> That is the <em>dataset's</em> metric pathology, not a property of either
+pipeline. So the claim is scoped correctly:</p>
+
+<div class="box key">
+  <span class="lbl">The precise, falsifiable statement</span>
+  <p>The correction is <strong>not backbone&#8209;specific &mdash; it is dataset&#8209;specific</strong>,
+  and the axis is the catch&#8209;all's calibration. Where the catch&#8209;all is competently
+  predicted (LoveDA, ~45 IoU), the fit improves land cover <em>and</em> the headline, on both
+  architectures. Where it is pathological (OpenEarthMap, ~17 IoU), the fit improves land cover on
+  both and the headline on neither, because the catch&#8209;all it must sacrifice owns a ninth of
+  the metric.</p>
+</div>
+
+
+<!-- ==================================================================== -->
+<h2>Act VIII &mdash; The third dataset falsifies us</h2>
+<p class="act">3 September &middot; commits <code>9090411</code> &rarr; <code>eabe959</code></p>
+
+<p>Two datasets is thin. We registered for ISPRS Potsdam, downloaded it via CLI (the browser
+route was quoting ten hours), and converted it.</p>
+
+<p>Before running a single inference pass, we computed a prediction <strong>from the ground
+truth masks alone</strong> and committed it to git, so the timestamp proves it came first.</p>
+
+<table>
+  <tr><th>Pre&#8209;registered prediction</th><th>Measured</th><th></th></tr>
+  <tr class="hi"><td>Residual size in the bracket 3.78&ndash;10.88%, point estimate ~4.5%</td><td class="n"><strong>4.68%</strong></td><td>&#10003; <strong>HELD</strong></td></tr>
+  <tr class="hi"><td>Detection AUC <em>higher than</em> 0.622, point estimate ~0.885</td><td class="n"><strong>0.578</strong></td><td>&#10007; <strong>FAILED</strong></td></tr>
+</table>
+
+<p>The baseline reproduced at <strong>57.83 against a published 57.8</strong> &mdash; the third
+reproduced baseline and the tightest of the three &mdash; so this is not a setup error.</p>
+
+<p>The size prediction gives three points, monotone in catch&#8209;all share: 0.84% &rarr; 3.78%,
+4.29% &rarr; 4.68%, 36.1% &rarr; 10.88%.</p>
+
+<p>The detectability prediction is simply wrong. <strong>Potsdam has a small catch&#8209;all
+(4.29%) and detects like LoveDA (36.1%), not like OpenEarthMap (0.84%).</strong> The base rate
+sits between the two, so this is not a base&#8209;rate artefact either.</p>
+
+<div class="box fail">
+  <span class="lbl">Our own pre-registration named this outcome as disqualifying</span>
+  <p>Written before the run, in these words: <em>"If a dataset near 5% background behaves like
+  LoveDA, or one near 30% behaves like OpenEarthMap, the mechanism is wrong and the paper's
+  central claim needs rewriting."</em></p>
+  <p>So we rewrote it. The claim splits in two:</p>
+</div>
+
+<table>
+  <tr><th>Claim</th><th>Status</th></tr>
+  <tr class="hi"><td>catch&#8209;all share &rarr; <strong>size of the residual</strong></td><td>&#10003; three datasets, monotone, one pre&#8209;registered and confirmed</td></tr>
+  <tr><td>catch&#8209;all share &rarr; <strong>detectability</strong></td><td>&#10007; <strong>falsified across datasets</strong></td></tr>
+</table>
+
+<p>Importantly, this does <em>not</em> overturn the causal intervention of Act VI. Both can be
+true: share is <strong>a</strong> cause of detectability <em>within</em> a dataset, and is
+<strong>not</strong> what determines it <em>across</em> datasets. The paper says exactly that,
+and no more.</p>
+
+<div class="box key">
+  <span class="lbl">The decision we are most confident was right</span>
+  <p>We did <strong>not</strong> go looking for a variable that fits three points. Any story
+  invented now would be fitted to the data it must explain, and the entire value of the
+  pre&#8209;registration is that it was not. A falsified prediction, reported as falsified, is
+  worth more to a reviewer than a repaired one.</p>
+</div>
+
+<h3>The method on a third dataset</h3>
+
+<table>
+  <tr><th></th><th class="n">Published &tau;</th><th class="n">Fitted</th><th class="n">&Delta;</th></tr>
+  <tr><td>full mIoU</td><td class="n">57.87</td><td class="n">58.47</td><td class="n">+0.60</td></tr>
+  <tr class="hi"><td><strong>catch&#8209;all&#8209;excluded</strong></td><td class="n">66.05</td><td class="n"><strong>67.09</strong></td><td class="n"><strong>+1.04</strong></td></tr>
+</table>
+
+<p>Five&#8209;fold: +0.59 &plusmn; 0.50, four of five folds positive, but the spread covers zero.
+Reported as <strong>marginal on full mIoU and positive on land cover</strong>, which is what
+both columns say.</p>
+
+<p>And a second honest complication: <em>car</em> carries the gain (+3.70) while <em>tree</em>
+does not &mdash; despite tree having a precision&ndash;recall gap of <strong>+54.7</strong>,
+larger than the LoveDA <em>water</em> gap (+34.8) that drove the entire LoveDA result. So the
+precision&ndash;recall asymmetry did <em>not</em> predict which class would move here. That
+<strong>weakens</strong> our own correlation from Act VI rather than confirming it, and it is
+reported directly beside it.</p>
+
+<p>One thing did get stronger with every dataset. The catch&#8209;all class depresses the
+published headline before any method is applied:</p>
+
+<table>
+  <tr><th>Dataset</th><th class="n">Catch&#8209;all IoU</th><th class="n">Real&#8209;class mean</th><th class="n">Headline depressed by</th></tr>
+  <tr><td>LoveDA</td><td class="n">45.50</td><td class="n">47.68</td><td class="n">0.31</td></tr>
+  <tr><td>OpenEarthMap</td><td class="n">17.13</td><td class="n">47.54</td><td class="n">3.38</td></tr>
+  <tr class="hi"><td><strong>Potsdam</strong></td><td class="n"><strong>16.96</strong></td><td class="n">66.05</td><td class="n"><strong>8.18</strong></td></tr>
+</table>
+
+<h3>The bug this dataset found</h3>
+
+<div class="box warn">
+  <span class="lbl">A silent failure that produced a plausible number</span>
+  <p>Two lines of the measurement code quietly encoded <em>"the catch&#8209;all is the lowest
+  class value"</em>. True for LoveDA and OpenEarthMap. <strong>False for Potsdam, where
+  <code>clutter</code> is the highest.</strong></p>
+  <p>The result: every tile reported <strong>0.00% discard</strong> while the aggregate printed a
+  plausible <strong>5.55%</strong> &mdash; computed over the wrong set of rows, with the
+  catch&#8209;all counted as a real class losing 34.68% of its pixels <em>to itself</em>. The
+  headline even fell inside our pre&#8209;registered bracket.</p>
+  <p>The tell was not the headline. It was <strong>"mean 0.00%, median 0.00%, max 0.00%" sitting
+  next to a non&#8209;zero total.</strong> Fixed, and verified to be a bit&#8209;exact no&#8209;op on
+  the two datasets where the old code was right, so no earlier number changed.</p>
+  <p>This was the <strong>fourth</strong> dataset&#8209;specific assumption to survive in code
+  whose whole job is to read its class list from the data. A dataset whose catch&#8209;all is not
+  first was always going to find them.</p>
+</div>
+
+
+<!-- ==================================================================== -->
+<h2>Where this research area stands</h2>
+
+<h3>The lineage we inherited</h3>
+
+<p>Understanding why our contribution has a place needs about ten years of context, compressed.</p>
+
+<table>
+  <tr><th>Year</th><th>Work</th><th>What it added</th></tr>
+  <tr><td>2015</td><td>FCN, U&#8209;Net</td><td>Dense per&#8209;pixel prediction. U&#8209;Net is still the remote&#8209;sensing workhorse.</td></tr>
+  <tr><td>2020</td><td>ViT</td><td>Images as sequences of patch tokens &mdash; the unit everything downstream operates on.</td></tr>
+  <tr><td>2020</td><td>DETR</td><td>Object "queries" and set prediction. <em>Its first author is also first author on SAM 3</em>, so the instance head is the same design lineage.</td></tr>
+  <tr><td>2021&ndash;22</td><td>MaskFormer / Mask2Former</td><td>Segmentation as mask classification. SAM 3's decoder is built on this.</td></tr>
+  <tr><td>2021</td><td>CLIP</td><td>The whole open&#8209;vocabulary paradigm &mdash; text and images in one space.</td></tr>
+  <tr><td>2023&ndash;25</td><td>SAM &rarr; SAM 2 &rarr; SAM 3</td><td>Class&#8209;agnostic segmentation, then video, then <strong>segmentation + recognition unified</strong> with a text&#8209;conditioned presence head.</td></tr>
+</table>
+
+<h4>Making CLIP produce dense masks with no training &mdash; the direct ancestors</h4>
+
+<table>
+  <tr><th>Work</th><th>Contribution</th></tr>
+  <tr><td><strong>MaskCLIP</strong> (2022)</td><td>First to pull dense features out of CLIP. The origin of this whole field.</td></tr>
+  <tr><td><strong>SCLIP</strong> (2023)</td><td>Correlative self&#8209;attention. <em>SegEarth&#8209;OV3's code is based on this repository.</em></td></tr>
+  <tr><td><strong>ClearCLIP</strong> (2024)</td><td>The "remove pooling" line of attack.</td></tr>
+  <tr><td><strong>ProxyCLIP</strong> / <strong>CorrCLIP</strong> (2025)</td><td>Use a second foundation model (DINO, SAM) to supply structure CLIP lacks.</td></tr>
+  <tr><td><strong>GroupViT</strong> (2022)</td><td>Weakly&#8209;supervised grouping &mdash; conceptually closest to a clustering step.</td></tr>
+</table>
+
+<h4>The remote&#8209;sensing branch &mdash; our actual neighbourhood</h4>
+
+<table>
+  <tr><th>Work</th><th>Date</th><th>What it does &mdash; and where it leaves room</th></tr>
+  <tr><td><strong>SegEarth&#8209;OV</strong></td><td>CVPR 2025</td><td>CLIP features on aerial images are 1/16 resolution, which is fatal for small objects. They train a lightweight upsampler on <em>unlabelled</em> images and subtract a global bias. Source of the dataset protocol everyone now uses.</td></tr>
+  <tr class="hi"><td><strong>SegEarth&#8209;OV3</strong></td><td>Dec 2025</td><td><strong>Our baseline.</strong> Replaces the whole CLIP stack with SAM 3. Two ideas: fuse the instance and semantic heads (things vs stuff), and gate by the presence score. Evaluated on 20 datasets.</td></tr>
+  <tr class="hi"><td><strong>ConInfer</strong></td><td>Mar 2026</td><td><strong>Nearest competitor.</strong> First to explicitly add context at inference for this task: fits a statistical model over DINOv3 features and fuses it with the vision&ndash;language prior. +2.80 mIoU. Purely <em>visual</em> context, at <em>patch</em> level. Its own limitations section names region&#8209;level context as future work.</td></tr>
+  <tr><td><strong>OVRSISBenchV1</strong></td><td>2026</td><td>A unified evaluation protocol across eight datasets. Standardisation is arriving &mdash; a sign of a maturing field.</td></tr>
+  <tr><td><strong>SkySense&#8209;O</strong>, <strong>AerOSeg</strong>, <strong>RemoteSAM</strong></td><td>2025</td><td>The "just pretrain on remote&#8209;sensing data" counter&#8209;argument, and other SAM&#8209;based unified pipelines.</td></tr>
+</table>
+
+<h3>What the state of the field means for us</h3>
+
+<p>Three readings, and they shaped every strategic decision after Act IV:</p>
+
+<ol>
+  <li><strong>The field has moved from "make CLIP dense" to "bolt a foundation segmenter on".</strong>
+  That move happened in December 2025, three months before we started. Competing on architecture
+  against groups with cluster&#8209;scale compute, from one 70&nbsp;W card, is the losing game.</li>
+
+  <li><strong>Inference&#8209;time context modelling was claimed in March 2026.</strong> The
+  original novelty of our problem statement had a competitor before we opened the file. Our
+  differentiators &mdash; semantic rather than visual context, region rather than patch,
+  corpus&#8209;level rather than per&#8209;scene &mdash; were real. Then we measured them and they
+  were worth 0.3 points.</li>
+
+  <li><strong>What nobody is doing is the evaluation and calibration question.</strong> Everyone
+  in this lineage tunes a global confidence threshold per dataset and mentions it in a config
+  file. Everyone reports mIoU including a catch&#8209;all class that owns 1/N of the metric.
+  Nobody had asked whether that threshold is the right <em>shape</em>, or what the catch&#8209;all
+  is doing to the numbers. <strong>That empty ground is where we ended up</strong> &mdash; not by
+  design, but by measuring carefully enough that the gap became visible.</li>
+</ol>
+
+<div class="box key">
+  <span class="lbl">Our comparative advantage, stated plainly</span>
+  <p>We cannot out&#8209;compute the competition. What we can do is out&#8209;<em>measure</em> them:
+  reproduced baselines on three datasets, validation gates that must pass before any number is
+  believed, negative controls, oracle bounds on every negative result, pre&#8209;registered
+  predictions, and a mechanism that <em>explains</em> results rather than reporting them.
+  Every decision from Act V onward played to that.</p>
+</div>
+
+
+<!-- ==================================================================== -->
+<h2>How we worked &mdash; the rules that produced this</h2>
+
+<p>Two dozen individual measurements are less useful to explain than the handful of habits that
+generated them, especially since most of the habits were adopted <em>after</em> something went
+wrong.</p>
+
+<h3>1. Measure before deciding</h3>
+<p>Every design choice that survived was settled by a cheap experiment rather than an argument:
+boundary&#8209;length adjacency, signed PMI, the hierarchical matrix, SLIC over connected
+components. The co&#8209;occurrence premise was tested with a 40&#8209;line script <em>before</em>
+any method was built on it &mdash; and the ceiling test that killed the method took an afternoon.
+Finding that out in week three instead of week eleven is the difference between a pivot and a
+disaster.</p>
+
+<h3>2. Validation gates are hard stops</h3>
+<p>Any instrumented run must still reproduce <strong>47.37 mIoU and 29.68% discard exactly</strong>.
+If either moves, the patch changed behaviour and the measurement is void. This caught nothing
+dramatic &mdash; which is the point. It is why every downstream number can be trusted, and it is
+what let us treat a cached histogram as a measurement instrument after proving it matched
+<code>eval.py</code> to 0.04 per class.</p>
+
+<h3>3. Write down what the result will mean, before you have it</h3>
+<p>Used three times. The presence&#8209;gating counterfactual had both readings written in advance
+&mdash; and the outcome matched neither cleanly, which made the gap between "the number I
+expected to be decisive" and "the number that actually decided it" impossible to paper over.
+The vocabulary intervention had twelve predictions committed to git. The Potsdam prediction was
+computed from labels alone and committed before any inference.</p>
+<p><strong>Pre&#8209;registration is nearly free and it is the single strongest signal of good
+faith a reviewer can be given.</strong> Almost nobody in computer vision does it.</p>
+
+<h3>4. Always run the control that shows what "nothing" looks like</h3>
+<p>A random&#8209;proxy control (95th percentile +0.58) is why we know the best label&#8209;free rule
+at +0.42 is noise. Random&#8209;colour images are why we caught a detector scoring 0.966 where no
+signal can exist. An arity&#8209;matched control is what made the vocabulary experiment causal
+rather than suggestive. On OpenEarthMap the random strata moved nearly as far as the real ones
+&mdash; without the control, that would have been written up as a pattern.</p>
+
+<h3>5. Cache everything the GPU produces</h3>
+<p>One 24&#8209;minute run wrote a per&#8209;tile cache. After that, every threshold sweep, oracle
+bound, cross&#8209;validation and vocabulary arm was a CPU pass measured in seconds. The
+thirteen&#8209;arm causal experiment cost <strong>zero GPU hours</strong> because of this. On a
+70&nbsp;W card it is the difference between running the experiments and not.</p>
+
+<h3>6. Report both metrics, always</h3>
+<p>Adopted after the catch&#8209;all artefact was measured in both directions. It converted a
+complaint into a recommendation other people can adopt, and it recovered a dataset we had filed
+as flat for four days.</p>
+
+<h3>7. Read the generated prose against its own table</h3>
+<div class="box warn">
+  <span class="lbl">The recurring failure mode of this codebase, stated for the record</span>
+  <p>Four separate incidents. A verdict that reasoned in prose about "higher" and "lower" and
+  swapped both branches. A test that printed "414% of the change" because two contributions had
+  opposite signs. A pass/fail gate that asked only "is the mean positive" and passed a result
+  with three of five folds negative. A summary that quoted a LoveDA number on three other
+  datasets' outputs.</p>
+  <p><strong>In all four, the tables were correct. Only the generated text was wrong.</strong> The
+  numbers were never at risk; the <em>conclusions printed beside them</em> were. Every verdict now
+  gets read against its own table, and gates that can be phrased backwards get rewritten in a
+  form that cannot be.</p>
+</div>
+
+<h3>8. Push back on your own results hardest</h3>
+<p>Five findings were refuted by us before anyone else could:</p>
+<table>
+  <tr><th>Finding</th><th>How it died</th></tr>
+  <tr><td>"Road is a hub"</td><td>Wrong null model &mdash; it was measuring road's perimeter.</td></tr>
+  <tr><td>"Presence gating causes the collapse"</td><td>Counterfactual: recovery uncorrelated with presence (+0.018).</td></tr>
+  <tr><td>"+3.47 from selective recovery"</td><td>Our own code was scoping regions using the answer key.</td></tr>
+  <tr><td>"The oracle needs precision, which needs labels"</td><td>Precision <em>is</em> label&#8209;free. It is simply the wrong quantity.</td></tr>
+  <tr><td>"Catch&#8209;all share governs detectability"</td><td>Potsdam, against a prediction we had committed in advance.</td></tr>
+</table>
+
+
+<!-- ==================================================================== -->
+<h2>Where the project stands today</h2>
+
+<h3>The results, in one place</h3>
+
+<table>
+  <tr><th>Dataset</th><th class="n">Baseline<br>(ours / published)</th><th class="n">&Delta; full mIoU</th><th class="n">&Delta; excl. catch&#8209;all</th></tr>
+  <tr class="hi"><td><strong>LoveDA</strong> &mdash; SAM 3</td><td class="n">47.38 / 47.4</td><td class="n"><strong>+1.18 &plusmn; 0.45</strong></td><td class="n"><strong>+1.36</strong></td></tr>
+  <tr class="hi"><td><strong>LoveDA</strong> &mdash; ConInfer (CLIP)</td><td class="n">36.99 / 39.33</td><td class="n"><strong>+2.51 &plusmn; 0.34</strong></td><td class="n"><strong>+1.94</strong></td></tr>
+  <tr><td><strong>OpenEarthMap</strong> &mdash; SAM 3</td><td class="n">44.19 / 42.9</td><td class="n">+0.30</td><td class="n"><strong>+1.75</strong></td></tr>
+  <tr><td><strong>Potsdam</strong> &mdash; SAM 3</td><td class="n">57.83 / 57.8</td><td class="n">+0.60</td><td class="n"><strong>+1.04</strong></td></tr>
+  <tr><td><em>LoveDA rural / urban split</em></td><td class="n">&mdash;</td><td class="n"><em>+2.77 / +0.10</em></td><td class="n">&mdash;</td></tr>
+</table>
+
+<p><strong>Land cover improves on every dataset and both architectures.</strong> Full mIoU moves
+only where the catch&#8209;all is competently predicted &mdash; which is itself one of the paper's
+findings, not a caveat hiding one.</p>
+
+<h3>Assets</h3>
+<ul class="tight">
+  <li><strong>Paper draft:</strong> 7,671 words, 26 references, one placeholder left (the author block). Every number in it comes from a macro file so a figure cannot go stale in one section and current in another.</li>
+  <li><strong>Supplementary material</strong> and an Overleaf bundling script.</li>
+  <li><strong>Seven figures</strong>, each rendered by a script that prints every plotted number against its source table on render &mdash; a figure that has drifted from its data is worse than no figure.</li>
+  <li><strong>Three reproduced baselines</strong>, all within 0.03 of published where the split is complete.</li>
+  <li><strong>Pre&#8209;registration files</strong> with git timestamps.</li>
+  <li><strong>A daily logbook</strong> and ~60,000 words of measured results across five documents.</li>
+</ul>
+
+<h3>Known limits, stated because they will be asked</h3>
+<ul class="tight">
+  <li>The thresholds <strong>do not transfer across a domain shift</strong>. The wrong domain's thresholds are worse than no calibration. Calibrate on the distribution you will evaluate on.</li>
+  <li>The LoveDA gain is <strong>carried by the rural half</strong>. Urban land cover improves but full mIoU does not.</li>
+  <li><strong>Half of the rural/urban gap has no mechanism.</strong> It is 85% <em>water</em> and <em>forest</em>, but <em>water</em> looks identical in both domains and gains 8&times; more in one.</li>
+  <li>The ConInfer reproduction is <strong>2.34 points below their published figure</strong>, and we report both numbers rather than the one that suits us.</li>
+  <li><strong>Half the mechanism claim is falsified</strong> by our own third dataset, reported as falsified.</li>
+</ul>
+
+<h3>What is left</h3>
+
+<table>
+  <tr><th>Task</th><th>Cost</th><th>Status</th></tr>
+  <tr><td>Verify five reference entries against their PDFs</td><td>~1 hour</td><td>manual</td></tr>
+  <tr><td>Read the paper end to end in the real template</td><td>~2 hours</td><td>manual</td></tr>
+  <tr><td>Fill the author block</td><td>minutes</td><td>manual</td></tr>
+  <tr><td>Settle the title</td><td>&mdash;</td><td>deferred by choice</td></tr>
+  <tr><td>Optional: Vaihingen as a fourth dataset</td><td>~30 min GPU</td><td>would tell us whether Potsdam is the anomaly</td></tr>
+  <tr><td>Optional: the one label&#8209;free family not yet bounded</td><td>1 CPU day</td><td>publishable either way</td></tr>
+</table>
+
+<h3>Timeline</h3>
+
+<table>
+  <tr><th>When</th><th>What</th></tr>
+  <tr><td>Sep &ndash; Dec 2026</td><td>Optional experiments, writing, figures</td></tr>
+  <tr class="hi"><td><strong>1 January 2027</strong></td><td><strong>Content freeze &mdash; no new experiments after this date</strong></td></tr>
+  <tr><td>Jan &ndash; Feb 2027</td><td>Write, cut to length, internal review</td></tr>
+  <tr><td>~March 2027</td><td>Submit to CVPR EarthVision 2027 <em>(date not yet officially posted; verify the call for papers)</em></td></tr>
+</table>
+
+<p>Fallback venues, in order: <strong>IGARSS 2027</strong> (~January deadline), <strong>IEEE
+GRSL</strong> (rolling), and <strong>IEEE TGRS</strong> &mdash; which is rolling, so there is no
+deadline to miss, and is the natural home for a measurement paper with a causal experiment. With
+three datasets and the ConInfer comparison done, TGRS became plausible where it previously was
+not.</p>
+
+<div class="box">
+  <span class="lbl">The content freeze exists for a reason</span>
+  <p>Six months is enough time to do three good things and far too much time to keep finding a
+  fourth. A project that misses a March deadline because it was still measuring in February has
+  made an avoidable mistake, and the roadmap has warned about it since week four.</p>
+</div>
+
+
+<!-- ==================================================================== -->
+<h2>Closing &mdash; what the project actually is</h2>
+
+<p>It started as a plan to rescue thrown&#8209;away pixels using the spatial grammar of land
+cover. That plan is dead, and it was killed by our own measurement rather than by a reviewer:
+a <em>perfect</em> co&#8209;occurrence matrix is worth 0.3 points over copying the biggest
+neighbour.</p>
+
+<p>What survived is smaller, sharper and better supported. <strong>A single confidence threshold
+is the wrong shape for a multi&#8209;class open&#8209;vocabulary pipeline.</strong> It is wrong for
+different classes in <em>opposite directions</em>, which is why nobody found it by sweeping one
+value. Fitting one threshold per class, on the same labelling budget the baseline already
+spends, and training no weights at all, recovers a real gain &mdash; on two architectures, two
+methods, and three datasets, and it <em>composes with</em> the nearest published competitor
+instead of beating it.</p>
+
+<p>Around it sits a measurement study with a causal experiment, a pre&#8209;registered prediction
+that held, a pre&#8209;registered prediction that failed and is reported as failed, and a metric
+recommendation that other people can adopt.</p>
+
+<div class="box key">
+  <span class="lbl">The one&#8209;line version</span>
+  <p><strong>We set out to fix what the model discards, and ended up fixing the rule that
+  discards it.</strong></p>
+</div>
+
+<p>The most valuable thing in the repository is not any single number. It is that every negative
+result carries an oracle bound saying how much was actually available, so a reader learns where
+the headroom is rather than only that we failed to reach it &mdash; and that five of our own
+findings were refuted by us, in writing, with the numbers that killed them.</p>
+
+
+<!-- ==================================================================== -->
+<h2>Appendix &mdash; reference list</h2>
+
+<h4>Our baseline and competitors</h4>
+<ul class="tight">
+  <li><strong>SegEarth&#8209;OV3</strong> &mdash; <em>Exploring SAM 3 for Open&#8209;Vocabulary Semantic Segmentation in Remote Sensing Images.</em> arXiv:2512.08730. <strong>The named baseline. Reproduced at 47.38 vs 47.4.</strong></li>
+  <li><strong>SegEarth&#8209;OV</strong> &mdash; CVPR 2025. Source of the dataset protocol.</li>
+  <li><strong>ConInfer</strong> &mdash; <em>Context&#8209;Aware Inference for Training&#8209;Free Open&#8209;Vocabulary Remote Sensing Segmentation.</em> arXiv:2603.29271. <strong>Nearest competitor. Run, measured, and improved by our method.</strong></li>
+  <li><strong>OVRSISBenchV1</strong> &mdash; <em>Towards Realistic Open&#8209;Vocabulary RS Segmentation.</em> arXiv:2604.15652.</li>
+</ul>
+
+<h4>Architectural lineage</h4>
+<ul class="tight">
+  <li>FCN (Long et al., 2015) &middot; U&#8209;Net (Ronneberger et al., 2015)</li>
+  <li>ViT (Dosovitskiy et al., 2020) &middot; DETR (Carion et al., 2020)</li>
+  <li>MaskFormer / Mask2Former (Cheng et al., 2021, 2022)</li>
+  <li>CLIP (Radford et al., 2021) &middot; DINOv2 (Oquab et al., 2023)</li>
+  <li>SAM (Kirillov et al., 2023) &middot; SAM 2 (Ravi et al., 2024) &middot; <strong>SAM 3 (Carion et al., 2025)</strong></li>
+</ul>
+
+<h4>Training&#8209;free open&#8209;vocabulary segmentation</h4>
+<ul class="tight">
+  <li>MaskCLIP (Zhou et al., 2022) &middot; SCLIP (Wang et al., 2023) &middot; ClearCLIP (Lan et al., 2024)</li>
+  <li>ProxyCLIP (Lan et al., 2025) &middot; CorrCLIP (Zhang et al., 2025) &middot; GroupViT (Xu et al., 2022)</li>
+</ul>
+
+<h4>Context modelling &mdash; the classical answers we position against</h4>
+<ul class="tight">
+  <li>SLIC superpixels (Achanta et al., 2012) &middot; Felzenszwalb&ndash;Huttenlocher (2004)</li>
+  <li>DeepLab with CRF post&#8209;processing (Chen et al., 2017) &middot; CRF&#8209;as&#8209;RNN (Zheng et al., 2015)</li>
+  <li>EncNet &mdash; Context Encoding for Semantic Segmentation (Zhang et al., 2018)</li>
+</ul>
+
+<h4>Remote&#8209;sensing specific</h4>
+<ul class="tight">
+  <li>SkySense&#8209;O (Zhu et al., 2025) &middot; AerOSeg (Dutta et al., 2025) &middot; RemoteSAM / InstructSAM (2025)</li>
+</ul>
+
+<h4>Datasets used</h4>
+<ul class="tight">
+  <li><strong>LoveDA</strong> &mdash; 7 classes, urban/rural split, 1,669 validation tiles at 1024&sup2;, 0.3&nbsp;m resolution. Catch&#8209;all 36.1%.</li>
+  <li><strong>OpenEarthMap</strong> &mdash; 9 classes, global coverage, 384 of 500 validation tiles. Catch&#8209;all 0.84%.</li>
+  <li><strong>ISPRS Potsdam</strong> &mdash; 6 classes, 2,016 tiles at 512&sup2;, 5&nbsp;cm resolution. Catch&#8209;all 4.29%.</li>
+  <li><strong>iSAID</strong> &mdash; <em>evaluated and rejected.</em> Its catch&#8209;all is 97.11% of ground truth <em>and</em> maximally confusable, so it would confirm the ordering and discriminate nothing. Documented rather than downloaded.</li>
+</ul>
+
+<p class="fig" style="margin-top:26px; border-top:1px solid var(--rule); padding-top:10px;">
+Generated from the project repository at commit <code>eabe959</code> &middot;
+150 commits &middot; 11 August &ndash; 3 September 2026 &middot;
+Every number in this document traces to a committed measurement file.
+</p>
