@@ -65,6 +65,44 @@ miniature: its `water` is 100% reachable, **0% self-reachable**, has a +50 P−R
 after the gains were known. The step that converts it into evidence is the Potsdam protocol:
 commit the predicted Δ for Vaihingen from its reachable share alone, *then* run it.
 
+**RAN IT — four rows, and two problems the run exposed.**
+
+⛔ **A tie bug in my own Spearman.** `argsort(argsort(x))` hands tied values distinct ranks in
+array order, so a **constant** vector gets ranks 0..n-1 and correlates with whatever it is paired
+against. ConInfer/OEM has self-reachable = 0 for every class, and the first run reported
+**ρ = +0.214** for it — that was the class ordering, nothing else. It also inflated the
+`published τ` row, where two datasets tie at 0.1: **+1.000 became +0.949** under averaged ranks.
+Fixed with tie-averaged ranks and a guard returning `nan` when either side is constant, so it
+prints *undefined* rather than a number. Fifth time in this project that the tables were right and
+the statistic printed beside them was not.
+
+⛔ **ConInfer/OpenEarthMap's published threshold is INERT, and that is a real finding.**
+Mechanism (A) is **exactly 0** — not one pixel scores below τ. `CONINFER_RESULTS.md` records that
+cache's `conf` range as **[0.1042, 0.9195]** against a published `prob_thd` of **0.1**, so the
+threshold sits below the score floor and never fires. Every catch-all assignment there is an
+argmax loss. The row cannot carry a correlation (reachable share is 0 by construction, not by
+measurement), and it was carrying the entire thing. The script now detects this, names such rows,
+and reports every ρ twice — with and without them.
+
+**Where that leaves the hypothesis, honestly:**
+
+⛔ **The per-class half is REFUTED.** SAM3/LoveDA gives self-reachable ρ **−0.200** — `water`
+gains **+6.78**, by far the most, on the *second-lowest* self-reachability (34.6%). Converting to
+absolute headroom kills it too: discard × self-reachable is **10.4–13.3% of GT for all six
+classes**, essentially flat. Self-reachability does not explain which classes move, and §9g's
+precision–recall gap is not displaced.
+
+⚠️ **The dataset-level half is UNIDENTIFIABLE at three live rows.** Reachable share orders the
+gain (ρ +1.000) and beats the discard rate (+0.500), but the live rows are 91.4 / 88.7 / 86.6 —
+a **five-point spread** standing in for a 2.35 mIoU range — and **published τ orders them
+identically (+1.000)**. The tautology flagged in the docstring is total here, not partial.
+
+⭐ **Potsdam is the discriminating row, and it did not run** (wrong cache path). It sits at
+**τ = 0.1, the same as SAM3/OEM**, so τ cannot separate the two — while their gains differ
+(+0.60 vs +0.16). If reachable share separates them, it separates from τ. One CPU pass decides it.
+
+---
+
 ## 2026-09-01 (Tue) — Phase 6 closes; ConInfer run, and the method transfers across backbones
 
 **§6.1 vocabulary intervention — the mechanism is now causal.** Catch-all share is set by the
