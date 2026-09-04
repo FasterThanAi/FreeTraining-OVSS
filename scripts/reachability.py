@@ -148,7 +148,8 @@ def spearman(a, b):
 def fmt_rho(r, p=None, how=None):
     """A constant variable prints as undefined, never as a number."""
     if not np.isfinite(r):
-        return '— *(undefined: constant)*'
+        # keep the cell count -- the caller may be filling a "rho | p" pair
+        return '— *(undefined: constant)*' + (' | —' if p is not None else '')
     return f'{r:+.3f}' + (f' | {p:.3f} *({how})*' if p is not None else '')
 
 
