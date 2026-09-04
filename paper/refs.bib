@@ -1,22 +1,23 @@
 % =====================================================================
 %  References
 %
-%  ⚠️ VERIFY BEFORE SUBMISSION — the entries in the block marked
-%  "RECENT / VERIFY" are 2025–2026 works whose full author lists were not
-%  available offline. First authors and arXiv identifiers come from
-%  ANALYSIS.md, which recorded them from the PDFs; the remaining authors are
-%  given as `and others`. Open each PDF and complete the author list before
-%  submitting. Do NOT guess them — a wrong author list is the kind of error a
-%  reviewer who knows the area spots immediately.
+%  Author lists here were VERIFIED on 4 Sep 2026, not guessed:
+%    SegEarth-OV, SegEarth-OV3  -- from the PDFs in papers/ (metadata + page 1)
+%    ConInfer, OVRSISBenchV1    -- from their arXiv abstract pages
+%    SAM 3                      -- arXiv:2511.16719; 38 authors, first six then
+%                                  `and others', which is the bibliography's job
+%  A wrong author list is the kind of error a reviewer who knows the area spots
+%  immediately, so nothing below is inferred from memory.
 % =====================================================================
 
 % ---------------------------------------------------------------------
-%  RECENT / VERIFY
+%  Baseline, competitors and benchmark
 % ---------------------------------------------------------------------
 @inproceedings{segearthov,
   title     = {{SegEarth-OV}: Towards Training-Free Open-Vocabulary Segmentation
                for Remote Sensing Images},
-  author    = {Li, Kaiyu and \textbf{[VERIFY AUTHORS FROM PDF]}},
+  author    = {Li, Kaiyu and Liu, Ruixun and Cao, Xiangyong and Bai, Xueru and
+               Zhou, Feng and Meng, Deyu and Wang, Zhi},
   booktitle = {Proc. IEEE/CVF Conf. Computer Vision and Pattern Recognition (CVPR)},
   year      = {2025}
 }
@@ -24,7 +25,8 @@
 @article{segearthov3,
   title  = {{SegEarth-OV3}: Exploring {SAM}~3 for Open-Vocabulary Semantic
             Segmentation in Remote Sensing Images},
-  author = {Li, Kaiyu and \textbf{[VERIFY AUTHORS FROM PDF]}},
+  author = {Li, Kaiyu and Zhang, Shengqi and Wang, Yujie and Deng, Yupeng and
+            Wang, Zhi and Meng, Deyu and Cao, Xiangyong},
   journal = {arXiv preprint arXiv:2512.08730},
   year   = {2025}
 }
@@ -32,22 +34,25 @@
 @article{coninfer,
   title  = {{ConInfer}: Context-Aware Inference for Training-Free
             Open-Vocabulary Remote Sensing Segmentation},
-  author = {Chen and \textbf{[VERIFY AUTHORS FROM PDF]}},
+  author = {Chen, Wenyang and Hu, Zhanxuan and Zhang, Yaping and
+            Ning, Hailong and Tai, Yonghang},
   journal = {arXiv preprint arXiv:2603.29271},
   year   = {2026}
 }
 
 @article{sam3,
   title  = {{SAM}~3: Segment Anything with Concepts},
-  author = {Carion, Nicolas and \textbf{[VERIFY AUTHORS FROM PDF]}},
-  journal = {arXiv preprint \textbf{[VERIFY arXiv ID]}},
+  author = {Carion, Nicolas and Gustafson, Laura and Hu, Yuan-Ting and
+            Debnath, Shoubhik and Hu, Ronghang and Suris, Didac and others},
+  journal = {arXiv preprint arXiv:2511.16719},
   year   = {2025}
 }
 
 @article{ovrsisbench,
-  title  = {Towards Realistic Open-Vocabulary Remote Sensing Image Segmentation
-            \textbf{[VERIFY TITLE]}},
-  author = {\textbf{[VERIFY AUTHORS FROM PDF]}},
+  title  = {Towards Realistic Open-Vocabulary Remote Sensing Segmentation:
+            Benchmark and Baseline},
+  author = {Li, Bingyu and Huo, Tao and Dong, Haocheng and Zhang, Da and
+            Zhao, Zhiyuan and Gao, Junyu and Li, Xuelong},
   journal = {arXiv preprint arXiv:2604.15652},
   year   = {2026}
 }
