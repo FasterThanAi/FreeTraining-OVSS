@@ -252,6 +252,23 @@ cover or the metric, not both"* — and it now holds for a competitor's pipeline
 That is a **stronger and more falsifiable** statement than "it transfers", and it
 ties the method back to the paper's own mechanism instead of standing beside it.
 
+⭐⭐ **THEIR OEM THRESHOLD CANNOT FIRE — measured 4 Sep, and it reframes this row.**
+`reachability.py` finds mechanism (A) is **exactly zero** across all 384 tiles: the cache's
+`conf` floor is **0.1042** against their published `prob_thd` of **0.1**, so the threshold
+sits *below the score floor* and never fires on a single pixel. Every catch-all assignment
+on that dataset is an argmax loss.
+
+⚠️ **So this is not the like-for-like test the row implies.** Their OEM baseline is an
+**un-thresholded argmax**, which means our fit could only ever *raise* thresholds, never
+lower them — the opposite regime from LoveDA, where τ=0.8 discards 20.7% and 89.4% of that
+is threshold-reachable. Say this beside the −0.39 rather than letting it read as "the
+method does not transfer here".
+
+⭐ It is also a finding about a published configuration in its own right, and a reviewer
+can verify it from their own released code: a tuned hyperparameter that has no effect on
+the dataset it was tuned for. Report it factually, without editorialising — the likeliest
+explanation is that `prob_thd` was carried over from a setting where it did bite.
+
 ⚠️ **Caveat that must travel with this row:** the OEM reproduction is off by 12.05
 against their published figure. The delta is robust to a constant offset, but this
 row rests on far weaker footing than the LoveDA one (−2.34), and should be labelled

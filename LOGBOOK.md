@@ -101,6 +101,35 @@ identically (+1.000)**. The tautology flagged in the docstring is total here, no
 **τ = 0.1, the same as SAM3/OEM**, so τ cannot separate the two — while their gains differ
 (+0.60 vs +0.16). If reachable share separates them, it separates from τ. One CPU pass decides it.
 
+**RESULT — refuted, both halves. @REACHABILITY_RESULTS.md.** Potsdam ran (2016 tiles,
+`~/outputs/potsdam/cache`) and killed it. Over four live rows, reachable share scores ρ
+**+0.400** against the discard rate's **+0.800** and the published τ's **+0.949** — the
+*worst* of the three, and worse than the statistic §9f already closed. Potsdam has the
+highest reachable share (93.9%) and the third gain.
+
+⭐ **The cleanest refutation is Potsdam alone:** its residual is **98.11% reachable**,
+mechanism (B) is 1.25%, so a threshold can touch nearly all of it — and the gain is
+**+0.59**. Maximum reachability, small gain, exactly backwards.
+
+Per class it is backwards too: Potsdam `car` at **6.9%** self-reachable gains **+3.69**
+while `tree` at 19.2% gains **+0.32**. `tree` was the case this was built to explain, and
+it stays unexplained. §9g is not displaced.
+
+⚠️ **The go/no-go criterion I wrote before the run was too loose, and the code was
+stricter.** I said a Potsdam reachable share above 86.6% would break the τ confound — that
+only checked the pairwise τ=0.1 comparison and ignored the *global* ordering. Potsdam came
+in at 93.9%, above the stated bar, and the correlation **fell from +1.000 to +0.400**. The
+script's verdict, which reads the whole ordering, called it right. Trust the coded
+criterion over the prose one.
+
+⭐ **One finding survives and it is worth having: ConInfer's published OEM threshold cannot
+fire.** Mechanism (A) is exactly zero over 384 tiles — `conf` floor **0.1042** against
+`prob_thd` **0.1**. Their OEM baseline is an un-thresholded argmax, so our §7.1a −0.39 row
+was never a like-for-like transfer test, and the write-up now says so.
+
+**Twelve label-free attempts, all bounded.** Stopping here — the Potsdam discipline applies:
+no thirteenth statistic fitted to five points. Back to the paper.
+
 ---
 
 ## 2026-09-01 (Tue) — Phase 6 closes; ConInfer run, and the method transfers across backbones

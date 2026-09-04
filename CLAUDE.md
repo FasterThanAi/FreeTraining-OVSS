@@ -288,6 +288,18 @@ buy the metric by repairing an over-predicted background, which is how OEM produ
 land cover −1.77. ⚠️ **Calibration must match the evaluation distribution** — LoveDA train → val
 gives −0.12. WEEK3 §9b.
 
+⛔ **A TWELFTH label-free attempt, and it fails too — @REACHABILITY_RESULTS.md, 4 Sep.**
+"Reachable" discard (below τ with a real-class argmax, so a threshold can touch it) vs
+"unreachable" (the argmax already picked the catch-all). Label-free, and it looked like it
+would resurrect §9f's criterion. It does not: over four live rows it scores ρ **+0.400**
+against the discard rate's **+0.800** and the published τ's **+0.949** — **worse than the
+statistic §9f already closed.** Potsdam's residual is **98.11% reachable** and gains only
++0.59; LoveDA `water` gains +6.78 on the *second-lowest* self-reachability. §9g's `tree`
+anomaly is **not** repaired. ⭐ One real finding survives: **ConInfer's published OEM
+threshold cannot fire** (`conf` floor 0.1042 vs `prob_thd` 0.1), so that −0.39 row is an
+un-thresholded argmax and not a like-for-like transfer test.
+⛔ **Do not look for a thirteenth statistic that fits five points.**
+
 ⛔ **⭐ The label-free bound is now CLOSED with a mechanism, and §9a's stated reason was wrong.**
 `precision_proxy.py`: **precision IS predictable without labels** — `mean_conf` ρ +0.943 p 0.017,
 cross-head `sem_inst_agree` ρ +0.886 p 0.033 (exact enumeration, 720 relabelings) — **and it buys
