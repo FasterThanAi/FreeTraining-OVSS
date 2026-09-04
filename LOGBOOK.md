@@ -13,6 +13,58 @@ should answer it with a `grep` instead of an archaeology session.
 
 ---
 
+## 2026-09-04 (Fri) — a statistic for what a threshold can actually reach
+
+**No measurement today — a script and a hypothesis, both written on the Mac.** The workstation
+runs it.
+
+**The observation.** Ordering every (pipeline, dataset) pair by the operating threshold it ships
+with: ConInfer/LoveDA τ=0.8 **+2.51**, SAM3/LoveDA τ=0.5 **+1.18**, SAM3/Potsdam τ=0.1 **+0.60**,
+SAM3/OEM τ=0.1 **+0.30**, ConInfer/OEM τ=0.1 **−0.09**. That is monotone across two architectures
+and it has never been written down anywhere in this project.
+
+**The mechanism it points at was measured in week one and then forgotten.** WEEK1 §7.7 split
+catch-all assignment into (A) below the threshold and (B) argmax lost. Lowering a threshold cannot
+change an argmax, so anything in (B) is outside what per-class τ can *ever* fix. At τ=0.5 the
+threshold does most of the work; at τ=0.1 it barely does any, so most of what remains must be
+argmax loss — which the method cannot touch by construction.
+
+⭐ **The reason it matters: the statistic is label-free.** "Of the pixels the model sent to the
+catch-all, what fraction were below the threshold" needs no ground truth. §9f went looking for
+exactly this kind of rule, tested the **discard rate**, and closed it as a negative (U-shaped on
+LoveDA, opposite sign on OEM). Reachable share is *not* the discard rate — so §9f killing one does
+not kill the other, and the script checks that collinearity **first**, before anything else it
+prints can be read.
+
+⚠️ **The tautology risk, stated in the docstring rather than discovered later.** A higher τ
+mechanically discards more *and* makes more of that discard threshold-driven, so part of the
+ordering is arithmetic. The report prints ρ(published τ, gain) alongside, and prefers the
+per-class evidence, which sits within one operating point and is free of it.
+
+**Sharpened past §7.7 while writing it.** `reachable` is a *strict subset* of mechanism (A): a
+pixel below the threshold whose argmax was already the catch-all is (A) and still untouchable. And
+the per-class version has to be **self**-reachability — `pred == c`, not just `pred != bg` —
+because a pixel of class c recovered as some other real class comes back wearing the wrong label
+and does not help c's IoU.
+
+**The prediction it exists to test:** self-reachability separates Potsdam's `tree` (P−R gap
+**+54.7**, Δ IoU **+0.32** — nothing) from LoveDA's `water` (gap **+34.8**, Δ IoU **+6.78**) where
+§9g's precision–recall gap does not. `tree` is currently an unexplained fact that *weakens* §9g's
+ρ = +0.713.
+
+**Verified before shipping**, since none of the five caches are on this machine: a synthetic cache
+with seven hand-worked pixels, checking all seven per-class counts, five partition invariants
+(`reach + unreach == to_bg`, `mech_A + mech_B == to_bg`, `reach ⊆ mech_A`, `self_reach ⊆ reach`),
+and — the one that matters — that `to_bg` equals the background column of `confusion_at` **exactly**,
+so the reachability columns and the gain describe the same pixels. All four verdict branches and
+the <3-row guard exercised with shape-only fixtures. The toy also reproduces the target pattern in
+miniature: its `water` is 100% reachable, **0% self-reachable**, has a +50 P−R gap and gains
+**+0.00**.
+
+⛔ **Not a result yet, and the verdict text says so in the winning branch.** Five points chosen
+after the gains were known. The step that converts it into evidence is the Potsdam protocol:
+commit the predicted Δ for Vaihingen from its reachable share alone, *then* run it.
+
 ## 2026-09-01 (Tue) — Phase 6 closes; ConInfer run, and the method transfers across backbones
 
 **§6.1 vocabulary intervention — the mechanism is now causal.** Catch-all share is set by the
