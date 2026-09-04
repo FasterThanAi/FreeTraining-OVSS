@@ -326,9 +326,25 @@ def main():
         md.append(f'| {k} | ' + ' | '.join(f'{x:.2f}' for x in w) + ' |')
     W = np.array([r[4] for r in rows])
     md.append('| **mean** | ' + ' | '.join(f'**{x:.2f}**' for x in W.mean(0)) + ' |')
+    md.append('| **sd** | ' + ' | '.join(f'{x:.2f}' for x in W.std(0, ddof=1)) + ' |')
     md.append('\nValues are renormalised to geometric mean 1, since only ratios '
               'affect an argmax. A class above 1 wins more argmaxes than before; '
               'below 1, fewer.\n')
+    # ⭐ Added after the first real run, as a DIAGNOSTIC rather than a hypothesis:
+    # the fold-to-fold spread of the fitted parameters separates "the fit is
+    # unstable" from "the fit is stable and the evaluation folds are small". Those
+    # need opposite responses and the first version could not tell them apart.
+    rel = W.std(0, ddof=1) / np.maximum(np.abs(W.mean(0)), 1e-9)
+    worst = float(np.max(rel))
+    md.append(f'Largest relative spread across folds: **{100 * worst:.1f}%** '
+              f'(`{LB.names[int(np.argmax(rel))]}`). ' +
+              ('⭐ **The fitted scales are stable**, so any scatter in the gains is '
+               'evaluation noise from small folds rather than an unstable fit — '
+               'which points at a larger cache, not at abandoning the rule.\n'
+               if worst < 0.15 else
+               '⚠️ **The fitted scales move substantially between folds**, which is '
+               'what overfitting looks like. Treat the gain as unproven regardless '
+               'of its sign.\n'))
 
     md += ['## Mean per-class Δ IoU, C over B\n', '| class | Δ |', '|---|---|']
     for c in range(nc):
@@ -353,6 +369,21 @@ def main():
                'the pipeline reproduces it; (2) check the fitted `w` against the '
                'confusion table, since the mechanism should be visible as the '
                'classes that were absorbing other classes being scaled **down**.\n']
+    elif allpos and m > 0:
+        md += [f'⚠️ **Promising, not established: {m:+.2f} ± {sd:.2f} mIoU over '
+               f'per-class thresholds, every fold positive** '
+               f'(range {gains_cb.min():+.2f} to {gains_cb.max():+.2f}).\n',
+               'Every fold positive is real evidence — under a sign test that is '
+               f'1 in {2 ** args.folds}. But the spread covers zero '
+               f'(mean − 2·sd = {m - 2 * sd:+.2f}), which is the bar this project '
+               'uses elsewhere, so this does not yet clear it. **Do not write it up '
+               'as a result at this width.** Two things close it, in order: a larger '
+               'cache so the folds stop being small, and an end-to-end run in the '
+               'segmentor as §9c did for per-class τ.\n',
+               '⭐ Check the fitted-scale stability table above before anything else. '
+               'If the scales agree across folds while the gains scatter, the *fit* '
+               'is stable and the *evaluation* is noisy — which argues for more '
+               'evaluation tiles rather than against the effect.\n']
     elif m > 0 and not allpos:
         md.append(f'⚠️ **Positive on average ({m:+.2f} ± {sd:.2f}) but not on every '
                   f'fold** ({int((gains_cb > 0).sum())}/{args.folds}). With '

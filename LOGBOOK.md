@@ -132,6 +132,45 @@ no thirteenth statistic fitted to five points. Back to the paper.
 
 ---
 
+## 2026-09-04, later — scaling before the argmax looks REAL, and my verdict said the opposite
+
+**The experiment.** `argmax_reorder.py`: `pred = argmax_c(w_c · s_c)` then `keep if s_pred ≥
+τ_pred`, fitting `(w, τ)` together on the same budget. Attacks the family the completeness
+argument explicitly does **not** cover — the 6.0% catch-all argmax wins and the 9.9% real-class
+confusion, neither reachable by any threshold. LoveDA, 500-tile `--cache-full`, subsample gate
+passed (largest disagreement **0.061** against a 0.15 bar).
+
+**C − B = +1.16 ± 0.97, 5/5 folds positive**, range +0.07 to +2.48. Roughly the size of the whole
+per-class τ contribution again.
+
+⛔ **My verdict function called this "buys nothing".** The positive branch required
+`mean − 2·sd > 0`; the case *positive, every fold positive, spread too wide* had **no branch** and
+fell through to the negative one. Sixth time in this project the table was right and the generated
+prose was wrong, third time it was mine. Branch added, plus a fitted-scale stability diagnostic —
+the first version could not distinguish "the fit is unstable" from "the fit is stable and the
+evaluation folds are small", which need opposite responses.
+
+⭐ **Four independent lines say it is probably real, not overfitting:**
+
+1. **5/5 folds positive** — 1 in 32 under a sign test.
+2. ⭐ **The fitted scales are stable across folds**: `water` **2.45 ± 0.08**, `background`
+   **0.39 ± 0.01**, largest relative spread 13.8% (`road`). Stable fit, scattered gains — so the
+   noise is in the evaluation folds (100 tiles each), not in the parameters.
+3. ⭐⭐ **The fit rediscovered §7.7 without being told.** It scales `background` **down to 0.39**
+   and `water` **up to 2.45** — and §7.7 measured, in week one, that *every* mechanism-(B) pixel
+   (catch-all winning the argmax at `conf ≥ τ`) is **water**, 19.4M px in 24 tiles. Two
+   independent measurements, the same fault.
+4. **The gains land where every prior analysis pointed**: `water` **+4.06**, `forest` **+4.52** —
+   §7.3's two deep-discard classes and §9g's 85% of the rural/urban gap. `forest` up to 1.45
+   against `agricultural` at 1.03 is exactly §8.1's top confusion (forest→agricultural, 23.8M px).
+
+⚠️ **Not established.** `mean − 2·sd = −0.78`, so it fails the bar this project uses elsewhere;
+six extra parameters; and the 500-tile subset makes rung B itself noisy (**+0.85 ± 0.94** here,
+against the published +1.18 ± 0.45, with fold 1 at −0.32). Next: the full 1669-tile `--cache-full`
+(~24 GB, 128 GB free) for real error bars, then an end-to-end segmentor run as §9c did for τ.
+
+---
+
 ## 2026-09-01 (Tue) — Phase 6 closes; ConInfer run, and the method transfers across backbones
 
 **§6.1 vocabulary intervention — the mechanism is now causal.** Catch-all share is set by the
