@@ -107,12 +107,49 @@ from tau_cv import per_tile_hists, fit                           # noqa: E402
 # --------------------------------------------------------------------------- #
 # statistics
 # --------------------------------------------------------------------------- #
+def _rank(x):
+    """Ranks with TIES AVERAGED.
+
+    ⚠️ The obvious `argsort(argsort(x))` is wrong the moment a value repeats: it
+    hands tied entries distinct ranks in array order, so a CONSTANT vector gets
+    ranks 0..n-1 and correlates with whatever the caller happened to pass. That
+    is not hypothetical here -- ConInfer/OpenEarthMap has self-reachable = 0 for
+    every class, and the first version of this script reported rho = +0.214 for
+    it, which was the class ordering and nothing else.
+    """
+    x = np.asarray(x, float)
+    n = len(x)
+    order = np.argsort(x, kind='mergesort')
+    r = np.empty(n, float)
+    r[order] = np.arange(n, dtype=float)
+    i = 0
+    while i < n:
+        j = i
+        while j + 1 < n and x[order[j + 1]] == x[order[i]]:
+            j += 1
+        if j > i:
+            r[order[i:j + 1]] = (i + j) / 2.0
+        i = j + 1
+    return r
+
+
 def spearman(a, b):
+    """nan when either side is constant -- a rank correlation is undefined there,
+    and returning a number invites it to be read as evidence."""
     a, b = np.asarray(a, float), np.asarray(b, float)
-    ra, rb = np.argsort(np.argsort(a)).astype(float), np.argsort(np.argsort(b)).astype(float)
+    if a.size < 2 or np.ptp(a) == 0 or np.ptp(b) == 0:
+        return float('nan')
+    ra, rb = _rank(a), _rank(b)
     ra, rb = ra - ra.mean(), rb - rb.mean()
     d = math.sqrt((ra ** 2).sum() * (rb ** 2).sum())
     return float((ra * rb).sum() / d) if d else float('nan')
+
+
+def fmt_rho(r, p=None, how=None):
+    """A constant variable prints as undefined, never as a number."""
+    if not np.isfinite(r):
+        return '— *(undefined: constant)*'
+    return f'{r:+.3f}' + (f' | {p:.3f} *({how})*' if p is not None else '')
 
 
 def perm_p(a, b, exact_cap=8, draws=20000, seed=0):
@@ -235,7 +272,17 @@ def run_cache(args):
           f'({pct(res_self, res_to_bg):.2f}%)')
     print(f'  §7.7 (A) threshold               {int(R["mech_a"][real].sum()):>16,}')
     print(f'  §7.7 (B) argmax at conf ≥ τ      {int(R["mech_b"][real].sum()):>16,}')
-    print('=' * 72 + '\n')
+    print('=' * 72)
+    inert = int(R['mech_a'].sum()) == 0
+    if inert:
+        print('\n⛔ THE PUBLISHED THRESHOLD IS INERT ON THIS CACHE.\n'
+              '   Mechanism (A) is EXACTLY zero: not one pixel scores below τ, so the\n'
+              '   threshold never fires and every catch-all assignment is an argmax\n'
+              '   loss. τ is below this pipeline\'s score floor on this dataset.\n'
+              '   This row cannot carry a reachability correlation -- reachable share\n'
+              '   is 0 by construction, not by measurement. It IS a real observation\n'
+              '   about the published method and worth reporting as one.\n')
+    print()
 
     # ---- the gain, computed here rather than transcribed from another table
     rng = np.random.default_rng(args.seed)
@@ -328,9 +375,8 @@ def run_cache(args):
         r2, (p2, h2) = spearman(pg_v, di_v), perm_p(pg_v, di_v)
         md += [f'Over the {len(rows)} real classes, against Δ IoU:\n',
                '| statistic | ρ | p |', '|---|---|---|',
-               f'| **self-reachable share** | **{r1:+.3f}** | {p1:.3f} *({h1})* |',
-               f'| precision−recall gap *(§9g\'s statistic)* | {r2:+.3f} | '
-               f'{p2:.3f} *({h2})* |',
+               f'| **self-reachable share** | {fmt_rho(r1, p1, h1)} |',
+               f'| precision−recall gap *(§9g\'s statistic)* | {fmt_rho(r2, p2, h2)} |',
                f'\n⚠️ {len(rows)} points. This is a direction, not a law — the '
                'cross-dataset test in `--summarize` is what the claim rests on.\n']
         percls = dict(self_reach_rho=r1, self_reach_p=p1, prgap_rho=r2, prgap_p=p2)
@@ -394,15 +440,29 @@ def run_summary(args):
         return
 
     # ---- the collinearity check comes FIRST, on purpose
+    keep = [i for i, d in enumerate(data) if d['lf_reach_share'] > 0.0]
+    sub = lambda v: [v[i] for i in keep]
+
     r_rd, (p_rd, h_rd) = spearman(reach, disc), perm_p(reach, disc)
+    inert = [d['tag'] for d in data if d['lf_reach_share'] == 0.0]
+    if inert:
+        md += ['\n⛔ **Rows with an INERT published threshold: '
+               + ', '.join(f'`{x}`' for x in inert) + '.**\n',
+               'Reachable share is 0 there *by construction* — τ sits below the score '
+               'floor, so the threshold never fires on a single pixel and every '
+               'catch-all assignment is an argmax loss. Such a row is a real finding '
+               'about that published configuration, but it **cannot carry a '
+               'correlation**, and a ρ computed with it in is measuring one point. '
+               'Every ρ below is reported twice: with, and without.\n']
+
     md += ['\n## First: is this just the discard rate again?\n',
            '§9f already tested the **discard rate** as a label-free predictor of when '
            'calibration pays, and found a U-shape on LoveDA and the opposite sign on '
            'OpenEarthMap. If reachable share is collinear with it, this experiment is a '
            'restatement of a closed negative.\n',
-           f'ρ(reachable share, discard rate) = **{r_rd:+.3f}**, p = {p_rd:.3f} '
-           f'*({h_rd})*\n']
-    collinear = abs(r_rd) >= 0.9
+           f'ρ(reachable share, discard rate) = **{fmt_rho(r_rd)}**, '
+           f'p = {p_rd:.3f} *({h_rd})*\n']
+    collinear = np.isfinite(r_rd) and abs(r_rd) >= 0.9
     md.append('⛔ **They are collinear.** Treat everything below as a restatement of '
               '§9f, not a new statistic.\n' if collinear else
               '✅ **They come apart.** The two statistics rank the rows differently, so '
@@ -412,12 +472,21 @@ def run_summary(args):
     r_d, (p_d, h_d) = spearman(disc, gain), perm_p(disc, gain)
     r_t, (p_t, h_t) = spearman(taus, gain), perm_p(taus, gain)
 
-    md += ['## Against the gain\n', '| predictor | ρ vs Δ mIoU | p | label-free? |',
+    kn = len(keep)
+    rg2 = spearman(sub(reach), sub(gain)) if kn >= 3 else float('nan')
+    rd2 = spearman(sub(disc), sub(gain)) if kn >= 3 else float('nan')
+    rt2 = spearman(sub(taus), sub(gain)) if kn >= 3 else float('nan')
+    md += ['## Against the gain\n',
+           f'| predictor | ρ (all {k} rows) | p | ρ (the {kn} live rows) |',
            '|---|---|---|---|',
-           f'| **reachable share** | **{r_g:+.3f}** | {p_g:.3f} *({h_g})* | ✅ yes |',
-           f'| discard rate *(§9f, closed negative)* | {r_d:+.3f} | {p_d:.3f} '
-           f'*({h_d})* | ✅ yes |',
-           f'| published τ | {r_t:+.3f} | {p_t:.3f} *({h_t})* | ✅ yes |',
+           f'| **reachable share** | **{fmt_rho(r_g)}** | {p_g:.3f} *({h_g})* '
+           f'| **{fmt_rho(rg2)}** |',
+           f'| discard rate *(§9f, closed negative)* | {fmt_rho(r_d)} | {p_d:.3f} '
+           f'*({h_d})* | {fmt_rho(rd2)} |',
+           f'| published τ | {fmt_rho(r_t)} | {p_t:.3f} *({h_t})* | {fmt_rho(rt2)} |',
+           '\n"Live rows" excludes any row whose threshold is inert, where reachable '
+           'share is 0 by construction. ⭐ **The right-hand column is the honest one** '
+           '— if the correlation only exists in the left, it is one degenerate point.\n',
            f'\n⚠️ **{k} points.** A correlation over {k} rows is an ordering, not a law; '
            f'the smallest attainable two-sided p is '
            f'{2 / math.factorial(k):.3f}. What this table can do is say whether the '
@@ -428,15 +497,20 @@ def run_summary(args):
     # another dataset. (tau_cv printed a LoveDA figure on four foreign caches
     # before that was caught — WEEK3 §11.)
     md.append('## Verdict\n')
-    if collinear:
+    r_use = rg2 if np.isfinite(rg2) else r_g
+    d_use = rd2 if np.isfinite(rd2) else r_d
+    if not np.isfinite(r_use):
+        md.append('⛔ **No usable correlation.** Too few live rows once inert '
+                  'thresholds are excluded. Add rows before reading anything here.\n')
+    elif collinear:
         md.append(f'⛔ **Reachable share is collinear with the discard rate** '
                   f'(ρ {r_rd:+.3f}). §9f measured that and found no rule. This adds a '
                   'name, not a finding. Report it as a negative and do not build the '
                   'pre-registration on it.\n')
-    elif abs(r_g) >= 0.8 and abs(r_g) > abs(r_d) + 0.2:
-        md += [f'⭐ **Reachable share orders the gain (ρ {r_g:+.3f}) and beats the '
-               f'discard rate (ρ {r_d:+.3f}) by a clear margin, while not being '
-               f'collinear with it (ρ {r_rd:+.3f}).**\n',
+    elif abs(r_use) >= 0.8 and abs(r_use) > abs(d_use) + 0.2:
+        md += [f'⭐ **Reachable share orders the gain (ρ {r_use:+.3f}, live rows) and '
+               f'beats the discard rate (ρ {d_use:+.3f}) by a clear margin, while not '
+               f'being collinear with it (ρ {r_rd:+.3f}).**\n',
                'That is the discriminating outcome this script was built to test: a '
                '**label-free** statistic that orders the gain where §9f\'s did not.\n',
                '⛔ **It is not established yet, and must not be written up as if it '
@@ -446,19 +520,20 @@ def run_summary(args):
                'from its reachable share alone.\n2. Run Vaihingen.\n3. Report the '
                'prediction against the measurement, held or failed.\n',
                'That is the Potsdam protocol, applied to a claim that would be new.\n']
-    elif abs(r_d) > abs(r_g) + 0.2:
-        md.append(f'⛔ **The discard rate orders the gain better (ρ {r_d:+.3f}) than '
-                  f'reachable share does (ρ {r_g:+.3f}).** The reachability framing adds '
+    elif abs(d_use) > abs(r_use) + 0.2:
+        md.append(f'⛔ **The discard rate orders the gain better (ρ {d_use:+.3f}) than '
+                  f'reachable share does (ρ {r_use:+.3f}).** The reachability framing adds '
                   'nothing over the statistic §9f already closed. Report as a bounded '
                   'negative and move on.\n')
     else:
-        md.append(f'⚠️ **Inconclusive.** Reachable share ρ {r_g:+.3f}, discard rate '
-                  f'ρ {r_d:+.3f} — neither separates from the other at {k} points. '
+        md.append(f'⚠️ **Inconclusive.** Reachable share ρ {r_use:+.3f}, discard rate '
+                  f'ρ {d_use:+.3f} — neither separates from the other at {kn} live points. '
                   'Either add rows (Vaihingen, and the ConInfer arms if any are '
                   'missing) or report that the ordering has no single predictor.\n')
 
-    if abs(r_t) >= 0.8:
-        md.append(f'⚠️ **The published τ alone orders the gain at ρ {r_t:+.3f}.** A '
+    if np.isfinite(r_use) and np.isfinite(rt2) and abs(rt2) >= 0.8:
+        md.append(f'⚠️ **The published τ alone orders the gain at ρ {rt2:+.3f} on the '
+                  'live rows.** A '
                   'higher τ mechanically discards more *and* makes more of that discard '
                   'threshold-driven, so part of any reachability result is arithmetic. '
                   'Say this beside the ρ, and prefer the per-class evidence — which is '
@@ -474,14 +549,20 @@ def run_summary(args):
                '|---|---|---|---|---|']
         for d in pcs:
             q = d['per_class']
-            md.append(f'| {d["tag"]} | **{q["self_reach_rho"]:+.3f}** | '
-                      f'{q["self_reach_p"]:.3f} | {q["prgap_rho"]:+.3f} | '
-                      f'{q["prgap_p"]:.3f} |')
-        wins = sum(1 for d in pcs
+            sr, pg = q['self_reach_rho'], q['prgap_rho']
+            md.append(f'| {d["tag"]} | **{fmt_rho(sr)}** | '
+                      + (f'{q["self_reach_p"]:.3f}' if np.isfinite(sr) else '—')
+                      + f' | {fmt_rho(pg)} | '
+                      + (f'{q["prgap_p"]:.3f}' if np.isfinite(pg) else '—') + ' |')
+        cmp_ok = [d for d in pcs
+                  if np.isfinite(d['per_class']['self_reach_rho'])
+                  and np.isfinite(d['per_class']['prgap_rho'])]
+        wins = sum(1 for d in cmp_ok
                    if abs(d['per_class']['self_reach_rho'])
                    > abs(d['per_class']['prgap_rho']))
+        pcs = cmp_ok
         md.append(f'\nSelf-reachability ranks the classes better than the P−R gap in '
-                  f'**{wins} of {len(pcs)}** datasets.\n')
+                  f'**{wins} of {len(pcs)}** datasets where both are defined.\n')
         if wins == len(pcs) and len(pcs) >= 3:
             md.append('⭐ It wins everywhere. §9g\'s P−R gap is then the *symptom* — a '
                       'class under-fires — and reachability is the *constraint*: whether '
