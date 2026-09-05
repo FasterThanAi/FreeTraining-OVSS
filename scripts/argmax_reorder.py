@@ -228,6 +228,21 @@ def main():
         raise SystemExit(f'no .npz under {args.cache}')
     print(f'{T} tiles | published τ = {args.tau} | subsample {args.subsample} px/tile\n')
 
+    # ⚠️ A cache being written by a concurrent measure_discard_rate.py run reads
+    # as a valid but MIXED set of tiles, and produces a plausible-looking table.
+    # That happened on OpenEarthMap: 1225 files where the split has 384, with the
+    # baseline landing 25 mIoU below its published value.
+    import time
+    now = time.time()
+    fresh = [f for f in files if now - f.stat().st_mtime < 600]
+    if fresh:
+        print(f'\n⛔ {len(fresh)} of {T} cache files were modified in the last 10 '
+              f'minutes (most recent: {int(now - max(f.stat().st_mtime for f in fresh))}s '
+              f'ago).\n   A cache still being written reads as a mixed set of tiles and '
+              f'produces a\n   plausible table from the wrong data. Wait for the writer '
+              f'to finish, then re-run.\n')
+        raise SystemExit('refusing to read a cache that is being written')
+
     rng = np.random.default_rng(args.seed)
     S, G, PT = load_full(files, args.subsample, nc, NBINS, rng)
     grid = np.round(np.exp(np.linspace(np.log(0.40), np.log(2.50), 11)), 3)
@@ -313,7 +328,12 @@ def main():
                'answer, so nothing below can be attributed to `w` rather than to '
                'sampling noise. Raise `--subsample` and re-run.\n'))
 
+    A_mean = float(np.mean([r[1] for r in rows]))
     md += ['## Result\n',
+           f'⚠️ **Rung A averages {A_mean:.2f} mIoU.** That is the published baseline '
+           "on these tiles — check it against the dataset's known value before "
+           'reading anything below. A cache holding the wrong tiles produces a '
+           'complete and plausible table.\n',
            '| fold | A published τ | B per-class τ | C + scaling | **C − B** |',
            '|---|---|---|---|---|']
     for k, a, b, c, *_ in rows:
@@ -362,9 +382,23 @@ def main():
     m, sd = gains_cb.mean(), gains_cb.std(ddof=1)
     allpos = bool((gains_cb > 0).all())
     md.append('\n## Verdict\n')
+    # ⚠️ The stability diagnostic and the verdict must not disagree. An earlier
+    # version printed "adds +3.54" directly beneath its own warning that the
+    # fitted scales moved 39% between folds. If the parameters are not stable,
+    # the sign of the gain is not evidence of anything.
+    unstable = worst >= 0.15
     if not passed:
         md.append('⛔ **Unreadable — the subsampling gate failed.** Fix that before '
                   'interpreting anything above.\n')
+    elif unstable:
+        md += [f'⛔ **Not readable: the fitted scales move {100 * worst:.0f}% between '
+               f'folds.** The measured increment is {m:+.2f} ± {sd:.2f}, and its sign '
+               'is not evidence either way while the parameters are this unstable — '
+               'each fold is fitting a different rule.\n',
+               'Check the cache before anything else: a partial or mixed cache '
+               'produces exactly this signature. Compare rung A above against the '
+               "dataset's published baseline; if it does not match, the input is "
+               'wrong and no amount of re-reading the gain will help.\n']
     elif m - 2 * sd > 0 and allpos:
         md += [f'⭐ **Scaling before the argmax adds {m:+.2f} ± {sd:.2f} mIoU over '
                f'per-class thresholds alone**, every fold positive.\n',
