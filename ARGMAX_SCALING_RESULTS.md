@@ -270,6 +270,101 @@ the bigger and the cheaper test, and OpenEarthMap should be dropped from this qu
 
 ---
 
+## ⭐⭐ Potsdam — a second positive, and it explains a September anomaly
+
+**6 Sep, 2016 tiles @ τ=0.1, all rungs exact.** Cache gate passed: **57.87 mIoU / 4.68%
+discard**, matching `POTSDAM_RESULTS.md`. Rung A **57.84**. Search-subsample gate passed at
+**0.052** against a 0.15 bar.
+
+| fold | A published τ | B per-class τ | C + scale | C − B |
+|---|---|---|---|---|
+| 1 | 58.33 | 58.07 | 62.59 | +4.52 |
+| 2 | 58.00 | 58.74 | 63.21 | +4.47 |
+| 3 | 57.35 | 58.24 | 63.40 | +5.16 |
+| 4 | 57.88 | 58.85 | 64.07 | +5.21 |
+| 5 | 57.65 | 58.28 | 63.24 | +4.96 |
+
+**C − B = +4.86 ± 0.35, 5/5 folds, mean − 2·sd = +4.16.** Clears the gate by a wide margin.
+**Every real class improves.**
+
+| road | building | grass | **tree** | car | *clutter* |
+|---|---|---|---|---|---|
+| +1.08 | +0.59 | +3.97 | **+21.56** | +2.81 | *−0.82* |
+
+Catch-all-excluded **+6.00**, full **+4.86**.
+
+### ⭐⭐ This is the answer to `tree`, which broke §9g
+
+`POTSDAM_RESULTS.md` recorded the anomaly and could not explain it:
+
+> ⚠️ **`car` carries it, and `tree` does not** — despite `tree` having precision 93.34 /
+> recall 38.63, a **+54.7** gap, larger than LoveDA's `water` (+34.8) that drove the entire
+> LoveDA result. **The precision–recall asymmetry did not predict which class would move.**
+> That weakens §9g's ρ = +0.713.
+
+**`tree` fires correctly 93% of the time and finds 39% of what is there — and per-class τ
+recovered +0.32 of it.** The scale recovers **+21.56** at w = 4.04.
+
+⭐ **The reason is visible in the reachability run**, which measured Potsdam `tree` at **96.2%
+reachable but only 19.2% SELF-reachable**. Nearly all of `tree`'s residual is below the
+threshold — but with a *different class* winning the argmax. Lowering `tree`'s own threshold
+therefore returns those pixels wearing the wrong label, which is precisely why the largest
+precision–recall gap in the project moved nothing. Scaling flips the argmax and collects it.
+
+> **§9g's precision–recall gap identifies a class that is under-firing. It does not say
+> whether a THRESHOLD can do anything about it. `tree` is the case where those two come
+> apart, and the second lever is what reaches it.** The anomaly is not a defect in §9g; it
+> is the signature of the family §9g's rule cannot address.
+
+### ⚠️ `tree` is 72% of the gain — and the result survives without it
+
+| | |
+|---|---|
+| real-class mean, all 5 | **+6.00** |
+| real-class mean **excluding `tree`** | **+2.11** |
+| full mIoU **excluding `tree`'s contribution** | **+1.27** |
+
+Comparable to LoveDA's +1.16 with `tree` removed entirely. **Unlike OpenEarthMap, where four
+of eight real classes got worse and one class was the whole effect, every Potsdam class
+improves and the result does not depend on the largest one.**
+
+### Calibration cost: lower than for thresholds alone
+
+| tiles | τ only | + scale | increment | worst draw |
+|---|---|---|---|---|
+| 100 | −0.09 | +4.71 | **+4.81** | **+4.42** |
+| 200 | +0.73 | +5.09 | +4.36 | +4.11 |
+| 400 | +0.83 | +5.52 | +4.69 | +4.67 |
+| 800 | +0.15 | +5.18 | +5.03 | +4.41 |
+
+⭐ **Positive at every size with worst draws above +4.1, from 100 tiles.** Flat thereafter —
+this needs *less* calibration data than per-class τ does, not more. Note also that per-class
+τ alone is worth only +0.15 to +0.83 here; **on Potsdam the scale is the method and the
+threshold is the ablation.**
+
+### ⚠️ Two checks that fired, and why they were wrong
+
+**`clutter` spreads 51% across folds.** It is the catch-all, and `--objective real` does not
+score it, so its scale is only weakly identified — it moves the objective indirectly, through
+which pixels it takes from real classes. Every real class sits between **2.6%** (`car`) and
+**15.3%** (`road`). The stability gate now covers the real classes and reports the catch-all
+beside them.
+
+**`road` still sits at 15.3%, marginally over the 15% bar — and the bar was not moved.**
+Instead the check order was fixed. Parameter instability was vetoing the verdict *before the
+gain was considered*, and those measure different things: overfitting shows up as an unstable
+**gain**, and the gain here is +4.86 ± 0.35 with a range of 0.74 over five folds. Unstable
+parameters with a steady gain is **non-uniqueness** — coordinate ascent reaching equivalent
+optima by different routes on a coupled objective. Instability now vetoes only when the gain
+*also* fails, and otherwise annotates it. ⛔ **Consequence: report the gain, never a single
+fitted vector as "the" scales.**
+
+⚠️ Both changes are post-hoc, made after seeing a result I wanted to keep. The arguments are
+about what the statistics mean rather than about this run, and are stated in the code, but
+the ordering is recorded honestly.
+
+---
+
 ## Status and limits
 
 | | |

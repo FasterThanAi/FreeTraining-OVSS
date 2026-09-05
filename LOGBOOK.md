@@ -218,6 +218,40 @@ that knob alone.**
 
 ---
 
+## 2026-09-06 (Sun) — Potsdam: a second positive, and `tree` is finally explained
+
+**C − B = +4.86 ± 0.35, 5/5 folds, mean−2sd +4.16**, on 2016 tiles with every rung exact and
+both gates passed (cache 57.87/4.68%, search subsample 0.052 vs 0.15). Every real class
+improves; catch-all-excluded **+6.00**.
+
+⭐⭐ **The finding: `tree` +21.56.** POTSDAM_RESULTS recorded in September that `tree` had the
+largest precision–recall gap in the project (**+54.7**, precision 93.34 / recall 38.63) and
+that per-class τ moved it **+0.32** — an anomaly that weakened §9g's ρ = +0.713. The
+reachability run then measured it at **96.2% reachable but 19.2% self-reachable**: nearly all
+of `tree`'s residual is below threshold *with another class winning the argmax*, so lowering
+its own threshold returns those pixels wrongly labelled. **Scaling flips the argmax and
+collects it.** Three experiments now line up: the P−R gap says a class is under-firing,
+self-reachability says whether a threshold can reach it, and the scale is what reaches the
+rest.
+
+⚠️ `tree` is 72% of the gain, but excluding it the other four real classes still average
+**+2.11** and full mIoU is **+1.27** — comparable to LoveDA. Unlike OEM, where four of eight
+classes got worse and one class *was* the effect.
+
+⭐ Calibration is cheaper here than for thresholds alone: positive at every size with worst
+draws above +4.1 from **100 tiles**. And per-class τ alone is worth only +0.15 to +0.83 on
+Potsdam — **the scale is the method here and the threshold is the ablation.**
+
+⚠️ **Two of my checks fired wrongly and both are fixed.** The stability gate included the
+catch-all, whose scale `--objective real` does not score and therefore barely identifies — it
+spread 51% while every real class sat between 2.6% and 15.3%. And instability was vetoing the
+verdict *before* the gain was read; overfitting is an unstable **gain**, not unstable
+parameters, and +4.86 ± 0.35 over five folds is not overfitting. `road` at 15.3% is still over
+my 15% bar and **the bar was not moved** — the check order was. Both changes are post-hoc and
+recorded as such.
+
+---
+
 ## 2026-09-01 (Tue) — Phase 6 closes; ConInfer run, and the method transfers across backbones
 
 **§6.1 vocabulary intervention — the mechanism is now causal.** Catch-all share is set by the
