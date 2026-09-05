@@ -207,6 +207,12 @@ def main():
                          'exact histograms before the run refuses to report C')
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--limit', type=int, default=0)
+    ap.add_argument('--sizes', type=int, nargs='*', default=None,
+                    help='ALSO run a calibration learning curve at these sizes. '
+                         'The combined rule fits 2N-1 parameters where thresholds '
+                         'alone fit N-1, so the ~200-tile figure measured for τ '
+                         'does NOT carry over and has to be re-measured.')
+    ap.add_argument('--repeats', type=int, default=3)
     ap.add_argument('--md', default=None)
     args = ap.parse_args()
 
@@ -404,6 +410,51 @@ def main():
               f'so the difference is the rule and not the sample. Rung B is also '
               f'reported exactly above; the exact five-fold value is '
               f'**{ge.mean():+.2f}**.\n')
+
+    # ---------------- calibration learning curve, both rules
+    if args.sizes:
+        print('\ncalibration learning curve:')
+        md += ['\n## How many labelled tiles does each rule need?\n',
+               'Fit on *n* randomly drawn tiles, evaluate on the rest, '
+               f'{args.repeats} draws each. Both rules see the SAME draw, so the '
+               'columns are comparable row by row.\n',
+               '⚠️ This is the question a doubled parameter count forces: the '
+               '~200-tile figure in the paper was measured for thresholds alone '
+               f'({nc - 1} parameters). The combined rule fits {2 * nc - 1}.\n',
+               '| tiles | τ only | + scale | **increment** | worst increment |',
+               '|---|---|---|---|---|']
+        for sz in args.sizes:
+            if sz >= T:
+                continue
+            db, dc = [], []
+            for r in range(args.repeats):
+                pm = rng.permutation(T)
+                tr, te = pm[:sz], pm[sz:]
+                Str2, Gtr2 = S[tr].reshape(-1, nc), G[tr].reshape(-1)
+                Ste2, Gte2 = S[te].reshape(-1, nc), G[te].reshape(-1)
+                Hs_tr2 = hist_at(Str2, Gtr2, ones, nc, NBINS)
+                Hs_te2 = hist_at(Ste2, Gte2, ones, nc, NBINS)
+                tb = fit_tau(Hs_tr2, bg, NBINS, objective=args.objective)
+                base = miou(confusion_at(Hs_te2, np.full(nc, args.tau), bg, NBINS))
+                mb = miou(confusion_at(Hs_te2, tb, bg, NBINS))
+                w2, _ = fit_scale(Str2, Gtr2, bg, nc, NBINS, grid, args.objective,
+                                  args.w_rounds, args.tau_rounds, verbose=False)
+                tc = fit_tau(hist_at(Str2, Gtr2, w2, nc, NBINS), bg, NBINS,
+                             objective=args.objective)
+                mc = miou(confusion_at(hist_at(Ste2, Gte2, w2, nc, NBINS), tc,
+                                       bg, NBINS))
+                db.append(mb - base)
+                dc.append(mc - base)
+            db, dc = np.array(db), np.array(dc)
+            inc = dc - db
+            md.append(f'| {sz} | {db.mean():+.2f} | {dc.mean():+.2f} | '
+                      f'**{inc.mean():+.2f}** | {inc.min():+.2f} |')
+            print(f'  {sz:>5} tiles: τ {db.mean():+.2f}   +scale {dc.mean():+.2f}   '
+                  f'increment {inc.mean():+.2f} (worst {inc.min():+.2f})')
+        md.append('\n⭐ Read the **increment** column, not the absolute ones. The '
+                  'question is the size at which the scale starts paying for its '
+                  'extra parameters — and whether that is larger than the figure '
+                  'the paper currently quotes for thresholds alone.\n')
 
     text = '\n'.join(md) + '\n'
     print('\n' + text)
