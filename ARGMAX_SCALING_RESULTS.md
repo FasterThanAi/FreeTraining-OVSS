@@ -230,6 +230,46 @@ forced into a branch it does not fit.
 
 ---
 
+### ⛔ The denser re-run settles it: OpenEarthMap cannot measure this
+
+`--subsample 150000`, 3.75x the pixels for the `w` search. If a thin search subsample were
+the cause, the scales should have stabilised. **They got worse.**
+
+| | 40k | **150k** |
+|---|---|---|
+| C − B | +0.95 ± 0.85 | **+0.40 ± 1.41** |
+| folds positive | 4/5 | **3/5** |
+| scale instability, worst class | 15.7% | **28.6%** |
+
+⭐ **The decisive number is rung A**, the published baseline, which does not involve the
+subsample at all: it swings **39.64 → 49.79** across folds. A **10-point** spread against an
+effect of 0.4. And **per-class τ becomes unreadable too** — **+0.40 ± 1.34**, with fold 1 at
+**−1.87** for a method verified end-to-end on LoveDA at +1.16 ± 0.15.
+
+> **OpenEarthMap's 384 tiles cannot resolve a ~1 mIoU effect under 5-fold cross-validation.
+> The fold-to-fold variance of the baseline is an order of magnitude larger than the
+> quantity being measured, and this applies to BOTH levers equally.** It is a limit of the
+> measurement, not a finding about the rule.
+
+`cropland` still carries what movement there is (+7.70, with four of eight real classes
+worse), so the §8.1 reading is unchanged.
+
+⚠️ **A design flaw this comparison exposed, now fixed.** The fold partition was drawn from
+the same RNG stream as the pixel subsampling, so `load_full` consumed randomness in
+proportion to `--subsample` and **raising the subsample silently reshuffled the folds**. The
+40k and 150k runs were therefore never comparable — rung A differed between them for a
+reason that had nothing to do with the knob under test. The partition is now drawn first,
+from its own stream, and is a function of `--seed` alone; verified by two subsample settings
+producing identical rungs A and B. **Two settings of one knob must differ in that knob
+alone**, and this one did not.
+
+⭐ **Where the transfer test should go instead: Potsdam.** 2016 tiles — *more than LoveDA's
+1669* — giving 403 evaluation tiles per fold against OEM's 77. Its tiles are 512², so a
+`--cache-full` is roughly 6 GB rather than LoveDA's 42, and about 35 GPU-minutes. It is both
+the bigger and the cheaper test, and OpenEarthMap should be dropped from this question.
+
+---
+
 ## Status and limits
 
 | | |

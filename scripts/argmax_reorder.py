@@ -280,12 +280,22 @@ def main():
         print(f'  ...stable at {n0} files. Recent but not being written — '
               f'proceeding.')
 
-    rng = np.random.default_rng(args.seed)
+    # ⚠️ Draw the fold partition BEFORE loading, from its own stream, so it does
+    # NOT depend on --subsample. It did: load_full consumes randomness in
+    # proportion to nsub, so raising the subsample silently reshuffled the folds.
+    # The 40k and 150k OpenEarthMap runs were therefore not comparable -- rung A,
+    # which does not involve the subsample at all, moved 41.0-46.0 in one and
+    # 39.6-49.8 in the other, purely because the tiles had been repartitioned.
+    # Two settings of one knob must differ in that knob alone.
+    #
+    # This changes the partition relative to runs before 5 Sep 2026. Recorded
+    # results from those runs stand as measured on their own partitions.
+    order = np.random.default_rng(args.seed).permutation(T)
+    rng = np.random.default_rng(args.seed + 1000)
     S, G, PT = load_full(files, args.subsample, nc, NBINS, rng)
     grid = np.round(np.exp(np.linspace(np.log(0.40), np.log(2.50), 11)), 3)
     print(f'\n  w grid: {list(grid)}\n')
 
-    order = rng.permutation(T)
     folds = np.array_split(order, args.folds)
     rows, gate_rows = [], []
 

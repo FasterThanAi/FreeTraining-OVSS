@@ -199,6 +199,23 @@ the 5-fold is the headline and this run is the verification.
 ⛔ **LoveDA only.** OEM, Potsdam and ConInfer are untested, and §9e gives no reason to assume `w`
 transfers across domains any better than τ did.
 
+**OEM settling run — the subsample was NOT the cause, and OEM is the wrong test.**
+`--subsample 150000` made the scales *less* stable (15.7% → **28.6%**) and the increment
+weaker (+0.95 → **+0.40 ± 1.41**). Rung A — the published baseline, independent of the
+subsample — swings **39.64 → 49.79** across folds, and per-class τ itself comes out
+**+0.40 ± 1.34** with a fold at −1.87. **384 tiles over 5 folds is 77 evaluation tiles; the
+baseline's fold variance is 10 points against an effect of 0.4.** OpenEarthMap cannot measure
+either lever. A measurement limit, not a result.
+
+⚠️ **And the two runs were never comparable.** The fold partition came from the same RNG
+stream as the pixel subsampling, so raising `--subsample` reshuffled the folds. Fixed: the
+partition is drawn first from its own stream and depends on `--seed` alone. Verified by two
+subsample settings giving identical rungs A and B. **Two settings of one knob must differ in
+that knob alone.**
+
+⭐ **Potsdam is the transfer test, not OEM** — 2016 tiles (more than LoveDA), 403 per fold,
+512² so `--cache-full` is ~6 GB and ~35 GPU-minutes. Bigger and cheaper.
+
 ---
 
 ## 2026-09-01 (Tue) — Phase 6 closes; ConInfer run, and the method transfers across backbones
