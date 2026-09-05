@@ -404,13 +404,23 @@ def main():
                   'pixel.** The subsample is used only to search for `w`, so this '
                   'gate is now a diagnostic of the search, not a condition on the '
                   'result.\n')
-    md.append(f'\nLargest disagreement **{disc:.3f}** mIoU against a bar of '
-              f'{args.gate:.2f}. ' +
-              ('✅ **Gate passed** — the subsample is a valid instrument here.\n'
-               if passed else
-               '⛔ **GATE FAILED.** The subsample does not reproduce the exact '
-               'answer, so nothing below can be attributed to `w` rather than to '
-               'sampling noise. Raise `--subsample` and re-run.\n'))
+    if exact is not None:
+        md.append(f'\nLargest disagreement **{disc:.3f}** mIoU against a bar of '
+                  f'{args.gate:.2f}. ' +
+                  ('✅ The search subsample tracks the exact answer.\n' if passed else
+                   '⚠️ **The search subsample does not track the exact answer.** The '
+                   'results below are unaffected — they are exact — but `w` was '
+                   'SEARCHED on this subsample, so the fit saw a noisier objective '
+                   'than the one it is scored against. If the fitted scales are also '
+                   'unstable, raising `--subsample` is the first thing to try.\n'))
+    else:
+        md.append(f'\nLargest disagreement **{disc:.3f}** mIoU against a bar of '
+                  f'{args.gate:.2f}. ' +
+                  ('✅ **Gate passed** — the subsample is a valid instrument here.\n'
+                   if passed else
+                   '⛔ **GATE FAILED.** Rung C rests on the subsample in this mode, '
+                   'so nothing below can be attributed to `w` rather than to '
+                   'sampling noise. Re-run without `--no-exact-eval`.\n'))
 
     A_mean = float(np.mean([r[1] for r in rows]))
     md += ['## Result\n',
@@ -479,10 +489,12 @@ def main():
                f'folds.** The measured increment is {m:+.2f} ± {sd:.2f}, and its sign '
                'is not evidence either way while the parameters are this unstable — '
                'each fold is fitting a different rule.\n',
-               'Check the cache before anything else: a partial or mixed cache '
-               'produces exactly this signature. Compare rung A above against the '
-               "dataset's published baseline; if it does not match, the input is "
-               'wrong and no amount of re-reading the gain will help.\n']
+               'Two causes to separate, in order. **(1) A partial or mixed cache** '
+               'produces exactly this signature — compare rung A above against the '
+               "dataset's published baseline first. **(2) A search subsample too "
+               'thin to fit against**: `w` is searched on the subsample even though '
+               'it is scored exactly, so a failed gate above and unstable scales '
+               'here are the same problem, and `--subsample` is the lever.\n']
     elif m - 2 * sd > 0 and allpos:
         md += [f'⭐ **Scaling before the argmax adds {m:+.2f} ± {sd:.2f} mIoU over '
                f'per-class thresholds alone**, every fold positive.\n',
@@ -524,10 +536,12 @@ def main():
                'pay either, at this supervision budget. State it as bounding the '
                'larger family, not as a failed attempt.\n']
 
-    md.append(f'\n⚠️ Rungs B and C are compared on **identical subsampled pixels**, '
-              f'so the difference is the rule and not the sample. Rung B is also '
-              f'reported exactly above; the exact five-fold value is '
-              f'**{ge.mean():+.2f}**.\n')
+    md.append(
+        (f'\n⭐ Every rung above is evaluated **exactly, over all pixels**; the '
+         f'subsample drove only the search for `w`.\n' if exact is not None else
+         f'\n⚠️ Rungs B and C are compared on **identical subsampled pixels**, so '
+         f'the difference is the rule and not the sample. Rung B is also reported '
+         f'exactly above; the exact five-fold value is **{ge.mean():+.2f}**.\n'))
 
     # ---------------- calibration learning curve, both rules
     if args.sizes:

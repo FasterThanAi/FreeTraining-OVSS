@@ -138,6 +138,98 @@ water +4.41, forest +2.63.
 
 ---
 
+## ⛔ OpenEarthMap — inconclusive, and the "gain" is one class
+
+**5 Sep, 384 tiles @ τ=0.1, all rungs evaluated exactly over every pixel.** Cache verified:
+384 tiles, rung A **43.64** against OEM's published 44.16.
+
+| | LoveDA | **OpenEarthMap** |
+|---|---|---|
+| per-class τ (B − A) | +1.16 ± 0.15 | +0.41 ± 0.26 |
+| **scale (C − B)** | **+1.16 ± 0.19** | **+0.95 ± 0.85** |
+| folds positive | **5/5** | 4/5 |
+| mean − 2·sd | **+0.78** ✅ | **−0.75** ⛔ |
+| scale stability, worst class | **6.7%** | **15.7%** |
+
+**Verdict: not readable.** The fitted scales move 16% between folds, so each fold is fitting
+a different rule and the sign of the increment is not evidence either way.
+
+### ⭐ And the per-class table says why, which the aggregate hides
+
+| class | Δ IoU |
+|---|---|
+| **cropland** | **+8.57** |
+| pavement | +2.98 |
+| water | +2.15 |
+| road | +0.78 |
+| *background (catch-all)* | *−0.02* |
+| building | −0.65 |
+| tree | −0.80 |
+| grass | −1.77 |
+| bareland | −2.66 |
+
+⛔ **`cropland` alone is +8.57. The other seven real classes sum to +0.03, and four of
+eight get worse.** Catch-all-excluded works out to +1.08 and full mIoU to +0.95 — both
+positive, both produced by a single class in a nine-class unweighted mean.
+
+⭐⭐ **This is §8.1 happening a third time on the same benchmark.** There, recovery's
+apparent +2.28 was 110% `background` while real classes lost 2.11. Here it is `cropland`.
+**OpenEarthMap keeps producing headline mIoU movements that are one class**, and the
+per-class table keeps being the only thing that reveals it. Compare LoveDA, where every
+real class improved and the two largest gains were 4.41 and 2.63.
+
+### Two causes, not yet separated
+
+1. **The dataset is small.** 384 tiles over five folds is ~77 evaluation tiles each against
+   LoveDA's 334. The baseline itself swings **41.0 → 46.0** across folds — a spread larger
+   than the effect being measured.
+2. **The search subsample was too thin.** The gate disagreed by 0.199 against a 0.15 bar.
+   Results are exact, but `w` was *searched* on that subsample, so the fit optimised a
+   noisier objective than it was scored against. A failed gate and unstable scales are
+   plausibly the same problem, and `--subsample` is the lever.
+
+⚠️ **Neither is established.** A re-run at `--subsample 150000` would separate them, at
+roughly 5× the search cost.
+
+### Calibration curve — every worst draw is negative
+
+| tiles | τ only | + scale | increment | worst draw |
+|---|---|---|---|---|
+| 50 | −0.48 | +0.10 | +0.58 | **−0.16** |
+| 100 | +0.22 | +0.29 | +0.07 | **−0.29** |
+| 200 | +0.01 | +0.28 | +0.27 | **−0.71** |
+
+Against LoveDA, where every worst draw from 200 tiles up was positive (+0.66 / +0.85 /
++0.97). Note also that **per-class τ itself barely works here** (+0.01 at 200 tiles), which
+matches §9b: OEM resists both levers, not just this one.
+
+---
+
+## Pre-registered predictions, scored
+
+`prereg/predict_oem_scaling.md`, committed at `7a14924` before the run.
+
+| | prediction | measured | |
+|---|---|---|---|
+| **S1** | `background` scale < 0.7 | **0.56** | ✅ |
+| **S2** | catch-all-excluded increment > +0.30 | **+1.08** | ⚠️ numerically, but not established |
+| **S3** | full increment < catch-all-excluded | +0.95 < +1.08 | ✅ |
+| **S4** | increment < LoveDA's +1.36 | +1.08 | ✅ |
+| **S5** | scales span ≥ 2× | **3.2×** (1.52 / 0.48) | ✅ |
+
+⚠️ **Four of five hold, and the fifth is the one that matters.** S1, S3, S4 and S5 describe
+the *shape* of the fit, which is measurable whether or not the effect is real. S2 is the
+only prediction about the effect itself, and the increment it names does not clear the
+stability bar — so it is satisfied by a number that is not established.
+
+⛔ **My pre-registration did not have a branch for this outcome.** It named "S5 holds, S2
+fails" as *"the scales move but buy nothing — LoveDA-specific"*, and "S5 fails, S2 fails" as
+an explained null. It did not anticipate **S2 numerically satisfied by a single class while
+the fit is too unstable to read**. Recorded as a gap in the pre-registration rather than
+forced into a branch it does not fit.
+
+---
+
 ## Status and limits
 
 | | |
