@@ -28,6 +28,16 @@ something is wrong and the cache must not be used.
     cd ~/ConInfer && python ~/FreeTraining-OVSS/scripts/coninfer_cache.py \
         --config configs_ConInfer/cfg_loveda_1gpu.py \
         --out ~/outputs/coninfer_loveda/cache
+
+⭐ `--cache-full` ALSO stores the per-class score stack, which argmax_reorder.py
+needs. `pred` is an argmax, and an argmax stops being a sufficient statistic the
+moment a per-class scale can reorder it -- so the whole (C, H, W) tensor is
+required, at roughly 10x the cache size. It is the same tensor `predict()`
+already returned, so this stays observation-only.
+
+    cd ~/ConInfer && python ~/FreeTraining-OVSS/scripts/coninfer_cache.py \
+        --config configs_ConInfer/cfg_loveda_1gpu.py --cache-full \
+        --out ~/outputs/coninfer_loveda_full/cache
 """
 import argparse
 import sys
@@ -47,7 +57,7 @@ import ConInfer_segmentor          # noqa: E402
 import custom_datasets             # noqa: F401,E402
 
 STATE = dict(out=None, classes=None, n=0, lo=float('inf'), hi=float('-inf'),
-             ignore=0, seen=set())
+             ignore=0, seen=set(), full=False)
 
 
 def dump(ds):
@@ -88,6 +98,11 @@ def dump(ds):
         pred2=(idxs[1] if k > 1 else idxs[0]).cpu().numpy().astype(np.uint8),
         gt=gt_ours.cpu().numpy().astype(np.uint8),
         classes=np.array(st['classes']),
+        # <<< ARGMAX SCALING. `pred` is an argmax and stops being a sufficient
+        # statistic the moment a per-class scale can reorder it, so the whole
+        # (C, H, W) stack is required. Still observation-only: this is the same
+        # tensor `predict()` already returned, written out unchanged.
+        **({'logits': lg.cpu().numpy().astype(np.float16)} if st['full'] else {}),
     )
     st['n'] += 1
     if st['n'] % 250 == 0:
@@ -99,7 +114,11 @@ def main():
     ap.add_argument('--config', required=True)
     ap.add_argument('--out', required=True)
     ap.add_argument('--work-dir', default='./out_cache')
+    ap.add_argument('--cache-full', action='store_true',
+                    help='also store the per-class score stack, needed by '
+                         'argmax_reorder.py. Roughly 10x the cache size.')
     args = ap.parse_args()
+    STATE['full'] = args.cache_full
 
     out = Path(args.out).expanduser()
     out.mkdir(parents=True, exist_ok=True)
@@ -118,6 +137,19 @@ def main():
         raise SystemExit('could not read class names from the dataset metainfo')
     STATE['classes'] = classes
     print(f'  classes ({len(classes)}): {", ".join(classes)}')
+    if args.cache_full:
+        import shutil
+        free = shutil.disk_usage(out).free / 1e9
+        n_est = len(runner.test_dataloader.dataset)
+        gb = 1024 * 1024 * 2 / 1e9 * len(classes) * n_est      # float16, 1024²
+        print(f'  --cache-full: storing the full ({len(classes)}, H, W) score '
+              f'stack.\n    ~{gb:.1f} GB for {n_est} tiles ASSUMING 1024² '
+              f'(scale by (H·W)/1024² otherwise); {free:.1f} GB free.')
+        if gb > free * 0.9:
+            raise SystemExit(
+                f'\n⛔ Estimated {gb:.1f} GB against {free:.1f} GB free. Refusing '
+                f'to start a multi-hour run that will fill the disk partway '
+                f'through and leave a half-written cache -- which reads as valid.\n')
 
     # Wrap AFTER the runner is built, so construction is untouched.
     orig = ConInfer_segmentor.ConInferSegmentation.predict
