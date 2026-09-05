@@ -35,6 +35,7 @@ class SegEarthOV3Segmentation(BaseSegmentor):
     def __init__(self, classname_path,
                  device=torch.device('cuda'),
                  prob_thd=0.0,
+                 class_scale=None,
                  bg_idx=0,
                  slide_stride=0,
                  slide_crop=0,
@@ -62,6 +63,8 @@ class SegEarthOV3Segmentation(BaseSegmentor):
         self.prob_thd = None
         self.prob_thd_vec = None
         self.set_prob_thd(prob_thd)
+        self.class_scale = None
+        self.set_class_scale(class_scale)
         self.slide_stride = slide_stride
         self.slide_crop = slide_crop
         self.confidence_threshold = confidence_threshold
@@ -108,6 +111,37 @@ class SegEarthOV3Segmentation(BaseSegmentor):
         else:
             self.prob_thd_vec = None
             self.prob_thd = float(prob_thd)
+
+    # <<< ARGMAX SCALING: one multiplier per class, applied to the scores BEFORE
+    # the argmax and nowhere else.
+    #
+    # Why this is a different lever from prob_thd, and not a reparameterisation
+    # of it: a per-class scale applied AFTER the argmax is monotone, so it folds
+    # into the threshold and buys nothing. Applied BEFORE, it changes which class
+    # wins -- which no threshold vector can do, because lowering a threshold
+    # cannot change an argmax. That is the family per-class tau provably cannot
+    # reach.
+    #
+    # `None` is the default and leaves predict() on the ORIGINAL code path, so
+    # the 47.38 gate is preserved by construction rather than by re-checking.
+    def set_class_scale(self, class_scale):
+        if class_scale is None:
+            self.class_scale = None
+            return
+        vec = torch.as_tensor(class_scale, dtype=torch.float32).flatten()
+        if vec.numel() != self.num_cls:
+            raise ValueError(
+                f'class_scale has {vec.numel()} entries but the model has '
+                f'{self.num_cls} classes. A misaligned scale vector would apply '
+                f'water\'s multiplier to forest and still produce a plausible '
+                f'mIoU, so this is fatal.')
+        if not torch.all(vec > 0):
+            raise ValueError(
+                f'class_scale must be strictly positive: {vec.tolist()}. A zero '
+                f'or negative entry does not down-weight a class, it deletes or '
+                f'inverts it.')
+        self.class_scale = vec.to(self.device)
+        print('  class_scale: ' + ', '.join(f'{s:.3f}' for s in vec.tolist()))
 
 
     def _inference_single_view(self, image):
@@ -304,10 +338,19 @@ class SegEarthOV3Segmentation(BaseSegmentor):
                 seg_logits = (seg_logits * cls_index).max(1)[0]
                 seg_pred = seg_logits.argmax(0, keepdim=True)
 
-            seg_pred = torch.argmax(seg_logits, dim=0)
+            # <<< ARGMAX SCALING: the argmax reads the SCALED scores; the
+            # threshold below reads the RAW ones. Keeping `max_vals` raw is what
+            # confines the scale to the reordering -- scaling the score the
+            # threshold sees would just reparameterise prob_thd.
+            if self.class_scale is None:
+                seg_pred = torch.argmax(seg_logits, dim=0)
+                max_vals = seg_logits.max(0)[0]          # original line, untouched
+            else:
+                seg_pred = torch.argmax(
+                    seg_logits * self.class_scale.view(-1, 1, 1), dim=0)
+                max_vals = seg_logits.gather(0, seg_pred.unsqueeze(0)).squeeze(0)
             
             # Apply probability threshold
-            max_vals = seg_logits.max(0)[0]
             # <<< PER-CLASS TAU: index the threshold by the predicted class.
             # With a scalar this is bit-identical to the published line.
             thd = (self.prob_thd if self.prob_thd_vec is None
