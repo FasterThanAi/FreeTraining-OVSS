@@ -207,16 +207,40 @@ def main():
           'increment above uses the subsampled rung 2, so the sampling difference '
           'is not credited to the scale.\n']
 
-    md += ['## Fitted parameters\n', '| class | scale | threshold |', '|---|---|---|']
+    # ⚠️ BOTH threshold vectors, because this script writes BOTH configs and they
+    # carry different ones: `taus_only` is fitted with no scale (rung 2), `taus_all`
+    # is refitted underneath the scale (rung 3). Printing only the second invites
+    # exactly the mistake it caused on Potsdam -- the tau-only config's printed
+    # vector was checked against the wrong column and read as a bug.
+    md += ['## Fitted parameters\n',
+           '| class | scale `w` | τ **without** scale *(rung 2 cfg)* | '
+           'τ **under** scale *(rung 3 cfg)* |', '|---|---|---|---|']
     for c in range(nc):
         md.append(f'| {LB.names[c]}{" *(catch-all)*" if c == bg else ""} | '
-                  f'**{w[c]:.3f}** | {taus_all[c]:.3f} |')
+                  f'**{w[c]:.3f}** | {taus_only[c]:.3f} | {taus_all[c]:.3f} |')
+    md.append(f'\nThe segmentor echoes whichever vector it loads, so '
+              f'`grep "per-class prob_thd" <log>` should match the third column for '
+              f'the tau-only config and the fourth for the scaled one.\n')
 
-    md += ['\n## Predicted per-class Δ IoU\n',
-           '| class | τ over baseline | scale over τ |', '|---|---|---|']
+    # ⭐ ABSOLUTE per-class IoU for all three rungs, not just deltas. eval.py
+    # prints absolutes, so deltas force the reader to subtract two tables by hand
+    # and a per-class disagreement stays invisible until someone does. On Potsdam
+    # rungs 2 and 3 missed by 1.2-1.6 mIoU while rung 1 matched to 0.03, and the
+    # cause was only locatable per class.
+    iou_a = per_class_iou(confusion_at(Hh, np.full(nc, args.tau), bg, NBINS))
+    iou_b = per_class_iou(confusion_at(Hh, taus_only, bg, NBINS))
+    iou_c = per_class_iou(confusion_at(Hh_w, taus_all, bg, NBINS))
+    md += ['\n## Predicted per-class IoU — compare directly against eval.py\n',
+           '| class | A published τ | B per-class τ | C + scale | B−A | C−B |',
+           '|---|---|---|---|---|---|']
     for c in range(nc):
-        if np.isfinite(pc_tau[c]) or np.isfinite(pc_all[c]):
-            md.append(f'| {LB.names[c]} | {pc_tau[c]:+.2f} | **{pc_all[c]:+.2f}** |')
+        md.append(f'| {LB.names[c]}{" *(catch-all)*" if c == bg else ""} | '
+                  f'{iou_a[c]:.2f} | {iou_b[c]:.2f} | {iou_c[c]:.2f} | '
+                  f'{pc_tau[c]:+.2f} | **{pc_all[c]:+.2f}** |')
+    md.append('\n⚠️ Every column is a **prediction**. Compare each against the '
+              'matching `eval.py` table class by class — an aggregate that agrees '
+              'can hide two classes that disagree in opposite directions, and an '
+              'aggregate that disagrees says nothing about which class caused it.\n')
 
     # ---- configs
     def block(vals, fmt='{:.3f}'):
