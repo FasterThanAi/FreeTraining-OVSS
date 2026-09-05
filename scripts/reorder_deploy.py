@@ -94,6 +94,13 @@ test_dataloader = dict(
 
 
 def main():
+    # These runs take tens of minutes and are usually piped to `tee`, which
+    # makes Python block-buffer stdout -- so progress vanishes and a healthy
+    # job looks hung. Line-buffer explicitly rather than relying on `-u`.
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+    except Exception:
+        pass
     ap = argparse.ArgumentParser()
     ap.add_argument('--cache', required=True, help='a --cache-full cache')
     ap.add_argument('--tau', type=float, required=True, help='the published τ')
