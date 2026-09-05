@@ -220,6 +220,9 @@ def main():
                          'alone fit N-1, so the ~200-tile figure measured for τ '
                          'does NOT carry over and has to be re-measured.')
     ap.add_argument('--repeats', type=int, default=3)
+    ap.add_argument('--no-exact-eval', action='store_true',
+                    help='skip the exact evaluation pass. Faster, but then the '
+                         'result rests on the subsample and its gate.')
     ap.add_argument('--md', default=None)
     args = ap.parse_args()
 
@@ -313,6 +316,57 @@ def main():
         print(f'    A {A_sub:.2f}   B {B_sub:.2f}   C {C_sub:.2f}   '
               f'(C−B {C_sub - B_sub:+.2f})\n')
 
+    # ---------------- phase 2: evaluate rung C EXACTLY, over every pixel
+    #
+    # ⭐ The subsample exists to make the w SEARCH affordable; it was never needed
+    # for the evaluation. Rungs A and B are already exact (from the per-tile
+    # histograms), and rung C can be too -- one more pass over the cache,
+    # accumulating each tile's exact histogram at ITS OWN fold's fitted w. That
+    # is 5 histograms built in a single read, not 5 reads.
+    #
+    # This matters where folds are small: on OpenEarthMap each evaluation fold is
+    # ~77 tiles, so the subsample carried 3M pixels against LoveDA's 13M and the
+    # gate failed at 0.199. With all three rungs exact the gate stops governing
+    # the result and becomes a diagnostic of the fit alone.
+    exact = None
+    if not args.no_exact_eval:
+        print('\nexact evaluation pass (all pixels, per-fold w):')
+        fold_of = np.empty(T, np.int64)
+        for k, te in enumerate(folds):
+            fold_of[te] = k
+        EX = np.zeros((args.folds, nc, nc, NBINS), np.int64)
+        for i, f in enumerate(files):
+            z = np.load(f)
+            L = z['logits'].astype(np.float32)
+            gt = z['gt'].astype(np.int32)
+            m = gt > 0
+            if not m.any():
+                continue
+            EX[fold_of[i]] += hist_at(L[:, m].T, gt[m], rows[fold_of[i]][4],
+                                      nc, NBINS)
+            if (i + 1) % 50 == 0 or i + 1 == T:
+                print(f'  {i + 1}/{T}')
+        exact = []
+        for k in range(args.folds):
+            te = folds[k]
+            Hte = PT[te].sum(0).astype(np.int64)
+            a_ = miou(confusion_at(Hte, np.full(nc, args.tau), bg, NBINS))
+            b_ = miou(confusion_at(Hte, fit_tau(
+                PT[np.concatenate([folds[j] for j in range(args.folds) if j != k])]
+                .sum(0).astype(np.int64), bg, NBINS, objective=args.objective),
+                bg, NBINS))
+            c_ = miou(confusion_at(EX[k], rows[k][5], bg, NBINS))
+            pcx = per_class_iou(confusion_at(EX[k], rows[k][5], bg, NBINS)) \
+                - per_class_iou(confusion_at(Hte, fit_tau(
+                    PT[np.concatenate([folds[j] for j in range(args.folds)
+                                       if j != k])].sum(0).astype(np.int64),
+                    bg, NBINS, objective=args.objective), bg, NBINS))
+            exact.append((k + 1, a_, b_, c_, pcx))
+            print(f'  fold {k + 1} exact: A {a_:.2f}  B {b_:.2f}  C {c_:.2f}  '
+                  f'(C−B {c_ - b_:+.2f})')
+        rows = [(e[0], e[1], e[2], e[3], r[4], r[5], e[4])
+                for e, r in zip(exact, rows)]
+
     gains_ba = np.array([r[2] - r[1] for r in rows])
     gains_cb = np.array([r[3] - r[2] for r in rows])
     pcs = np.nanmean(np.array([r[6] for r in rows]), axis=0)
@@ -345,6 +399,11 @@ def main():
           '| fold | B−A exact | B−A subsample | difference |', '|---|---|---|---|']
     for k, e, s_ in gate_rows:
         md.append(f'| {k} | {e:+.2f} | {s_:+.2f} | {e - s_:+.2f} |')
+    if exact is not None:
+        md.append('\n⭐ **All three rungs below are evaluated EXACTLY, over every '
+                  'pixel.** The subsample is used only to search for `w`, so this '
+                  'gate is now a diagnostic of the search, not a condition on the '
+                  'result.\n')
     md.append(f'\nLargest disagreement **{disc:.3f}** mIoU against a bar of '
               f'{args.gate:.2f}. ' +
               ('✅ **Gate passed** — the subsample is a valid instrument here.\n'
@@ -412,7 +471,7 @@ def main():
     # fitted scales moved 39% between folds. If the parameters are not stable,
     # the sign of the gain is not evidence of anything.
     unstable = worst >= 0.15
-    if not passed:
+    if not passed and exact is None:
         md.append('⛔ **Unreadable — the subsampling gate failed.** Fix that before '
                   'interpreting anything above.\n')
     elif unstable:
