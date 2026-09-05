@@ -62,7 +62,13 @@ _base_ = './{base_cfg}'
 
 model = dict(
     classname_path='./configs/{cls_file}',
-    confidence_threshold=0.5,
+    # ⛔ `confidence_threshold` is deliberately NOT set here. It is SAM 3's
+    # decoder instance-confidence threshold -- a different knob from `prob_thd`,
+    # and one that changes `seg_logits` itself rather than the decision on top of
+    # them. Hardcoding it silently swapped the model out from under the
+    # comparison on any dataset whose base config does not happen to use 0.5.
+    # cfg_loveda.py does, which is why the LoveDA verification matched to 0.04
+    # and hid this. It inherits from _base_ now.
     # one threshold per class, in the order of {cls_file}:
 {thd_comment}
     prob_thd=[{thd_list}],
