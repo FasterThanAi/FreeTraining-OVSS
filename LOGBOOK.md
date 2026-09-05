@@ -171,6 +171,36 @@ against the published +1.18 ± 0.45, with fold 1 at −0.32). Next: the full 166
 
 ---
 
+## 2026-09-05 (Sat) — the scale is real, verified in the pipeline, and free
+
+**@ARGMAX_SCALING_RESULTS.md.** Full 1669-tile `--cache-full` (41.7 GB), gate passed exactly
+(47.37 / 29.68%). **C − B = +1.16 ± 0.19, 5/5 folds, mean−2sd = +0.78** — clears the bar. Total
+over the published baseline **+2.32**.
+
+✅ **End-to-end.** Three `eval.py` passes on 1469 held-out tiles. Predicted increment **+1.31**,
+measured **+1.34**; per-class `background` +1.55/+1.55, `building` +0.09/+0.09, `agricultural`
++0.17/+0.17. The segmentor printed its scale vector, so the config demonstrably reached the model.
+
+⚠️ **A subsampling offset I had to chase.** Rung 3's raw absolute predicted 49.27 against a
+measured 49.02 — a 0.25 miss that looked like a failure. It is not: the subsample carries a
+**+0.28** absolute offset (rung 2 exact 47.68 vs subsampled 47.96) which cancels in the
+increment. `reorder_deploy.py` now reports the debiased absolute, which for this run gives 48.97
+against 49.02. **The increment was always the trustworthy quantity and the script said so; the
+level was not.**
+
+⭐⭐ **The calibration budget does not rise.** 13 parameters instead of 6, and 200 tiles is still
+where every draw turns positive (increment +0.94, worst +0.66; at 100 the worst is −0.21). And
+the combined rule at **200** tiles (+1.60) beats thresholds alone at **800** (+1.26) — adding the
+scale is worth more than quadrupling the labels.
+
+⚠️ The deployment draw was unlucky for τ alone (+0.03 against the 5-fold's +1.16), which is why
+the 5-fold is the headline and this run is the verification.
+
+⛔ **LoveDA only.** OEM, Potsdam and ConInfer are untested, and §9e gives no reason to assume `w`
+transfers across domains any better than τ did.
+
+---
+
 ## 2026-09-01 (Tue) — Phase 6 closes; ConInfer run, and the method transfers across backbones
 
 **§6.1 vocabulary intervention — the mechanism is now causal.** Catch-all share is set by the

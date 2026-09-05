@@ -288,6 +288,18 @@ buy the metric by repairing an over-predicted background, which is how OEM produ
 land cover −1.77. ⚠️ **Calibration must match the evaluation distribution** — LoveDA train → val
 gives −0.12. WEEK3 §9b.
 
+⭐⭐ **A SECOND LEVER — scaling before the argmax. @ARGMAX_SCALING_RESULTS.md, 5 Sep.**
+`pred = argmax_c(w_c·s_c)` then threshold the RAW score, fitting `(w, τ)` together. This is the
+family the completeness argument explicitly excludes — the 6.0% catch-all argmax wins and the
+9.9% real-class confusion no threshold can reach. **LoveDA 5-fold: +1.16 ± 0.19 ON TOP of
+per-class τ, 5/5 folds, mean−2sd = +0.78, total +2.32.** Every real class improves; catch-all
+**−0.03**; catch-all-excluded +1.36. ✅ **Verified end-to-end**: predicted increment +1.31,
+`eval.py` measured **+1.34**, per-class within 0.02. ⭐ **The budget does not rise** — 200 tiles
+still, and the combined rule at 200 (+1.60) beats τ alone at 800 (+1.26). ⭐ The fit rediscovered
+§7.7 unprompted: `background` → 0.41, `water` → 2.55, and §7.7 found every mechanism-(B) pixel is
+water. ⚠️ Quote the **increment**, not a subsampled absolute (the subsample carries a ~0.28 offset
+that cancels in the increment). ⛔ **LoveDA only — OEM, Potsdam and ConInfer are untested.**
+
 ⛔ **A TWELFTH label-free attempt, and it fails too — @REACHABILITY_RESULTS.md, 4 Sep.**
 "Reachable" discard (below τ with a real-class argmax, so a threshold can touch it) vs
 "unreachable" (the argmax already picked the catch-all). Label-free, and it looked like it

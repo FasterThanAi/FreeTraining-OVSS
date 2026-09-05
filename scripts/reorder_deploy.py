@@ -168,8 +168,14 @@ def main():
     pc_all = per_class_iou(confusion_at(Hh_w, taus_all, bg, NBINS)) \
         - per_class_iou(confusion_at(Hh_sub, taus_only, bg, NBINS))
 
-    d_tau, d_all = m_tau - m_pub, m_all - m_pub
+    d_tau = m_tau - m_pub
     d_inc = m_all - m_tau_sub
+    # ⚠️ Rung 3's raw subsampled absolute carries the subsample's own offset --
+    # on LoveDA that was +0.28, so the naive prediction missed eval.py by 0.25
+    # while the INCREMENT matched to 0.03. Debias it by adding the increment to
+    # the EXACT rung 2, so the printed absolute is the one eval.py will print.
+    m_all_dbi = m_tau + d_inc
+    d_all = m_all_dbi - m_pub
 
     md = ['# Scaled argmax — deployment fit and prediction\n',
           f'- cache: `{args.cache}`  |  tiles: **{T}**  |  calibration: '
@@ -179,8 +185,13 @@ def main():
           '| rung | scale | thresholds | mIoU |', '|---|---|---|---|',
           f'| baseline | — | published {args.tau} | {m_pub:.2f} |',
           f'| **per-class τ** | — | fitted | **{m_tau:.2f}** ({d_tau:+.2f}) |',
-          f'| **+ class scale** | fitted | fitted | **{m_all:.2f}** ({d_all:+.2f}) |',
-          f'\n⭐ **The increment that matters is {d_inc:+.2f}** — the scale over the '
+          f'| **+ class scale** | fitted | fitted | **{m_all_dbi:.2f}** '
+          f'({m_all_dbi - m_pub:+.2f}) |',
+          f'\n⚠️ Rung 3 is quoted **debiased**: the exact rung 2 plus the '
+          f'subsampled increment. Its raw subsampled absolute is {m_all:.2f}, '
+          f'which carries the subsample\'s own offset and is NOT what eval.py '
+          f'prints — the offset cancels in the increment but not in the level.\n',
+          f'⭐ **The increment that matters is {d_inc:+.2f}** — the scale over the '
           'thresholds, both measured on the same subsampled pixels. Beating the '
           'baseline proves nothing here; per-class τ already does that.\n',
           f'⚠️ Rungs 1–2 are exact over every pixel; rung 3 is over a '
@@ -219,7 +230,7 @@ def main():
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(CFG.format(
             ncal=args.calib, seed=args.seed, nheld=len(stems), tau=args.tau,
-            m_pub=m_pub, m_tau=m_tau, m_all=m_all, d_tau=d_tau, d_all=d_all,
+            m_pub=m_pub, m_tau=m_tau, m_all=m_all_dbi, d_tau=d_tau, d_all=d_all,
             d_inc=d_inc, base_cfg=args.base_cfg, cls_file=args.cls_file,
             scale_comment=block(w), scale_list=', '.join(f'{x:.3f}' for x in w),
             thd_comment=block(taus_all), split=sp,
