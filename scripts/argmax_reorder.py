@@ -134,20 +134,29 @@ def load_full(files, nsub, nc, nbins, rng):
     return S, G, PT
 
 
-def hist_at(S, G, w, nc, nbins):
+def hist_at(S, G, w, nc, nbins, chunk=2_000_000):
     """(gt, pred, conf-bin) histogram under a per-class scale w.
 
     `pred` uses the SCALED scores; `conf` uses the RAW score, so w is confined to
     the argmax. See the module docstring -- a post-argmax scale is monotone and
     would just reparameterise tau.
+
+    ⚠️ Chunked. `S * w` is a full copy of the score stack, and at 150k px/tile on
+    a 9-class dataset that is 1.7 GB per call inside a coordinate-ascent loop
+    that calls it hundreds of times. Chunking caps the temporary at roughly
+    chunk x nc x 4 bytes and changes nothing else -- histograms add.
     """
-    sc = S * w                                   # (n, N)
-    pred = np.argmax(sc, axis=1)
-    conf = S[np.arange(len(pred)), pred]
-    b = np.clip((conf * nbins).astype(np.int32), 0, nbins - 1)
-    idx = (G - 1) * nc * nbins + pred * nbins + b
-    return np.bincount(idx, minlength=nc * nc * nbins
-                       ).reshape(nc, nc, nbins).astype(np.int64)
+    H = np.zeros(nc * nc * nbins, np.int64)
+    n = len(S)
+    for s in range(0, n, chunk):
+        e = min(s + chunk, n)
+        blk = S[s:e]
+        pred = np.argmax(blk * w, axis=1)
+        conf = blk[np.arange(e - s), pred]
+        b = np.clip((conf * nbins).astype(np.int32), 0, nbins - 1)
+        H += np.bincount((G[s:e] - 1) * nc * nbins + pred * nbins + b,
+                         minlength=nc * nc * nbins)
+    return H.reshape(nc, nc, nbins)
 
 
 def score_w(S, G, w, bg, nc, nbins, objective, rounds):
