@@ -229,19 +229,37 @@ def main():
     print(f'{T} tiles | published τ = {args.tau} | subsample {args.subsample} px/tile\n')
 
     # ⚠️ A cache being written by a concurrent measure_discard_rate.py run reads
-    # as a valid but MIXED set of tiles, and produces a plausible-looking table.
+    # as a valid but MIXED set of tiles and produces a plausible-looking table.
     # That happened on OpenEarthMap: 1225 files where the split has 384, with the
     # baseline landing 25 mIoU below its published value.
+    #
+    # But a RECENT mtime is not the signal -- `cp` of a perfectly good cache
+    # leaves every file seconds old, and the first version of this check refused
+    # to run on exactly that. A check that fires when nothing is wrong stops
+    # being read (WEEK3 §11). What actually distinguishes a live writer is that
+    # the file set keeps CHANGING, so sample it twice.
     import time
-    now = time.time()
-    fresh = [f for f in files if now - f.stat().st_mtime < 600]
-    if fresh:
-        print(f'\n⛔ {len(fresh)} of {T} cache files were modified in the last 10 '
-              f'minutes (most recent: {int(now - max(f.stat().st_mtime for f in fresh))}s '
-              f'ago).\n   A cache still being written reads as a mixed set of tiles and '
-              f'produces a\n   plausible table from the wrong data. Wait for the writer '
-              f'to finish, then re-run.\n')
-        raise SystemExit('refusing to read a cache that is being written')
+
+    def snapshot():
+        fs = list(Path(args.cache).expanduser().glob('*.npz'))
+        return len(fs), max((f.stat().st_mtime for f in fs), default=0.0)
+
+    n0, t0 = snapshot()
+    if time.time() - t0 < 600:
+        print(f'  cache last modified {int(time.time() - t0)}s ago — checking '
+              f'whether it is still being written...')
+        time.sleep(4)
+        n1, t1 = snapshot()
+        if (n1, t1) != (n0, t0):
+            raise SystemExit(
+                f'\n⛔ THE CACHE IS BEING WRITTEN RIGHT NOW.\n'
+                f'   {n0} files -> {n1} in 4 seconds (newest mtime moved '
+                f'{t1 - t0:.1f}s).\n'
+                f'   Reading it would mix tiles from two runs and produce a\n'
+                f'   plausible table from the wrong data. Wait for the writer to\n'
+                f'   finish, then re-run.\n')
+        print(f'  ...stable at {n0} files. Recent but not being written — '
+              f'proceeding.')
 
     rng = np.random.default_rng(args.seed)
     S, G, PT = load_full(files, args.subsample, nc, NBINS, rng)
