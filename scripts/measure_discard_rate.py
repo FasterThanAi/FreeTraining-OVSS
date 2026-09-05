@@ -185,6 +185,25 @@ def main():
     from mmengine.config import Config
     cfg = Config.fromfile(args.config)
 
+    # ⚠️ --img-dir and --ann-dir default to LoveDA INDEPENDENTLY of --config.
+    # Passing `--config configs/cfg_openearthmap.py` without them therefore runs
+    # OpenEarthMap's vocabulary over LoveDA imagery, and writes a cache that has
+    # the right class names, the right shapes, and is entirely the wrong dataset.
+    # That happened on 5 Sep: 856 LoveDA tiles landed in the OEM cache and
+    # produced a complete, plausible five-fold table whose baseline was 25 mIoU
+    # below the published value. Nothing downstream could have caught it.
+    root = getattr(cfg, 'data_root', None)
+    if root and str(root) not in str(args.img_dir):
+        raise SystemExit(
+            f'\n⛔ CONFIG / IMAGE-DIRECTORY MISMATCH -- refusing to run.\n\n'
+            f'   --config   {args.config}\n'
+            f'                 declares data_root = {root!r}\n'
+            f'   --img-dir  {args.img_dir}\n'
+            f'   --ann-dir  {args.ann_dir}\n\n'
+            f'   Those two paths are the LoveDA DEFAULTS and they do not follow\n'
+            f'   --config. Running on would prompt one dataset over another's\n'
+            f'   imagery. Pass --img-dir and --ann-dir explicitly, under {root}/.\n')
+
     # ---- label convention. THIS IS LOAD-BEARING AND DATASET-SPECIFIC.
     #
     # LoveDA sets reduce_zero_label=True: raw mask 0 is no-data and the classes

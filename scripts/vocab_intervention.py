@@ -53,7 +53,14 @@ is run. `git log` is the timestamp. Do not edit them afterwards.
 
     # one GPU pass, ~25 min, writes ~10x the usual cache
     python scripts/measure_discard_rate.py --config configs/cfg_openearthmap.py \
+        --img-dir data/OpenEarthMap/images/val \
+        --ann-dir data/OpenEarthMap/labels/val \
         --tau 0.1 --cache-full --out ~/outputs/oem_full
+
+    # ⚠️ --img-dir/--ann-dir do NOT follow --config; their defaults are LoveDA.
+    # This docstring omitted them and the command was copied verbatim on 5 Sep,
+    # writing 856 LoveDA tiles into the OEM cache. measure_discard_rate.py now
+    # refuses when the config's data_root and the image directory disagree.
 
     # every arm, CPU
     python scripts/vocab_intervention.py --cache ~/outputs/oem_full/cache \
