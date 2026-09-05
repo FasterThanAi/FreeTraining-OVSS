@@ -201,7 +201,7 @@ def main():
             f'   --img-dir  {args.img_dir}\n'
             f'   --ann-dir  {args.ann_dir}\n\n'
             f'   Those two paths are the LoveDA DEFAULTS and they do not follow\n'
-            f'   --config. Running on would prompt one dataset over another's\n'
+            f"   --config. Running on would prompt one dataset over another's\n"
             f'   imagery. Pass --img-dir and --ann-dir explicitly, under {root}/.\n')
 
     # ---- label convention. THIS IS LOAD-BEARING AND DATASET-SPECIFIC.
