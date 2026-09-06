@@ -272,6 +272,23 @@ it — the oracle bounds, the cross-validations, the +1.18 headline. Exonerating
 arithmetic left exactly one candidate. **And the tell throughout was that rung A reproduced:
 a control that works is what makes a broken result findable.**
 
+**ConInfer: the scale is a NULL, and my pre-registered C1 is falsified.** C − B =
+**−0.10 ± 0.14**, 1/5 folds, both gates passed (36.99 exactly, conf in [0.1601, 0.9611]).
+Per-class τ reproduces §7.1a at **+2.51 ± 0.34**. Catch-all-excluded +0.27, catch-all −2.31.
+
+⭐ **The pre-registration named this branch before the run:** *"C4 holds, C1 fails → the
+scales move but buy nothing."* And they do move — `water` fitted at **7.94**, a 15.9× span —
+and buy nothing.
+
+⛔ **Worse for me than C1: the REASONING behind C2 is contradicted.** I argued the gain tracks
+the argmax-lost share. Potsdam has the **lowest** argmax-lost mass (6.10%) and the **highest**
+scale gain (+4.92); ConInfer has 8.56% and −0.10. The mechanism is withdrawn.
+
+⭐ What three datasets do show is that **the two levers substitute**: τ +2.51 / scale −0.10 on
+ConInfer, τ +0.75 / scale +4.92 on Potsdam, τ +1.16 / scale +1.16 on LoveDA. Post-hoc, three
+points, and the totals are not constant (+5.67, +2.32, +2.41) — so it is a description, not a
+law, and it needs a fourth dataset before it goes in the paper as more than that.
+
 ---
 
 ## 2026-09-01 (Tue) — Phase 6 closes; ConInfer run, and the method transfers across backbones

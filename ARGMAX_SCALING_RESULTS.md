@@ -433,6 +433,65 @@ more than a result that does not**, and it is the reason this was findable at al
 
 ---
 
+## ⛔ ConInfer (CLIP) — a clean null, and my main prediction was FALSIFIED
+
+**6 Sep, 1669 tiles @ their published τ = 0.8, all rungs exact.** Both gates passed:
+instrumented run **36.99** exactly, `conf` in **[0.1601, 0.9611]**. Rung A **37.00**.
+
+| | |
+|---|---|
+| per-class τ (B − A) | **+2.51 ± 0.34** — reproduces §7.1a exactly |
+| **scale (C − B)** | **−0.10 ± 0.14**, 1/5 folds positive |
+| catch-all-excluded | **+0.27** (real classes), catch-all **−2.31** |
+
+**Scaling before the argmax adds nothing on a CLIP backbone.** The learning curve agrees at
+every size (−0.18 / +0.12 / −0.27 / −0.05).
+
+### Pre-registered predictions, scored — `prereg/predict_coninfer_scaling.md` (`4b5ee2e`)
+
+| | prediction | measured | |
+|---|---|---|---|
+| **C1** | increment **> +0.50** | **−0.10** | ⛔ **FALSIFIED** |
+| C2 | smaller than Potsdam's +4.92 | −0.10 | ✅ |
+| C3 | no class > 60% of the real gain | `water` 48% | ✅ |
+| C4 | scales span ≥ 2× | **15.9×** | ✅ |
+| C5 | positive worst draw at 50 tiles | +0.06 | ✅ |
+
+⭐ **The pre-registration named this exact outcome in advance.** Its branch table reads:
+*"C4 holds, C1 fails → the scales move but buy nothing: CLIP's argmax is comparatively
+clean, and τ = 0.8 already collects what is available."* The fit **does** move the scales
+hard — `water` at **7.94**, a 15.9× span — and it buys nothing.
+
+### ⛔ And the REASONING behind C2 is contradicted, which matters more than C1
+
+I argued the gain should track the **argmax-lost share**: less argmax-blocked mass, less for
+the scale to recover. Across three datasets that is simply wrong.
+
+| dataset | published τ | argmax-lost | τ gain | **scale gain** |
+|---|---|---|---|---|
+| Potsdam | 0.1 | **6.10%** (lowest) | +0.75 | **+4.92** (highest) |
+| LoveDA (SAM 3) | 0.5 | 11.31% | +1.16 | +1.16 |
+| ConInfer (CLIP) | 0.8 | 8.56% | **+2.51** | **−0.10** |
+
+**Potsdam has the least argmax-lost mass and the largest scale gain.** The stated mechanism
+does not survive contact with three datasets, and is withdrawn.
+
+### ⭐ What the three datasets do show: the two levers SUBSTITUTE
+
+Read the last two columns instead. **Where the threshold collects a lot, the scale collects
+nothing; where the threshold collects little, the scale collects a great deal.** ConInfer's
++2.51 / −0.10 and Potsdam's +0.75 / +4.92 are the two extremes; LoveDA's +1.16 / +1.16 sits
+between them.
+
+⚠️ **Stated as an observation over three points, not a law.** It is post-hoc — it was not
+pre-registered, and the pre-registered mechanism failed. It should be tested on a fourth
+dataset before it appears in the paper as anything more than a description of these three.
+
+⚠️ Note also that the *totals* are not constant (+5.67, +2.32, +2.41), so the two levers are
+not simply splitting a fixed pool.
+
+---
+
 ## Status and limits
 
 | | |
