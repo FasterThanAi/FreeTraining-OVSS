@@ -147,4 +147,127 @@ across domains that differ this much.
 
 \bibliographystyle{plain}
 \bibliography{refs}
+
+\subsection*{The gain is not uniform, and the thresholds are domain-specific}
+\label{sup:domain}
+
+LoveDA's urban and rural domains differ by a factor of two in discard rate. Fitting
+and evaluating within each, the gain is \DOMr{}~$\pm$~\DOMrsd{}~mIoU on rural and
+\DOMu{}~$\pm$~\DOMusd{} on urban, which is not distinguishable from zero --- though
+land cover improves in both, and urban's catch-all pays for it exactly. The two
+domains also want genuinely different thresholds (mean absolute difference
+\DOMtaudiff{}, rising to \DOMtaumax{} on \texttt{road}), and calibrating on the
+wrong one is \best{worse than not calibrating at all}: \DOMxr{} and \DOMxu{}~mIoU,
+both below the published $\tau$. Decomposing the gap, \texttt{water} and
+\texttt{forest} account for \cpTop{} of it, and across the twelve (domain, class)
+cells the statistic that ranks which classes move is the precision--recall
+asymmetry ($\rho=\cpGapRho{}$, $p=\cpGapP{}$) rather than precision itself
+($\rho=\cpPrecRho{}$). It does not explain \texttt{water}, the largest single
+contributor, whose share and asymmetry are near-identical across the domains while
+its gain differs eightfold; about half the gap therefore still lacks a mechanism.
+Full tables are in the supplementary material.
+
+\section{Scoring detectability direction-agnostically}
+\label{sup:auc}
+ AUC is symmetric,
+so an AUC of $0.208$ is a detector of strength $0.792$ with its sign reversed, not
+an absent signal. We report $\mathrm{det} = \max(\mathrm{AUC}, 1-\mathrm{AUC})$
+throughout. This is not a technicality: under a variant that merges class
+\emph{channels} into the catch-all rather than removing them, the top score does
+not degrade at all --- it \emph{inverts}, because a catch-all assembled from
+strong prompts is confidently correct about the pixels it absorbed. Scoring raw
+AUC would have reported that as a destroyed signal.
+
+\section{Predicting when calibration pays}
+\label{sup:when}
+
+Since the gain is uneven across domains, a practitioner
+needs to know in advance whether their data is the kind where it pays --- and the
+catch-all fraction is computable from predictions alone, with no ground truth
+(it ranks tiles almost identically to the labelled discard rate,
+$\rho=\crProxyRho{}$ on LoveDA and $\crProxyRhoOEM{}$ on OpenEarthMap). It does
+not work. Stratifying LoveDA by it gives a \emph{U-shaped} profile rather than a
+monotone one: the largest and by far the most reliable gain, \crLow{}, falls in
+the stratum with the \emph{least} residual, while the most-affected stratum has
+the biggest mean and is useless as guidance at \crHigh{}, with a negative worst
+fold. Across strata $\rho=\crRho{}$, and on OpenEarthMap $\crRhoOEM{}$ --- the
+opposite sign, with random strata of the same sizes moving nearly as far.
+
+This is not a separate negative. The gain lives in classes with a large
+precision--recall asymmetry, and which classes those are \emph{is} per-class
+precision: the quantity that is measurable without labels and still does not
+determine the threshold. \best{So one bound covers both halves --- the labels
+cannot be avoided in choosing the thresholds, and they cannot be avoided in
+deciding whether to choose them.} The calibration set buys the answer and the
+question at the same time, and its cost is irreducible.
+
+% =====================================================================
+
+\section{The dose--response detail, and saturation}
+\label{sup:saturate}
+ It is concentrated at
+the low-share end: above roughly \ivSatShare{} of the scene, four points across
+both datasets sit within \ivSatLo{}--\ivSatHi{}, and further increases do nothing.
+LoveDA \emph{begins} inside that band, so its own dose arm is underpowered rather
+than null --- its dose and its control move by the same magnitude in opposite
+directions. Two consequences follow, and we state both. The mechanism is
+established where a catch-all grows from rare to roughly a third of the scene, and
+not beyond. And \best{share therefore cannot explain the urban--rural gap} in the
+stratified evidence, since both strata already lie in the saturated regime; that
+stratification eliminates confusability, but the gradient within LoveDA remains
+unexplained.
+
+Predictions were registered in the repository before each run and are scored
+against the outcome, including four that failed. The effect is
+\emph{not} monotone in the interior of the dose range --- the smallest dose is the
+minimum --- so we quote the endpoints. Point predictions from a line fitted to the
+observational data missed at two of three doses, so the direction transfers and
+the rate does not.
+
+% =====================================================================
+% =====================================================================
+
+\section{Presence gating: a refuted hypothesis of our own}
+\label{sup:presence}
+ Tiles that fail
+catastrophically ($\ge$99\% discarded, $n=\catTilesLove{}$) have a
+median maximum presence score of $0.273$ against $0.918$ on healthy tiles, and
+the correlation over all \loveTiles{} tiles is \presCorrLove{}. On one such tile
+the semantic head emits a $+10.13$ logit for \texttt{road} --- effective
+certainty --- while the presence gate crushes the tile's best achievable score to
+$0.076$. We proposed that gating was destroying recoverable evidence, and then
+refuted it: with gating removed, recovery on those tiles is \emph{uncorrelated}
+with how suppressed they were ($r=+0.018$), the same intervention pushes healthy,
+barely-gated tiles from 0.46\% to 54.11\% discard, and
+mIoU falls by \presCost{}. The correlation is partly mechanical --- since
+$P_{\text{final}} = P_{\text{fused}}\cdot S_{\text{pres}}$, a low presence score
+\emph{forces} discard whether or not gating is at fault --- and we report it as an
+observation only.
+
+That counterfactual produced an unexpected finding. \best{SAM~3 essentially never
+detects \bg{}}: its median presence score is $0.022$, against $0.45$--$0.91$ for
+every real class, because \bg{} is not a visual concept but the dataset's
+catch-all. The gate's largest measured effect is therefore \emph{suppressing
+\bg{}} so that $\tau$, rather than the argmax, governs background assignment ---
+which inverts the motivation the baseline paper gives for it.
+
+% =====================================================================
+
+\section{Confusability, eliminated by stratification}
+\label{sup:confuse}
+ Across two datasets the catch-all's
+share moves together with its \emph{confusability} --- how much of it the model
+gives a real class --- and either could explain the ordering. LoveDA's urban and
+rural domains separate them, and in opposite directions: rural has the larger
+share (\SHAREr{} of ground truth against \SHAREu{}) while urban's catch-all is
+much the more confusable (\CONFu{} of it escapes into real classes, against
+\CONFr{}). The two hypotheses therefore name \emph{different} strata as the one
+that should detect worse, and share is right: AUC is \AUCr{} in rural against
+\AUCu{} in urban, so the more confusable stratum is the one where detection works
+\emph{better}. We note what this does and does not settle. It eliminates
+confusability as the driver. It does not explain the gap between those two strata,
+which is large and, by the saturation result below, cannot be attributed to their
+difference in share either; we leave that unexplained rather than fitting a story
+to it.
+
 \end{document}
