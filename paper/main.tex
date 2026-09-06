@@ -79,6 +79,15 @@ the same reason in both: the fit must sacrifice a pathologically calibrated
 catch-all that owns a ninth of the metric. That exclusion is itself a recommendation: mIoU is an
 unweighted mean, so a catch-all owns $1/N$ of the score however meaningful it is,
 and we observe it moving the headline in both directions.
+A \emph{second} correction follows from the same argument. Per-class thresholds are
+provably everything available \emph{after} the argmax, so we also fit one multiplier
+per class \emph{before} it, on the same tiles and still training nothing. This
+reaches errors no threshold can: Potsdam's \texttt{tree}, which has the largest
+precision--recall gap we measure (\treeGap{}) and which thresholds move \treeTau{},
+gains \treeScale{}~IoU. The two levers turn out to be \best{substitutes} --- the
+scale adds \scPots{}~mIoU where thresholds add \subPotstau{}, and \scCI{} where they
+add \subCItau{} --- so which one pays depends on the pipeline's operating point
+rather than on its backbone.
 Finally, we show the oracle bound is not reachable without labels, and identify
 why: \nAttempts{} label-free rules fail, four of which provably estimate per-class
 precision, because the optimal threshold solves a \emph{coupled} multi-class
@@ -163,6 +172,13 @@ at
         (Table~\ref{tab:transfer}). \best{The rule is also the complete family for
         this decision}: any per-class monotone recalibration composed with a global
         threshold reduces to it exactly (Sec.~\ref{sec:method}).
+  \item \textbf{A second lever, and the bound that motivated it.} Because the
+        completeness result above holds only \emph{given} the argmax, we fit a
+        per-class scale \emph{before} it (Sec.~\ref{sec:scale}). It adds
+        \scPots{}~$\pm$~\scPotsSD{}~mIoU on Potsdam and \scLove{}~$\pm$~\scLoveSD{}
+        on LoveDA over thresholds alone, both verified end to end, and \scCI{} on
+        the CLIP pipeline. \best{We pre-registered a positive result there and were
+        wrong}; the mechanism we proposed is withdrawn in Sec.~\ref{sec:scaleresults}.
   \item \textbf{A reporting recommendation.} We observe the catch-all moving the
         headline mIoU in both directions, supplying \oemBgGain{}~IoU of an
         apparent gain in one experiment and cancelling a real one in another, and
@@ -571,12 +587,36 @@ heuristic substitute for calibrating it.
 
 \paragraph{And exactly where that argument stops.} The equivalence holds \emph{given
 the argmax}. A recalibration applied \emph{before} the argmax can reorder classes,
-which is a strictly larger family that our rule cannot reach --- and we can say how
-much lives there, because it is precisely the argmax-loss mass of
-Sec.~\ref{sec:anatomy}: \mechB{} of the residual on LoveDA and \mechBpots{} on
-Potsdam. That bounds what any argmax-changing recalibration could recover from the
-part of the residual thresholds cannot touch, and on both datasets it is small. We
-regard closing it as the natural next step rather than as a defect of the rule.
+which is a strictly larger family that no threshold vector can reach: lowering a
+threshold cannot change which class won. Two error modes live there and neither is
+addressable by Sec.~\ref{sec:method}'s rule --- the argmax-loss mass of
+Sec.~\ref{sec:anatomy} (\mechB{} of the LoveDA residual, \mechBpots{} of Potsdam's),
+and real-class confusion, which is \confusionShare{} of all real-class pixels on
+LoveDA. The next section closes that family.
+
+\subsection{The second lever: scaling before the argmax}
+\label{sec:scale}
+
+We fit one multiplier per class alongside the thresholds:
+\begin{equation}
+\hat{c} = \arg\max_c\ w_c \cdot s_c,
+\qquad\text{keep } \hat{c} \text{ if } s_{\hat{c}} \ge \tau_{\hat{c}}.
+\label{eq:scale}
+\end{equation}
+Both vectors are fitted together by coordinate ascent on the same calibration
+tiles, and no weights are trained. \best{The threshold reads the \emph{raw} score
+$s_{\hat c}$, not the scaled one.} That is forced by the completeness argument
+above: a scale applied to the score the threshold sees is monotone and folds into
+$\tau$, so reading it raw confines $w$ to the reorderings and makes the gain
+attributable to them alone.
+
+\paragraph{This is prior correction, and we claim only where it applies.} Per-class
+logit scaling is standard in the long-tail literature. What is untested is whether
+it helps a training-free open-vocabulary pipeline at an unchanged supervision
+budget, and --- the question that matters here --- whether it adds anything
+\emph{on top of} per-class thresholds. We report it as the increment over
+Sec.~\ref{sec:method}, never over the published baseline, since the latter would
+credit the thresholds to the scale.
 
 \begin{figure*}[t]\centering
 \includegraphics[width=\textwidth]{fig7_method.pdf}
@@ -833,6 +873,66 @@ pathological case of Fig.~\ref{fig:oemperclass}, and the catch-all-excluded colu
 is independently positive, but we quote both as everywhere else.
 
 % =====================================================================
+\subsection{The second lever, measured}
+\label{sec:scaleresults}
+
+\begin{table}[t]\centering
+\caption{The two levers are \textbf{substitutes}. Five-fold, all from one script,
+each dataset at its own published $\tau$. Where the threshold collects a great
+deal the scale collects nothing, and the reverse.}
+\label{tab:levers}
+\small
+\begin{tabular}{llrr}
+\toprule
+pipeline & $\tau$ & per-class $\tau$ & \;+ scale \\
+\midrule
+ConInfer (CLIP) & $0.8$ & \best{\subCItau{}} & \scCI{} \\
+SAM~3, LoveDA   & $0.5$ & \subLovetau{} & \scLove{} \\
+SAM~3, Potsdam  & $0.1$ & \subPotstau{} & \best{\scPots{}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Two datasets gain, one does not.} On LoveDA the scale adds
+\scLove{}~$\pm$~\scLoveSD{}~mIoU over per-class thresholds, five folds of five
+positive, with the catch-all moving \scLoveBg{} and the catch-all-excluded figure
+\scLoveExcl{}: both metrics agree, so the gain is land cover. On Potsdam it adds
+\scPots{}~$\pm$~\scPotsSD{}, again five of five. On the CLIP pipeline it adds
+\scCI{}~$\pm$~\scCISD{}, \scCIfolds{} folds positive --- \best{nothing}.
+
+\paragraph{End-to-end.} Both positives were run through the pipeline, not only the
+cache. On Potsdam three \texttt{eval.py} passes over identical held-out tiles give
+\eePotsA{}, \eePotsB{} and \eePotsC{}~mIoU: the scale is \eePotsScale{} and both
+levers together \eePotsTotal{}. \best{Every rung lands within \eePotsMiss{}~mIoU of
+its cached prediction and every class within \eePotsClassMiss{}.} On LoveDA the
+measured increment is \eeScaleLove{} against a predicted \eeScaleLovePred{}.
+
+\paragraph{It does not cost more calibration data.} The combined rule fits roughly
+twice the parameters, so the budget is the obvious objection. It is not larger: on
+LoveDA \calibTiles{} labelled tiles remains the point where every random draw turns
+positive, and on Potsdam \scCalibPots{} suffice. On Potsdam the combined rule at
+\scCalibPots{} tiles beats thresholds alone at any budget we tested.
+
+\paragraph{\texttt{tree} is the case that shows the mechanism.} Potsdam's
+\texttt{tree} has the largest precision--recall gap we measure anywhere
+(\treeGap{}: precision \treeP{}, recall \treeR{}). It is the clearest instance of
+the asymmetry Sec.~\ref{sec:method} exploits, and per-class thresholds move it
+\treeTau{} --- essentially nothing. The reason is that its residual is below the
+threshold with a \emph{different} class winning the argmax, so lowering its own
+threshold returns those pixels wearing the wrong label. At $w = \treeW{}$ the scale
+recovers \best{\treeScale{}~IoU}, measured by \texttt{eval.py}. \best{A large
+precision--recall gap says a class is under-firing; it does not say a threshold can
+do anything about it.}
+
+\paragraph{We predicted the CLIP result wrongly, and report the reasoning that
+failed.} We pre-registered that the scale would add more than $+0.50$ there, arguing
+that the gain should track the argmax-loss share. It does not: Potsdam has the
+\emph{smallest} argmax-loss share of the three (\mechBpots{}) and the largest gain.
+That mechanism is withdrawn rather than patched. What the three datasets show is
+Table~\ref{tab:levers}'s substitution, and \best{we state it as a description of
+three points rather than a law} --- it was not pre-registered, and the totals are not
+constant across them.
+
 \subsection{The label-free bound, and why it holds}
 \label{sec:bound}
 
@@ -923,6 +1023,20 @@ headline \methodGain{} is a benchmark-level figure and not a claim about every
 stratum of it. We regard this as the sharpest limitation of the work: the method
 is a calibration correction, and calibration is exactly the thing that does not
 transport.
+
+\paragraph{The substitution between the two levers is a description, not a law.}
+Table~\ref{tab:levers} orders three pipelines cleanly, but three points cannot
+establish a relationship, it was not pre-registered, and the mechanism we \emph{did}
+pre-register for it was falsified. We report the ordering and decline to explain it
+until a fourth pipeline tests it.
+
+\paragraph{The scale's parameters are not uniquely identified.} Across folds the
+fitted multipliers vary by up to \scSpread{} on the real classes while the held-out
+gain holds to $\pm$\scPotsSD{}. Coordinate ascent on a coupled objective reaches
+equivalent optima by different routes, so \best{the gain is the result and no single
+fitted vector should be read as ``the'' scales.} The catch-all's multiplier varies
+more still, which is expected: the fit objective excludes it, so it is identified
+only through the pixels it takes from real classes.
 
 \paragraph{Oracle bounds are bounds under our labeller.} Every ``oracle'' figure
 we report gives one component perfect information while holding the rest of our

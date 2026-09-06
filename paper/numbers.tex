@@ -230,3 +230,42 @@
 \newcommand{\potsFull}{+0.59}      % five-fold full mIoU
 \newcommand{\potsFullSd}{0.50}     % spread covers zero -- marginal, say so
 \newcommand{\potsDistort}{8.18}    % clutter depresses the headline by this much
+
+% ---------------------------------------------------------------------
+%  THE SECOND LEVER: per-class scaling before the argmax.
+%  ARGMAX_SCALING_RESULTS.md. All five-fold figures come from one script
+%  (argmax_reorder.py) so the substitution table compares like with like.
+% ---------------------------------------------------------------------
+\newcommand{\scLove}{+1.16}          % LoveDA  C-B, 5-fold
+\newcommand{\scLoveSD}{0.19}
+\newcommand{\scLoveExcl}{+1.36}      % catch-all-excluded
+\newcommand{\scLoveBg}{-0.03}
+\newcommand{\scPots}{+4.86}          % Potsdam C-B, 5-fold
+\newcommand{\scPotsSD}{0.35}
+\newcommand{\scCI}{-0.10}            % ConInfer C-B, 5-fold
+\newcommand{\scCISD}{0.14}
+\newcommand{\scCIfolds}{1 of 5}
+% the substitution table -- all five-fold, same script
+\newcommand{\subCItau}{+2.51}
+\newcommand{\subLovetau}{+1.16}
+\newcommand{\subPotstau}{+0.59}
+% end-to-end verification
+\newcommand{\eeScaleLove}{+1.34}     % measured increment, LoveDA
+\newcommand{\eeScaleLovePred}{+1.31}
+\newcommand{\eePotsA}{57.60}
+\newcommand{\eePotsB}{58.35}
+\newcommand{\eePotsC}{63.27}
+\newcommand{\eePotsScale}{+4.92}
+\newcommand{\eePotsTotal}{+5.67}
+\newcommand{\eePotsMiss}{0.05}       % worst rung miss vs prediction
+\newcommand{\eePotsClassMiss}{0.23}  % worst per-class miss
+% the tree case
+\newcommand{\treeGap}{+54.7}
+\newcommand{\treeP}{93.34}
+\newcommand{\treeR}{38.63}
+\newcommand{\treeTau}{+0.32}         % what per-class tau moved it
+\newcommand{\treeScale}{+21.17}      % what the scale moved it, measured
+\newcommand{\treeW}{3.73}
+\newcommand{\scCalibPots}{100}
+\newcommand{\confusionShare}{9.9\%}   % WEEK1 7.6: real-class confusion, LoveDA
+\newcommand{\scSpread}{15\%}   % worst real-class fold spread, Potsdam (road)
