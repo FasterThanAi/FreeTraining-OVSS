@@ -250,6 +250,28 @@ parameters, and +4.86 ± 0.35 over five folds is not overfitting. `road` at 15.3
 my 15% bar and **the bar was not moved** — the check order was. Both changes are post-hoc and
 recorded as such.
 
+**Potsdam VERIFIED end to end: 57.60 → 63.27.** Every rung within **0.05** mIoU of its cached
+prediction, every class within 0.23. Scale **+4.92** against the 5-fold's +4.86 ± 0.35.
+⭐⭐ **`tree` 37.92 → 59.09, +21.17 measured against +21.11 predicted** — September's
+unexplained anomaly, confirmed in the pipeline.
+
+⛔ **It took two rounds, and the first was my bug.** The deploy templates hardcoded
+`confidence_threshold=0.5` into every generated config. That is SAM 3's *decoder*
+instance-confidence threshold, passed into `Sam3Processor`, and it changes `seg_logits`
+themselves — so passes 2 and 3 ran a **different model** from pass 1. First attempt: 57.60 /
+57.18 / 61.71, with rung A exact and rungs B and C off by 1.2 and 1.6.
+
+⚠️ `cfg_loveda.py` happens to use 0.5, so it was a no-op on LoveDA and §9c's published
+verification is unaffected — **the bug could only surface on a second dataset, and it did,
+the first time one was tried.** It is in `tau_deploy.py` too.
+
+⭐ **The step that mattered was eliminating the alternative.** `diagnose_vector_tau.py`
+applied the segmentor rule per pixel with no binning and matched `confusion_at` **exactly**,
+vector and scalar. Had that failed, every cached sweep in the project would have inherited
+it — the oracle bounds, the cross-validations, the +1.18 headline. Exonerating the
+arithmetic left exactly one candidate. **And the tell throughout was that rung A reproduced:
+a control that works is what makes a broken result findable.**
+
 ---
 
 ## 2026-09-01 (Tue) — Phase 6 closes; ConInfer run, and the method transfers across backbones

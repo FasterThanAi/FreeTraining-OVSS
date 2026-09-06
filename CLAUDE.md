@@ -288,6 +288,20 @@ buy the metric by repairing an over-predicted background, which is how OEM produ
 land cover −1.77. ⚠️ **Calibration must match the evaluation distribution** — LoveDA train → val
 gives −0.12. WEEK3 §9b.
 
+✅ **VERIFIED END-TO-END ON POTSDAM, 6 Sep — 57.60 → 63.27.** Three `eval.py` passes,
+1816 held-out tiles: A **57.60**, B (per-class τ) **58.35**, C (+scale) **63.27**. Every rung
+within **0.05** of its cached prediction, every class within 0.23. **The scale is +4.92**
+against the 5-fold's +4.86 ± 0.35. ⭐⭐ `tree` **37.92 → 59.09 (+21.17)** — the class whose
++54.7 precision–recall gap moved nothing under thresholds and weakened §9g in September, now
+explained and confirmed in the pipeline.
+⛔ **A config bug was found doing this and it is fixed:** the deploy templates hardcoded
+`confidence_threshold=0.5`, which is SAM 3's *decoder* threshold and changes `seg_logits`
+themselves. Generated configs therefore ran a different model from the baseline on any
+dataset whose base config differs. `cfg_loveda.py` uses 0.5, so it was a no-op there and
+**§9c's published verification is unaffected** — but it is in `tau_deploy.py` too, and any
+future per-class τ deployment on another dataset would have been wrong. Both templates now
+inherit from `_base_`. @ARGMAX_SCALING_RESULTS.md.
+
 ⭐⭐ **A SECOND LEVER — scaling before the argmax. @ARGMAX_SCALING_RESULTS.md, 5 Sep.**
 `pred = argmax_c(w_c·s_c)` then threshold the RAW score, fitting `(w, τ)` together. This is the
 family the completeness argument explicitly excludes — the 6.0% catch-all argmax wins and the

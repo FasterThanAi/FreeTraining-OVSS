@@ -365,6 +365,74 @@ the ordering is recorded honestly.
 
 ---
 
+## ✅ Potsdam verified end to end — 57.60 → 63.27
+
+**6 Sep.** Three `eval.py` passes on the same 1816 held-out tiles, after a config bug
+described below was fixed.
+
+| rung | predicted from cache | **measured by `eval.py`** | miss |
+|---|---|---|---|
+| A published τ = 0.1 | 57.63 | **57.60** | −0.03 |
+| B per-class τ | 58.40 | **58.35** | −0.05 |
+| C **+ class scale** | 63.31 | **63.27** | −0.04 |
+
+| | |
+|---|---|
+| per-class τ (B − A) | **+0.75** |
+| ⭐ **scale (C − B)** | **+4.92** — against +4.86 ± 0.35 from the 5-fold |
+| both together (C − A) | **+5.67** |
+
+**Every class within 0.23 IoU of prediction**, worst `road` at 0.23.
+
+### ⭐⭐ `tree`: 37.92 → 59.09, measured
+
+**+21.17 against a predicted +21.11.** Recall 39.26 → 66.83.
+
+That is the class `POTSDAM_RESULTS.md` recorded in September as an unexplained anomaly:
+the largest precision–recall gap in the project (**+54.7**, precision 93.34 / recall 38.63),
+which per-class τ moved by **+0.32** and which weakened §9g's ρ = +0.713. **The mechanism is
+now confirmed in the pipeline, not inferred from a cache.**
+
+Also confirms the histogram as an instrument on a second dataset, so the 5-fold **+4.86 ±
+0.35** inherits the guarantee — the same argument §9c made for LoveDA.
+
+---
+
+## ⛔ The config bug this uncovered, and why it hid for a week
+
+The first three passes gave 57.60 / **57.18** / **61.71** — rung A exact on every class,
+rungs B and C low by 1.2 and 1.6 with three of six classes off by 2–3 IoU.
+
+**Cause: `tau_deploy.py` and `reorder_deploy.py` hardcoded `confidence_threshold=0.5` into
+every generated config.** That is SAM 3's *decoder instance-confidence* threshold, passed
+straight into `Sam3Processor` — a different knob from `prob_thd`, and one that changes
+`seg_logits` **themselves** rather than the decision applied on top of them.
+
+So pass 1 (the original `cfg_potsdam.py`) and passes 2–3 (generated configs) **were running
+different models.** Both templates now inherit it from `_base_`.
+
+⚠️ **`cfg_loveda.py` uses 0.5, so this was a no-op on LoveDA** — which is exactly why §9c's
+end-to-end verification matched to 0.04 per class and the bug stayed invisible. **It could
+only surface on a second dataset**, and it did, the first time one was tried.
+⛔ It is in `tau_deploy.py` too, the script behind the *published* §9c verification. That
+result is unaffected because the value coincides there, but any future per-class τ
+deployment on another dataset would have been wrong.
+
+**How it was localised, and the step that mattered:** `diagnose_vector_tau.py` applied the
+segmentor's rule **per pixel with no binning** and compared against `confusion_at` on the
+same tiles and the same vector. They agreed **exactly** — for the vector *and* the scalar.
+That eliminated the histogram, which was the alternative and the far worse outcome: had it
+failed, every cached sweep in the project would have inherited the error, including the
++1.18 headline. With the arithmetic exonerated the only remaining candidate was the cache
+vs the pipeline, and the only thing that differs between a scalar run and a vector run is
+which config file was loaded.
+
+⭐ **The tell was that rung A was exact.** A scalar threshold is invariant to whatever else
+changed; only the fitted rungs used a generated config. **A control that reproduces is worth
+more than a result that does not**, and it is the reason this was findable at all.
+
+---
+
 ## Status and limits
 
 | | |
