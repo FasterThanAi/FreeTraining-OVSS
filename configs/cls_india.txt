@@ -1,0 +1,7 @@
+solar panel,photovoltaic array
+flood water,muddy water
+building,rooftop
+road,track
+tree,forest canopy
+scrub,grass
+bare soil
