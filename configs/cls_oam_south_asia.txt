@@ -1,0 +1,7 @@
+tin roof,metal roof,corrugated roof
+concrete roof,rooftop,terrace
+unpaved road,dirt track,mud road
+paved road,street,highway
+water,pond,water tank
+vegetation,tree,crop field
+bare ground,soil,sand
