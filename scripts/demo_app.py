@@ -269,6 +269,23 @@ def ratio(inter, union):
     return out
 
 
+def miou(ib, if_, present, keep=None):
+    """Mean IoU for two rungs over the SAME class set.
+
+    ⚠️ Averaging each rung over whatever it happens to define is a trap. If the
+    calibration removes a false-positive class that is absent from the ground
+    truth, that class's IoU goes from 0 to undefined -- and a nanmean then drops
+    it from the denominator, handing the method a gain it did not earn. On one
+    Potsdam tile that alone was worth +10 mIoU. The class set is the classes
+    PRESENT IN GROUND TRUTH, which is what mIoU means, and it is fixed across
+    both rungs."""
+    idx = [c for c in range(len(ib)) if present[c] and (keep is None or keep(c))]
+    if not idx:
+        return np.nan, np.nan, idx
+    f = lambda v: float(np.mean([0.0 if np.isnan(v[c]) else v[c] for c in idx]))
+    return f(ib), f(if_), idx
+
+
 def iou(gt, pred, n):
     return ratio(*iu(gt, pred, n))
 
@@ -320,22 +337,31 @@ def panels(eng, image_path, vocab_text, preset, tau_override=None):
         note.append(f'**{moved:,} pixels ({100 * moved / diff.size:.1f}%) change label.**')
         if g is not None:
             (i0, u0), (i1, u1) = iu(g, base, n), iu(g, fit, n)
-            stats.update(i0=i0, u0=u0, i1=i1, u1=u1)
+            present = np.array([int((g == c).sum()) > 0 for c in range(n)])
+            stats.update(i0=i0, u0=u0, i1=i1, u1=u1, present=present.astype(np.int64))
             ib, if_ = ratio(i0, u0), ratio(i1, u1)
-            real = [c for c in range(n) if c != eng.bg]
-            m0, m1 = np.nanmean(ib), np.nanmean(if_)
-            r0, r1 = np.nanmean(ib[real]), np.nanmean(if_[real])
-            note.append(f'**tile mIoU {m0:.2f} → {m1:.2f} ({m1 - m0:+.2f})**, '
-                        f'excluding `{names[eng.bg]}` {r0:.2f} → {r1:.2f} '
-                        f'({r1 - r0:+.2f})')
-            rows = [(names[c], ib[c], if_[c]) for c in range(n)
+            m0, m1, idx = miou(ib, if_, present)
+            r0, r1, ridx = miou(ib, if_, present, keep=lambda c: c != eng.bg)
+            note.append(f'**tile mIoU {m0:.2f} → {m1:.2f} ({m1 - m0:+.2f})** over '
+                        f'the {len(idx)} classes present in the ground truth'
+                        + ('' if not ridx else
+                           f', excluding `{names[eng.bg]}` {r0:.2f} → {r1:.2f} '
+                           f'({r1 - r0:+.2f})'))
+            rows = [(names[c], ib[c], if_[c], present[c]) for c in range(n)
                     if not (np.isnan(ib[c]) and np.isnan(if_[c]))]
-            rows.sort(key=lambda r: -(0 if np.isnan(r[2] - r[1]) else r[2] - r[1]))
-            note.append('| class | baseline IoU | calibrated | Δ |')
-            note.append('|---|---|---|---|')
-            for nm, a, b in rows:
-                d = b - a
-                note.append(f'| {nm} | {a:.1f} | {b:.1f} | {d:+.1f} |')
+            rows.sort(key=lambda r: -(-1e9 if np.isnan(r[2] - r[1]) else r[2] - r[1]))
+            note.append('| class | in truth | baseline IoU | calibrated | Δ |')
+            note.append('|---|---|---|---|---|')
+            for nm, a, b, pr in rows:
+                fmt = lambda v: '—' if np.isnan(v) else f'{v:.1f}'
+                d = '—' if (np.isnan(a) or np.isnan(b)) else f'{b - a:+.1f}'
+                note.append(f'| {nm} | {"yes" if pr else "no"} | {fmt(a)} | '
+                            f'{fmt(b)} | {d} |')
+            if any(not pr for *_, pr in rows):
+                note.append('_&mdash; = the class is in neither the truth nor that '
+                            'prediction, so IoU is undefined. Rows marked_ no _are '
+                            'absent from the truth and are excluded from both means, '
+                            'so removing a false positive cannot inflate the gain._')
         for c in range(n):
             d = int((fit == c).sum()) - int((base == c).sum())
             if abs(d) > diff.size * 0.002:
@@ -519,15 +545,16 @@ def main():
     summary = ''
     if 'u0' in pool:
         b, c = ratio(pool['i0'], pool['u0']), ratio(pool['i1'], pool['u1'])
-        real = [i for i in range(len(names)) if i != eng.bg]
-        summary = (f'Pooled over {len(files)} tiles: '
-                   f'<b>mIoU {np.nanmean(b):.2f} &rarr; {np.nanmean(c):.2f} '
-                   f'({np.nanmean(c) - np.nanmean(b):+.2f})</b>, excluding '
-                   f'<code>{names[eng.bg]}</code> {np.nanmean(b[real]):.2f} &rarr; '
-                   f'{np.nanmean(c[real]):.2f} '
-                   f'({np.nanmean(c[real]) - np.nanmean(b[real]):+.2f}). '
+        pres = pool['present'] > 0
+        m0, m1, idx = miou(b, c, pres)
+        r0, r1, _ = miou(b, c, pres, keep=lambda i: i != eng.bg)
+        summary = (f'Pooled over {len(files)} tiles, {len(idx)} classes present: '
+                   f'<b>mIoU {m0:.2f} &rarr; {m1:.2f} ({m1 - m0:+.2f})</b>, excluding '
+                   f'<code>{names[eng.bg]}</code> {r0:.2f} &rarr; {r1:.2f} '
+                   f'({r1 - r0:+.2f}). '
                    f'<i>Pooled over the tiles shown, not a dataset result &mdash; '
-                   f'too few tiles for a stable mIoU.</i>')
+                   f'too few tiles for a stable mIoU. The measured Potsdam figure is '
+                   f'57.60 &rarr; 63.27 over 1816 held-out tiles.</i>')
         print('\n  ' + re.sub('<[^>]+>', '', summary))
     write_html(results, names, args.out, summary)
 
