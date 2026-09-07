@@ -89,7 +89,31 @@ def usable(tile, max_nodata):
     return frac, frac >= (1.0 - max_nodata)
 
 
-def rebuild(out, size, licence='', gsd=''):
+def load_meta(path):
+    """Per-source metadata, joined on the filename stem.
+
+    ⚠️ Exists because renaming a download breaks provenance. The manifest takes
+    source_id from the filename, so `ind.tif` records `ind` -- which no reviewer
+    can look up. This file carries the real OAM id, the location and a per-image
+    GSD and licence, which also handles a batch where those differ between
+    images.
+
+    CSV with a `source_id` column matching the file stems; every other column is
+    copied onto that source's tiles. Unknown stems are reported, not guessed.
+    """
+    rows = {}
+    with Path(path).expanduser().open() as f:
+        for r in csv.DictReader(f):
+            key = (r.get('source_id') or '').strip()
+            if not key:
+                raise SystemExit('⛔ --source-meta needs a `source_id` column '
+                                 'matching the file stems')
+            rows[key] = {k: (v or '').strip() for k, v in r.items()
+                         if k != 'source_id'}
+    return rows
+
+
+def rebuild(out, size, licence='', gsd='', meta=None):
     """Reconstruct provenance from the tiles themselves.
 
     The filename carries everything that cannot be recomputed: `<oam id>_<x>_<y>`.
@@ -113,9 +137,24 @@ def rebuild(out, size, licence='', gsd=''):
         rows.append(dict(tile=t.name, source_id=sid, x=int(x), y=int(rest),
                          size=a.shape[0], gsd_m=gsd, valid_frac=f'{frac:.3f}',
                          seed='', licence=licence))
+        if meta is not None:
+            rows[-1].update(meta.get(sid, {}))
+    cols = list(rows[0])
+    for r in rows:
+        for k in r:
+            if k not in cols:
+                cols.append(k)
     man = out / 'manifest.csv'
     with man.open('w', newline='') as f:
-        w = csv.DictWriter(f, fieldnames=list(rows[0])); w.writeheader(); w.writerows(rows)
+        w = csv.DictWriter(f, fieldnames=cols, restval='')
+        w.writeheader(); w.writerows(rows)
+    if meta is not None:
+        unknown = sorted({r['source_id'] for r in rows} - set(meta))
+        if unknown:
+            print('  ⚠️  no metadata row for: ' + ', '.join(unknown))
+        unused = sorted(set(meta) - {r['source_id'] for r in rows})
+        if unused:
+            print('  ⚠️  metadata rows matching no tile: ' + ', '.join(unused))
     ids = sorted({r['source_id'] for r in rows})
     print(f'  rebuilt {man} from {len(rows)} tiles, {len(ids)} source images:')
     for i in ids:
@@ -147,6 +186,12 @@ def main():
                          'carries that licence.')
     ap.add_argument('--gsd', default='',
                     help='fill gsd_m for every tile, in METRES (4 cm = 0.04)')
+    ap.add_argument('--source-meta',
+                    help='CSV with a source_id column matching the file stems; its '
+                         'other columns (oam_id, location, gsd_m, licence, ...) are '
+                         'copied onto that source\'s tiles. Use this instead of '
+                         '--licence/--gsd when the images differ, or when the files '
+                         'have been renamed and the OAM id is no longer the stem.')
     ap.add_argument('--rebuild', action='store_true',
                     help='reconstruct manifest.csv from tiles already in --out, '
                          'for a run that was interrupted before it wrote one')
@@ -157,7 +202,8 @@ def main():
 
     if args.rebuild:
         return rebuild(Path(args.out).expanduser(), args.size,
-                       args.licence, args.gsd)
+                       args.licence, args.gsd,
+                       load_meta(args.source_meta) if args.source_meta else None)
     if not args.sources:
         raise SystemExit('⛔ no GeoTIFFs given (and --rebuild not set)')
     if args.size < 64:
@@ -166,6 +212,7 @@ def main():
     (out / 'img_dir' / 'val').mkdir(parents=True, exist_ok=True)
     rng = random.Random(args.seed)
     rows, total = [], 0
+    meta = load_meta(args.source_meta) if args.source_meta else None
     # ⚠️ Written incrementally. An earlier version wrote it only after every file
     # was processed, so an interrupted run left tiles with NO provenance -- which
     # is the one record that cannot be reconstructed later if the source files
@@ -173,9 +220,11 @@ def main():
     man = out / 'manifest.csv'
     FIELDS = ['tile', 'source_id', 'x', 'y', 'size', 'gsd_m', 'valid_frac',
               'seed', 'licence']
+    if meta:
+        FIELDS += [k for k in next(iter(meta.values())) if k not in FIELDS]
     fresh = not man.exists()
     mf = man.open('a', newline='')
-    wcsv = csv.DictWriter(mf, fieldnames=FIELDS)
+    wcsv = csv.DictWriter(mf, fieldnames=FIELDS, restval='')
     if fresh:
         wcsv.writeheader(); mf.flush()
 
@@ -217,6 +266,8 @@ def main():
             rows.append(dict(tile=name, source_id=src.stem, x=x, y=y, size=s,
                              gsd_m=f'{gsd:.4f}' if gsd else '',
                              valid_frac=f'{frac:.3f}', seed=args.seed, licence=''))
+            if meta is not None:
+                rows[-1].update({k: v for k, v in meta.get(src.stem, {}).items() if v})
             kept += 1
         wcsv.writerows(rows[total:]); mf.flush()      # provenance, before the next file
         total += kept
