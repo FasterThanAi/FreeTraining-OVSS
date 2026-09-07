@@ -1,0 +1,7 @@
+blue roof
+red roof,rust roof
+banana tree,palm
+dirt lane
+debris,rubbish
+bare earth
+water
