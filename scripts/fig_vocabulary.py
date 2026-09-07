@@ -93,7 +93,9 @@ def main():
             print(f'      vocab {tag}: ' + ',  '.join(
                 f'{nm[c]} {sh[c]:.1f}%' for c in top if sh[c] >= 0.5))
 
-    fig, axes = plt.subplots(len(rows), 3, figsize=(9.6, 3.35 * len(rows)))
+    nr = len(rows)
+    fig, axes = plt.subplots(nr, 3, figsize=(9.6, 3.25 * nr + 0.7),
+                             gridspec_kw=dict(hspace=0.04, wspace=0.04))
     axes = np.atleast_2d(axes)
     heads = ['input', 'vocabulary A', 'vocabulary B']
     for r, (stem, img, (na, pa, _), (nb, pb, _)) in enumerate(rows):
@@ -105,17 +107,25 @@ def main():
             if r == 0:
                 ax.set_title(heads[c], fontsize=9, pad=5)
 
-    def legend(names, ax, title):
+    # ⚠️ Two legends anchored under the same point overlapped -- 'bare ground'
+    # and 'solar panel' printed on top of each other. They are stacked full-width
+    # instead, one line per vocabulary, so neither can collide with the other.
+    def legend(names, y, title):
         h = [plt.Rectangle((0, 0), 1, 1,
                            fc=np.array(D.PALETTE[c % len(D.PALETTE)]) / 255,
                            ec='#0003') for c in range(len(names))]
-        ax.legend(h, names, loc='upper center', ncol=min(len(names), 4),
-                  frameon=False, fontsize=7.2, title=title,
-                  title_fontsize=7.6, bbox_to_anchor=(0.5, 0.0))
-    legend(rows[0][2][0], axes[-1, 1], 'vocabulary A')
-    legend(rows[0][3][0], axes[-1, 2], 'vocabulary B')
+        lg = fig.legend(h, names, loc='lower center', ncol=len(names),
+                        frameon=False, fontsize=7.4, handlelength=1.1,
+                        handletextpad=0.45, columnspacing=1.3,
+                        bbox_to_anchor=(0.5, y))
+        lg.set_title(title, prop=dict(size=7.8, weight='bold'))
+        return lg
+    pad = 0.62 / (3.25 * nr + 0.7)
+    legend(rows[0][2][0], pad * 0.92, 'vocabulary A')
+    legend(rows[0][3][0], -0.012, 'vocabulary B')
 
-    fig.tight_layout(rect=(0, 0.12, 1, 1))
+    fig.subplots_adjust(left=0.01, right=0.99, top=0.955,
+                        bottom=pad * 2.05, hspace=0.04, wspace=0.04)
     out = Path(args.outdir).expanduser(); out.mkdir(parents=True, exist_ok=True)
     for ext in ('png', 'pdf'):
         p = out / f'{args.name}.{ext}'
