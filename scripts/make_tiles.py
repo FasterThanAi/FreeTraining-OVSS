@@ -89,26 +89,82 @@ def usable(tile, max_nodata):
     return frac, frac >= (1.0 - max_nodata)
 
 
+def rebuild(out, size):
+    """Reconstruct provenance from the tiles themselves.
+
+    The filename carries everything that cannot be recomputed: `<oam id>_<x>_<y>`.
+    The valid fraction is remeasured from the pixels. GSD and licence cannot be
+    recovered from a PNG and are left blank for the OAM page to supply.
+    """
+    from PIL import Image
+    d = out / 'img_dir' / 'val'
+    tiles = sorted(d.glob('*.png'))
+    if not tiles:
+        raise SystemExit(f'⛔ no tiles in {d}')
+    rows = []
+    for t in tiles:
+        src, _, rest = t.stem.rpartition('_')       # rest = y
+        sid, _, x = src.rpartition('_')
+        if not (x.isdigit() and rest.isdigit()):
+            print(f'  ⚠️  {t.name} does not follow <id>_<x>_<y>.png, skipped')
+            continue
+        a = np.asarray(Image.open(t))
+        frac = float((a[..., :3].max(axis=2) > 0).mean())
+        rows.append(dict(tile=t.name, source_id=sid, x=int(x), y=int(rest),
+                         size=a.shape[0], gsd_m='', valid_frac=f'{frac:.3f}',
+                         seed='', licence=''))
+    man = out / 'manifest.csv'
+    with man.open('w', newline='') as f:
+        w = csv.DictWriter(f, fieldnames=list(rows[0])); w.writeheader(); w.writerows(rows)
+    ids = sorted({r['source_id'] for r in rows})
+    print(f'  rebuilt {man} from {len(rows)} tiles, {len(ids)} source images:')
+    for i in ids:
+        print(f'    {i}  ({sum(1 for r in rows if r["source_id"] == i)} tiles)')
+    print('\n  ⚠️  `gsd_m` and `licence` are EMPTY and cannot be recovered from a')
+    print('      PNG. Fill both from each image id\'s OpenAerialMap page before any')
+    print('      figure using these tiles is published.')
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('sources', nargs='+', help='GeoTIFF files')
+    ap.add_argument('sources', nargs='*', help='GeoTIFF files (omit with --rebuild)')
     ap.add_argument('--out', required=True)
     ap.add_argument('--size', type=int, default=512)
     ap.add_argument('--per-image', '-n', type=int, default=8)
     ap.add_argument('--max-nodata', type=float, default=0.05,
                     help='reject a tile with more than this fraction of nodata')
     ap.add_argument('--seed', type=int, default=0)
+    ap.add_argument('--rebuild', action='store_true',
+                    help='reconstruct manifest.csv from tiles already in --out, '
+                         'for a run that was interrupted before it wrote one')
     ap.add_argument('--max-gib', type=float, default=6.0,
                     help='refuse the PIL path above this decoded size; rasterio, '
                          'which reads windows, is unaffected')
     args = ap.parse_args()
 
+    if args.rebuild:
+        return rebuild(Path(args.out).expanduser(), args.size)
+    if not args.sources:
+        raise SystemExit('⛔ no GeoTIFFs given (and --rebuild not set)')
     if args.size < 64:
         raise SystemExit('⛔ --size below 64 is not a tile, it is a patch')
     out = Path(args.out).expanduser()
     (out / 'img_dir' / 'val').mkdir(parents=True, exist_ok=True)
     rng = random.Random(args.seed)
     rows, total = [], 0
+    # ⚠️ Written incrementally. An earlier version wrote it only after every file
+    # was processed, so an interrupted run left tiles with NO provenance -- which
+    # is the one record that cannot be reconstructed later if the source files
+    # are deleted. Provenance is flushed as soon as it exists.
+    man = out / 'manifest.csv'
+    FIELDS = ['tile', 'source_id', 'x', 'y', 'size', 'gsd_m', 'valid_frac',
+              'seed', 'licence']
+    fresh = not man.exists()
+    mf = man.open('a', newline='')
+    wcsv = csv.DictWriter(mf, fieldnames=FIELDS)
+    if fresh:
+        wcsv.writeheader(); mf.flush()
 
     from PIL import Image
     for src in args.sources:
@@ -149,17 +205,15 @@ def main():
                              gsd_m=f'{gsd:.4f}' if gsd else '',
                              valid_frac=f'{frac:.3f}', seed=args.seed, licence=''))
             kept += 1
+        wcsv.writerows(rows[total:]); mf.flush()      # provenance, before the next file
         total += kept
         print(f'    wrote {kept} tiles')
         close()
 
+    mf.close()
     if not rows:
         raise SystemExit('⛔ no tiles written — try a larger --max-nodata or a '
                          'smaller --size')
-    man = out / 'manifest.csv'
-    with man.open('w', newline='') as f:
-        wcsv = csv.DictWriter(f, fieldnames=list(rows[0]))
-        wcsv.writeheader(); wcsv.writerows(rows)
     print(f'\n  {total} tiles -> {out / "img_dir" / "val"}')
     print(f'  manifest      -> {man}')
     print('\n  ⚠️  NEXT, BEFORE ANY FIGURE IS PUBLISHED:')
