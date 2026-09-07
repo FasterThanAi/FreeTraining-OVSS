@@ -132,6 +132,13 @@ class Engine:
         from mmseg.apis import init_model, inference_model
         self._infer = inference_model
         print(f'  loading {config} ...')
+        from mmengine.config import Config
+        cfg = Config.fromfile(str(config))
+        # ⚠️ the segmentor reads classname_path in __init__ and does not keep it,
+        # so it must come off the CONFIG. Reading it off the model returns None and
+        # used to fall through to a placeholder vocabulary -- a wrong-but-plausible
+        # run, which is the failure mode WEEK3_RESULTS §11 documents repeatedly.
+        self.classname_path = cfg.get('model', {}).get('classname_path')
         self.model = init_model(str(config), device=device)
         self.bg = int(getattr(self.model, 'bg_idx', 0))
         self.base_tau = float(getattr(self.model, 'prob_thd', 0.5) or 0.5)
@@ -294,8 +301,17 @@ def main():
               + ', '.join(f'{k} x{len(v)}' for k, v in presets[name].items()))
 
     eng = Engine(args.config)
-    vp = args.vocab or getattr(eng.model, 'classname_path', None)
-    default_vocab = Path(vp).read_text() if vp and Path(vp).exists() else 'building\nroad\nwater\ntree'
+    vp = args.vocab or eng.classname_path
+    if not (vp and Path(vp).expanduser().exists()):
+        raise SystemExit(
+            f'⛔ cannot find the class list (looked for {vp!r}).\n'
+            '   Pass --vocab <file>, one class per line. Refusing to guess: a\n'
+            '   substituted vocabulary produces a plausible mask for the wrong\n'
+            '   classes and switches every fitted preset off silently.')
+    default_vocab = Path(vp).expanduser().read_text()
+    print(f'  vocabulary: {vp} '
+          f'({len(parse_vocab(default_vocab)[2])} classes: '
+          + ', '.join(parse_vocab(default_vocab)[2]) + ')')
 
     try:
         import gradio  # noqa: F401
