@@ -905,6 +905,80 @@ it generalises to any training-free pipeline that thresholds a per-class score.
 
 \paragraph{The same bound governs whether calibration is worth commissioning.} The same bound also governs \emph{whether} calibration will pay: stratifying by a label-free residual measure predicts neither the size nor the spread of the gain, on either dataset (\suppref{sup:when}). \best{The calibration cost buys the answer and the question together, and neither is available without labels.}
 
+% =====================================================================
+\section{Deploying the correction}
+\label{sec:deploy}
+
+Both levers are two lines of arithmetic over scores a pipeline already computes,
+so what they cost to put into service is worth stating precisely.
+
+\paragraph{What is required.} No weights are trained, no architecture is changed,
+and no second pretrained backbone is downloaded. The complete deployment artefact
+is two vectors of length $N$ --- a threshold and a multiplier per class --- fitted
+by coordinate ascent on \calibTiles{} labelled tiles in a few minutes of CPU time,
+and applied at the argmax. On our hardware the fit is negligible beside a single
+inference pass over the evaluation split. This matters against the alternative a
+practitioner would otherwise reach for: adapting an open-vocabulary segmenter to a
+new region by fine-tuning needs labelled data in the thousands of tiles and a
+training run, and it forfeits the training-free property that made the pipeline
+attractive. \best{Our correction asks for roughly a day of annotation and no
+gradient steps.} It is also additive rather than exclusive --- applied on top of
+ConInfer it raises that pipeline from \cnRepro{} to \cnFit{}~mIoU
+(Section~\ref{sec:transfer}), so a deployment need not choose between them.
+
+\paragraph{The vocabulary stays open.} Nothing in either lever is tied to a fixed
+class list: the prompts are read at inference, and the fitted vectors are indexed
+by position in whatever vocabulary is supplied. A practitioner mapping a class the
+benchmarks do not contain supplies the prompt and, if labelled tiles exist for it,
+a fitted entry; if they do not, that class runs at the published global threshold
+and the remaining classes keep their calibration. \best{The correction degrades to
+the baseline class by class rather than all at once}, which is the behaviour a
+deployment needs when a vocabulary grows faster than its annotations.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{fig8_qualitative}
+  \caption{The correction on four Potsdam tiles, chosen to span its behaviour.
+  Same network, same weights, same forward pass: the two right-hand columns
+  differ only in the arithmetic applied to the scores. Rows, top to bottom: a
+  mixed urban scene, where \texttt{tree} improves while the already
+  well-calibrated \texttt{building} and \texttt{car} are left alone; a tile whose
+  canopy the baseline misses entirely; a tile the correction barely touches,
+  fourteen pixels of a quarter-million; and \best{a tile where it loses
+  \qualLoss{}~mIoU} because a dataset-wide multiplier over-fires on an ambiguous
+  field. Per-row: mIoU under both rules, the same excluding the catch-all, and
+  the class that moves most. The fourth row is included deliberately --- the
+  five-fold Potsdam gain is \scPots{}$\pm$\scPotsSD{}~mIoU, an average over
+  tiles, and a figure of four gains would misrepresent it.}
+  \label{fig:qual}
+\end{figure*}
+
+\paragraph{What it looks like in practice.} Figure~\ref{fig:qual} shows four
+Potsdam tiles under both rules, chosen to span the behaviour rather than to
+flatter it. The first two are gains: a mixed urban scene where \texttt{tree}
+improves while \texttt{building} and \texttt{car}, already well calibrated, are
+left within a point of where they were; and a tile where the baseline misses an
+entire canopy and the correction recovers it. The third is a tile the correction
+barely touches --- fourteen pixels of a quarter-million change label --- which is
+the intended behaviour where nothing is miscalibrated. \best{The fourth is a tile
+where the correction loses \qualLoss{}~mIoU}: the multiplier that repairs
+\texttt{tree}'s recall across the dataset over-fires on a texturally ambiguous
+field, and two thirds of the tile changes label with only \qualLossRight{} of the
+changed pixels becoming correct. That failure is intrinsic to the method as
+specified. The fitted vectors are constant across tiles, so they are right on
+average --- \scPots{}$\pm$\scPotsSD{}~mIoU over five folds, every fold positive ---
+and can be wrong on any individual scene. A per-tile adaptive variant is the
+obvious next step and we have not tested one.
+
+\paragraph{Where the correction should not be shipped.} The transfer results
+(Section~\ref{sec:limitations}) are a deployment rule, not only a caveat:
+calibrate on the distribution to be evaluated, and do not pool across domains that
+differ as LoveDA's rural and urban halves do. A vector fitted on the wrong domain
+performs \emph{worse} than not calibrating at all. Because no label-free statistic
+we tested predicts whether calibration will pay, the honest deployment procedure
+is to annotate the \calibTiles{} tiles, fit, and measure on held-out tiles from
+the same source --- which answers both questions at once.
+
 \section{Limitations}
 \label{sec:limitations}
 

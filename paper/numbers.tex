@@ -269,3 +269,9 @@
 \newcommand{\scCalibPots}{100}
 \newcommand{\confusionShare}{9.9\%}   % WEEK1 7.6: real-class confusion, LoveDA
 \newcommand{\scSpread}{15\%}   % worst real-class fold spread, Potsdam (road)
+
+% ---- the qualitative figure (scripts/fig_qualitative.py, Potsdam val) --------
+% Row 4 is a tile where the method LOSES. It is in the figure deliberately: the
+% five-fold Potsdam gain \scPots{} is an AVERAGE and four wins would misstate it.
+\newcommand{\qualLoss}{7.72}         % 2_13_1024_0_1536_512, full mIoU 41.04->33.32
+\newcommand{\qualLossRight}{26.1\%}  % of its changed pixels that became correct
