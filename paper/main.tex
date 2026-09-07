@@ -137,7 +137,7 @@ is the paper's main contribution. On OpenEarthMap, whose \bg{} class is a rare
 genuine label rather than a catch-all, only \discardOEM{} is discarded, there
 are no catastrophic tiles, and the residual is easy to detect --- the runner-up
 class score reaches AUC \aucOEM{} where on LoveDA nine separate signals sit at
-chance (Fig.~\ref{fig:auc}). \best{Detectability is a property of the annotation scheme, not of the
+chance (\suppref{sup:auc}). \best{Detectability is a property of the annotation scheme, not of the
 model.} A catch-all class gives the model a plausible answer everywhere, so a
 strong second-place score carries no information about whether a real class was
 suppressed. We do not leave this as a correlation across two datasets. The
@@ -474,27 +474,10 @@ by editing the prompt list.
 
 \paragraph{The effect saturates, which bounds the claim.} The effect saturates by roughly a third of the scene, which bounds the claim and explains why the reverse arm has no room to act; \suppref{sup:saturate} gives the doses.
 
-\section{What else we built}
+\section{The method}
 \label{sec:built}
 
-Our original proposal was to recover the residual with a corpus-level semantic
-co-occurrence prior over region atoms. The prior is real --- class adjacency
-carries \pmiSignal{}~bits of mean absolute pointwise mutual information against a
-structure-preserving permutation floor of \pmiFloor{}, a factor of \pmiRatio{} ---
-and mining it from the model's own predictions reproduces the ground-truth matrix
-at Spearman $\rho=\rhoMined{}$. \best{It still does not earn its place}: against
-copying the largest neighbouring region it adds \priorGain{} points, and a
-\emph{perfect} matrix adds \priorOracle{}. Adjacent classes are also the confused
-ones, so the prior reinforces the errors it was meant to fix. Building it did
-produce one result that generalises beyond this paper: pointwise mutual information
-over class adjacency must use \emph{boundary} marginals, not the natural choice of
-\emph{area} marginals, and correcting that inverted a published finding of our own.
-The atom choice matters far more than the prior --- superpixels~\cite{slic} reach
-an oracle ceiling of \ceilSLIC{} against \ceilCC{} for connected components.
-Details, and the refuted ``road is a hub'' finding, are in the supplementary
-material.
-
-\subsection{The method: per-class thresholds}
+\subsection{Lever one: per-class thresholds}
 \label{sec:method}
 
 A single threshold is being asked to serve classes with very different operating
@@ -540,7 +523,7 @@ Sec.~\ref{sec:anatomy} (\mechB{} of the LoveDA residual, \mechBpots{} of Potsdam
 and real-class confusion, which is \confusionShare{} of all real-class pixels on
 LoveDA. The next section closes that family.
 
-\subsection{The second lever: scaling before the argmax}
+\subsection{Lever two: scaling before the argmax}
 \label{sec:scale}
 
 We fit one multiplier per class alongside the thresholds:
@@ -721,15 +704,6 @@ relabelling it either fixes it or leaves it wrong in a different class --- while
 worse segmentation into a better number.}
 \label{fig:oemperclass}
 \end{figure}
-\begin{figure}[t]\centering
-\includegraphics[width=\columnwidth]{fig4_detection_auc.pdf}
-\caption{Nine detection signals on both datasets against an empirical floor of
-\aucFloor{}. On LoveDA every signal lands between $0.434$ and \aucLove{}; on
-OpenEarthMap the same signals separate the residual well. The floor is empirical
-rather than $0.5$ because region-level features carry a size confound, which we
-control for by computing AUC within size-matched bins.}
-\label{fig:auc}
-\end{figure}
 
 \subsection{Does it transfer to another pipeline?}
 \label{sec:transfer}
@@ -885,12 +859,11 @@ fitted knob over six classes can extract a gain from a meaningless vector.
 
 \paragraph{The reason is not the one we first proposed.} We had supposed the
 oracle exploits per-class \emph{precision}, which is label-derived by definition.
-That is false. Precision is predictable without labels: mean confidence ranks the
-six classes by precision at $\rho=\proxyConfRho{}$ ($p=\proxyConfP{}$), and agreement between SAM~3's two heads at $\rho=\proxyHeadRho{}$
-($p=\proxyHeadP{}$), a statistic available only because we instrument the heads
-separately where the baseline fuses them with a maximum. Both $p$-values are exact, by
-enumerating all $720$ relabelings, because at six classes $|\rho|=0.6$ arises by
-chance roughly a fifth of the time. Both move mIoU by less than $0.1$.
+That is false. Precision \emph{is} predictable without labels --- mean confidence
+ranks the six classes by precision at $\rho=\proxyConfRho{}$
+($p=\proxyConfP{}$, exact), and cross-head agreement at $\rho=\proxyHeadRho{}$
+($p=\proxyHeadP{}$) --- and both move mIoU by less than $0.1$. Measuring
+precision better is not the missing ingredient.
 
 \paragraph{The restated bound.} Precision does not determine the threshold. The
 relation is not even monotone: \texttt{water} at 88.5\% precision
