@@ -39,7 +39,7 @@ from pathlib import Path
 import numpy as np
 
 
-def open_reader(path):
+def open_reader(path, max_gib):
     """rasterio if present (windowed reads, no full decode), else PIL.
 
     A 700 MB compressed GeoTIFF can be many gigabytes decoded, so the PIL path
@@ -59,9 +59,20 @@ def open_reader(path):
         Image.MAX_IMAGE_PIXELS = None                        # these are legitimately huge
         im = Image.open(str(path))
         w, h = im.size
+        need = w * h * len(im.getbands()) / 2**30
+        if need > max_gib:
+            raise MemoryError(
+                f'{w}x{h}x{len(im.getbands())} decodes to about {need:.1f} GiB and '
+                f'PIL has no windowed read.\n'
+                f'       Either raise --max-gib (and risk the OOM killer), or use '
+                f'rasterio, which reads\n'
+                f'       one window at a time and also recovers the GSD:\n'
+                f'         conda create -n tiles -c conda-forge python=3.11 rasterio '
+                f'pillow numpy -y\n'
+                f'         conda activate tiles && python scripts/make_tiles.py ...\n'
+                f'       ⛔ Do NOT install rasterio into segov3.')
         print(f'    ⚠️  rasterio not available — decoding the whole image with PIL '
-              f'({w}x{h}). If this is killed, install rasterio in a SEPARATE env; '
-              f'⛔ never into segov3.')
+              f'({w}x{h}, ~{need:.1f} GiB).')
         arr = np.asarray(im)
         if arr.ndim == 2:
             arr = arr[..., None]
@@ -87,6 +98,9 @@ def main():
     ap.add_argument('--max-nodata', type=float, default=0.05,
                     help='reject a tile with more than this fraction of nodata')
     ap.add_argument('--seed', type=int, default=0)
+    ap.add_argument('--max-gib', type=float, default=6.0,
+                    help='refuse the PIL path above this decoded size; rasterio, '
+                         'which reads windows, is unaffected')
     args = ap.parse_args()
 
     if args.size < 64:
@@ -102,7 +116,11 @@ def main():
         if not src.exists():
             print(f'  ⛔ {src} not found'); continue
         print(f'  {src.name}  ({src.stat().st_size / 2**20:.0f} MiB)')
-        w, h, gsd, read, backend, close = open_reader(src)
+        try:
+            w, h, gsd, read, backend, close = open_reader(src, args.max_gib)
+        except MemoryError as e:
+            print(f'    ⛔ skipped: {e}')
+            continue
         s = args.size
         print(f'    {w}x{h}, backend {backend}'
               + (f', GSD {gsd * 100:.1f} cm' if gsd else ', GSD unknown'))
@@ -146,6 +164,12 @@ def main():
     print(f'  manifest      -> {man}')
     print('\n  ⚠️  NEXT, BEFORE ANY FIGURE IS PUBLISHED:')
     print('      fill the `licence` column from each image id\'s OpenAerialMap page.')
+    if any(not r['gsd_m'] for r in rows):
+        n = sum(1 for r in rows if not r['gsd_m'])
+        print(f'      ⚠️  {n} tiles have NO GSD (the PIL path cannot read the GeoTIFF')
+        print('          transform). The OAM page states it per image — fill `gsd_m`')
+        print('          from there, in metres, or the imagery cannot be placed')
+        print('          against the 4-50 cm band the benchmarks occupy.')
     print('      ⚠️  There is no ground truth here. The demo will show baseline vs')
     print('      calibrated with NO IoU, and a preset fitted for another dataset\'s')
     print('      vocabulary will switch itself off. Both are correct.')
