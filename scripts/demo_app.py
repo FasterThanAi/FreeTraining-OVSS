@@ -342,26 +342,42 @@ def panels(eng, image_path, vocab_text, preset, tau_override=None):
             ib, if_ = ratio(i0, u0), ratio(i1, u1)
             m0, m1, idx = miou(ib, if_, present)
             r0, r1, ridx = miou(ib, if_, present, keep=lambda c: c != eng.bg)
+            # ⭐ the direct answer to "is it hallucinating?": of the pixels the
+            # calibration MOVED, how many landed on the right class and how many
+            # on the wrong one. IoU going up is consistent with adding some wrong
+            # pixels too; this is not.
+            ch = diff & (g >= 0)
+            nch = int(ch.sum())
+            if nch:
+                won = int(((base[ch] != g[ch]) & (fit[ch] == g[ch])).sum())
+                lost = int(((base[ch] == g[ch]) & (fit[ch] != g[ch])).sum())
+                neither = nch - won - lost
+                note.append(f'Of the {nch:,} changed pixels with a label: '
+                            f'**{100 * won / nch:.1f}% became correct**, '
+                            f'{100 * lost / nch:.1f}% became wrong, '
+                            f'{100 * neither / nch:.1f}% were wrong before and after. '
+                            f'Net **{won - lost:+,}** pixels.')
             note.append(f'**tile mIoU {m0:.2f} → {m1:.2f} ({m1 - m0:+.2f})** over '
                         f'the {len(idx)} classes present in the ground truth'
                         + ('' if not ridx else
                            f', excluding `{names[eng.bg]}` {r0:.2f} → {r1:.2f} '
                            f'({r1 - r0:+.2f})'))
-            rows = [(names[c], ib[c], if_[c], present[c]) for c in range(n)
+            gshare = np.array([100.0 * int((g == c).sum()) / max(int((g >= 0).sum()), 1)
+                               for c in range(n)])
+            rows = [(names[c], ib[c], if_[c], present[c], gshare[c]) for c in range(n)
                     if not (np.isnan(ib[c]) and np.isnan(if_[c]))]
             rows.sort(key=lambda r: -(-1e9 if np.isnan(r[2] - r[1]) else r[2] - r[1]))
-            note.append('| class | in truth | baseline IoU | calibrated | Δ |')
+            note.append('| class | % of truth | baseline IoU | calibrated | Δ |')
             note.append('|---|---|---|---|---|')
-            for nm, a, b, pr in rows:
+            for nm, a, b, pr, sh in rows:
                 fmt = lambda v: '—' if np.isnan(v) else f'{v:.1f}'
                 d = '—' if (np.isnan(a) or np.isnan(b)) else f'{b - a:+.1f}'
-                note.append(f'| {nm} | {"yes" if pr else "no"} | {fmt(a)} | '
-                            f'{fmt(b)} | {d} |')
-            if any(not pr for *_, pr in rows):
-                note.append('_&mdash; = the class is in neither the truth nor that '
-                            'prediction, so IoU is undefined. Rows marked_ no _are '
-                            'absent from the truth and are excluded from both means, '
-                            'so removing a false positive cannot inflate the gain._')
+                note.append(f'| {nm} | {sh:.1f}% | {fmt(a)} | {fmt(b)} | {d} |')
+            if any(not r[3] for r in rows):
+                note.append('_&mdash; = in neither the truth nor that prediction, so '
+                            'IoU is undefined. Classes at 0.0% of the truth are '
+                            'excluded from both means, so removing a false positive '
+                            'cannot inflate the gain._')
         for c in range(n):
             d = int((fit == c).sum()) - int((base == c).sum())
             if abs(d) > diff.size * 0.002:
