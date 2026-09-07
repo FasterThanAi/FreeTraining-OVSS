@@ -89,7 +89,7 @@ def usable(tile, max_nodata):
     return frac, frac >= (1.0 - max_nodata)
 
 
-def rebuild(out, size):
+def rebuild(out, size, licence='', gsd=''):
     """Reconstruct provenance from the tiles themselves.
 
     The filename carries everything that cannot be recomputed: `<oam id>_<x>_<y>`.
@@ -111,8 +111,8 @@ def rebuild(out, size):
         a = np.asarray(Image.open(t))
         frac = float((a[..., :3].max(axis=2) > 0).mean())
         rows.append(dict(tile=t.name, source_id=sid, x=int(x), y=int(rest),
-                         size=a.shape[0], gsd_m='', valid_frac=f'{frac:.3f}',
-                         seed='', licence=''))
+                         size=a.shape[0], gsd_m=gsd, valid_frac=f'{frac:.3f}',
+                         seed='', licence=licence))
     man = out / 'manifest.csv'
     with man.open('w', newline='') as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0])); w.writeheader(); w.writerows(rows)
@@ -120,9 +120,15 @@ def rebuild(out, size):
     print(f'  rebuilt {man} from {len(rows)} tiles, {len(ids)} source images:')
     for i in ids:
         print(f'    {i}  ({sum(1 for r in rows if r["source_id"] == i)} tiles)')
-    print('\n  ⚠️  `gsd_m` and `licence` are EMPTY and cannot be recovered from a')
-    print('      PNG. Fill both from each image id\'s OpenAerialMap page before any')
-    print('      figure using these tiles is published.')
+    miss = [k for k in ('gsd_m', 'licence') if not rows[0][k]]
+    if miss:
+        print(f'\n  ⚠️  {" and ".join(miss)} EMPTY — a PNG does not carry them. Fill from')
+        print('      each image id\'s OpenAerialMap page (--licence / --gsd fill every')
+        print('      row at once, so use them only if every source image agrees).')
+    else:
+        print(f'\n  licence={rows[0]["licence"]!r} gsd={rows[0]["gsd_m"]!r} on all '
+              f'{len(rows)} tiles.')
+        print('  ⚠️  Applied uniformly — confirm every source image really matches.')
     return 0
 
 
@@ -135,6 +141,12 @@ def main():
     ap.add_argument('--max-nodata', type=float, default=0.05,
                     help='reject a tile with more than this fraction of nodata')
     ap.add_argument('--seed', type=int, default=0)
+    ap.add_argument('--licence', default='',
+                    help='fill the licence column, e.g. "CC-BY 4.0". ⚠️ Applies to '
+                         'EVERY tile, so use it only when every source image really '
+                         'carries that licence.')
+    ap.add_argument('--gsd', default='',
+                    help='fill gsd_m for every tile, in METRES (4 cm = 0.04)')
     ap.add_argument('--rebuild', action='store_true',
                     help='reconstruct manifest.csv from tiles already in --out, '
                          'for a run that was interrupted before it wrote one')
@@ -144,7 +156,8 @@ def main():
     args = ap.parse_args()
 
     if args.rebuild:
-        return rebuild(Path(args.out).expanduser(), args.size)
+        return rebuild(Path(args.out).expanduser(), args.size,
+                       args.licence, args.gsd)
     if not args.sources:
         raise SystemExit('⛔ no GeoTIFFs given (and --rebuild not set)')
     if args.size < 64:

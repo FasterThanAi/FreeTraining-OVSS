@@ -303,8 +303,22 @@ def panels(eng, image_path, vocab_text, preset, tau_override=None):
 
     tau0 = eng.base_tau if tau_override is None else float(tau_override)
     base = apply_rule(lg, tau0, eng.bg)
-    out = {'input': img, 'baseline': blend(img, colourise(base, n))}
+
+    # ⛔ NODATA. Aerial scenes delivered as flight strips inside a bounding box
+    # are padded with pure black. The model has no way to know that and labels it
+    # anyway, so a panel that paints those pixels asserts land cover where there
+    # is no observation. They are shown as the raw (black) image instead, and the
+    # fraction is reported.
+    nod = img[..., :3].max(axis=2) == 0 if img.ndim == 3 else img == 0
+    if nod.shape != base.shape:
+        nod = np.zeros_like(base, bool)
+    show = lambda m: np.where(nod[..., None], img[..., :3], blend(img, colourise(m, n)))
+
+    out = {'input': img, 'baseline': show(base)}
     note = []
+    if nod.any():
+        note.append(f'_{100 * nod.mean():.1f}% of this tile is nodata (outside the '
+                    'flight strip); it is left unpainted rather than labelled._')
 
     eng._gt_why = ''
     g = eng.gt(image_path, n)
@@ -312,7 +326,7 @@ def panels(eng, image_path, vocab_text, preset, tau_override=None):
         eng._gt_why = f'mask is {g.shape}, prediction is {base.shape}'
         g = None
     if g is not None:
-        out['truth'] = blend(img, colourise(np.where(g < 0, eng.bg, g), n))
+        out['truth'] = show(np.where(g < 0, eng.bg, g))
     else:
         note.append(f'_no usable ground truth ({eng._gt_why}) — panels are '
                     'qualitative only, no IoU is reported._')
@@ -328,8 +342,8 @@ def panels(eng, image_path, vocab_text, preset, tau_override=None):
         tau = preset['prob_thd']
         sc = preset.get('class_scale')
         fit = apply_rule(lg, tau, eng.bg, sc)
-        out['calibrated'] = blend(img, colourise(fit, n))
-        diff = fit != base
+        out['calibrated'] = show(fit)
+        diff = (fit != base) & ~nod
         hi = np.zeros_like(out['input'])
         hi[..., 0] = 255
         out['changed'] = np.where(diff[..., None], hi, blend(img, np.zeros_like(hi), 0.0))
