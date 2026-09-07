@@ -139,10 +139,45 @@ class Engine:
         # used to fall through to a placeholder vocabulary -- a wrong-but-plausible
         # run, which is the failure mode WEEK3_RESULTS §11 documents repeatedly.
         self.classname_path = cfg.get('model', {}).get('classname_path')
+        # where the masks live, and how they are encoded. Read from the config --
+        # WEEK3_RESULTS SS11 records four dataset-specific assumptions that were
+        # hardcoded and survived until a dataset broke them.
+        dl = cfg.get('test_dataloader', {}).get('dataset', {})
+        self.data_root = dl.get('data_root')
+        pre = dl.get('data_prefix', {})
+        self.img_prefix, self.ann_prefix = pre.get('img_path'), pre.get('seg_map_path')
+        self.reduce_zero = bool(dl.get('reduce_zero_label', False))
         self.model = init_model(str(config), device=device)
         self.bg = int(getattr(self.model, 'bg_idx', 0))
         self.base_tau = float(getattr(self.model, 'prob_thd', 0.5) or 0.5)
-        print(f'  ready. bg_idx={self.bg}, published tau={self.base_tau}')
+        print(f'  ready. bg_idx={self.bg}, published tau={self.base_tau}, '
+              f'reduce_zero_label={self.reduce_zero}')
+
+    def gt(self, image_path):
+        """The mask for this tile, as 0-indexed class ids with -1 for ignore.
+
+        Returns None rather than guessing if the mask cannot be located -- a
+        wrong mask would print a confident IoU for the wrong answer."""
+        import matplotlib.image as mpimg
+        p = Path(image_path)
+        cands = []
+        if self.data_root and self.img_prefix and self.ann_prefix:
+            root = Path(self.data_root).expanduser()
+            rel = p.relative_to(root / self.img_prefix) if str(root / self.img_prefix) in str(p) else Path(p.name)
+            for ext in (p.suffix, '.png', '.tif'):
+                cands.append(root / self.ann_prefix / rel.with_suffix(ext))
+        for ext in (p.suffix, '.png', '.tif'):
+            cands.append(Path(str(p.parent).replace('img_dir', 'ann_dir')) / (p.stem + ext))
+        for c in cands:
+            if c.exists():
+                g = mpimg.imread(str(c))
+                if g.ndim == 3:
+                    g = g[..., 0]
+                if g.dtype != np.uint8:
+                    g = (g * 255).round().astype(np.uint8) if g.max() <= 1.0 else g.astype(np.uint8)
+                g = g.astype(np.int32)
+                return (g - 1) if self.reduce_zero else g
+        return None
 
     def set_vocab(self, text):
         import torch
@@ -161,6 +196,19 @@ class Engine:
         return r.seg_logits.data.float().cpu().numpy()
 
 
+def iou(gt, pred, n):
+    """Per-class IoU over valid pixels. NaN where a class is in neither."""
+    v = gt >= 0
+    g, p_ = gt[v], pred[v]
+    out = np.full(n, np.nan)
+    for c in range(n):
+        gi, pi = g == c, p_ == c
+        u = int((gi | pi).sum())
+        if u:
+            out[c] = 100.0 * int((gi & pi).sum()) / u
+    return out
+
+
 def panels(eng, image_path, vocab_text, preset, tau_override=None):
     """Returns (names, dict of panels, summary markdown)."""
     import matplotlib.image as mpimg
@@ -175,6 +223,14 @@ def panels(eng, image_path, vocab_text, preset, tau_override=None):
     base = apply_rule(lg, tau0, eng.bg)
     out = {'input': img, 'baseline': blend(img, colourise(base, n))}
     note = []
+
+    g = eng.gt(image_path)
+    if g is not None and g.shape == base.shape:
+        out['truth'] = blend(img, colourise(np.where(g < 0, eng.bg, g), n))
+    else:
+        g = None
+        note.append('_no ground-truth mask found for this tile — panels are '
+                    'qualitative only._')
 
     ok = preset and len(preset.get('prob_thd', [])) == n
     if preset and not ok:
@@ -194,6 +250,22 @@ def panels(eng, image_path, vocab_text, preset, tau_override=None):
         out['changed'] = np.where(diff[..., None], hi, blend(img, np.zeros_like(hi), 0.0))
         moved = int(diff.sum())
         note.append(f'**{moved:,} pixels ({100 * moved / diff.size:.1f}%) change label.**')
+        if g is not None:
+            ib, if_ = iou(g, base, n), iou(g, fit, n)
+            real = [c for c in range(n) if c != eng.bg]
+            m0, m1 = np.nanmean(ib), np.nanmean(if_)
+            r0, r1 = np.nanmean(ib[real]), np.nanmean(if_[real])
+            note.append(f'**tile mIoU {m0:.2f} → {m1:.2f} ({m1 - m0:+.2f})**, '
+                        f'excluding `{names[eng.bg]}` {r0:.2f} → {r1:.2f} '
+                        f'({r1 - r0:+.2f})')
+            rows = [(names[c], ib[c], if_[c]) for c in range(n)
+                    if not (np.isnan(ib[c]) and np.isnan(if_[c]))]
+            rows.sort(key=lambda r: -(0 if np.isnan(r[2] - r[1]) else r[2] - r[1]))
+            note.append('| class | baseline IoU | calibrated | Δ |')
+            note.append('|---|---|---|---|')
+            for nm, a, b in rows:
+                d = b - a
+                note.append(f'| {nm} | {a:.1f} | {b:.1f} | {d:+.1f} |')
         for c in range(n):
             d = int((fit == c).sum()) - int((base == c).sum())
             if abs(d) > diff.size * 0.002:
@@ -204,6 +276,35 @@ def panels(eng, image_path, vocab_text, preset, tau_override=None):
 
 
 # --------------------------------------------------------------------------- #
+def render(note):
+    """The tiny slice of markdown the notes actually use: **bold**, `code`, and
+    pipe tables. Written out rather than pulling in a dependency."""
+    html, tbl = [], []
+
+    def flush():
+        if not tbl:
+            return
+        head, body = tbl[0], [r for r in tbl[1:] if set(r.replace('|', '').strip()) - set('-: ')]
+        cells = lambda r, t: '<tr>' + ''.join(
+            f'<{t}>{c.strip()}</{t}>' for c in r.strip().strip('|').split('|')) + '</tr>'
+        html.append('<table>' + cells(head, 'th')
+                    + ''.join(cells(r, 'td') for r in body) + '</table>')
+        tbl.clear()
+
+    for line in note.split('\n'):
+        if line.strip().startswith('|'):
+            tbl.append(line)
+            continue
+        flush()
+        html.append(line + '<br>')
+    flush()
+    out = ''.join(html)
+    out = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', out)
+    out = re.sub(r'`(.+?)`', r'<code>\1</code>', out)
+    out = re.sub(r'_(.+?)_', r'<i>\1</i>', out)
+    return out
+
+
 def write_html(results, names, out_dir):
     """Self-contained page. No server, no dependencies, opens on a phone."""
     out = Path(out_dir).expanduser()
@@ -213,7 +314,7 @@ def write_html(results, names, out_dir):
     cards = []
     for i, (stem, panels_d, note) in enumerate(results):
         imgs = []
-        for key in ('input', 'baseline', 'calibrated', 'changed'):
+        for key in ('input', 'truth', 'baseline', 'calibrated', 'changed'):
             if key not in panels_d:
                 continue
             f = out / f'{stem}_{key}.png'
@@ -223,7 +324,7 @@ def write_html(results, names, out_dir):
                         f'<figcaption>{key}</figcaption></figure>')
             f.unlink()
         cards.append(f'<section><h2>{stem}</h2><div class=row>{"".join(imgs)}</div>'
-                     f'<div class=note>{note.replace(chr(10), "<br>")}</div></section>')
+                     f'<div class=note>{render(note)}</div></section>')
 
     legend = ''.join(
         f'<span class=key><i style="background:rgb({",".join(map(str, PALETTE[c % len(PALETTE)]))})"></i>{n}</span>'
@@ -240,6 +341,10 @@ figure{{margin:0;flex:1 1 220px;min-width:200px}}
 img{{width:100%;border-radius:4px;display:block;border:1px solid #ddd}}
 figcaption{{font-size:12px;color:#666;margin-top:4px;text-transform:uppercase;letter-spacing:.05em}}
 .note{{margin-top:12px;font-size:13px;color:#333;border-top:1px solid #eee;padding-top:10px}}
+table{{border-collapse:collapse;margin:8px 0;font-size:12px}}
+th,td{{border:1px solid #ddd;padding:3px 9px;text-align:right}}
+th:first-child,td:first-child{{text-align:left}} th{{background:#f4f4f4}}
+code{{background:#f0f0f0;padding:1px 4px;border-radius:3px;font-size:12px}}
 .legend{{margin:0 0 24px}} .key{{display:inline-flex;align-items:center;gap:5px;margin:0 12px 6px 0;font-size:13px}}
 .key i{{width:13px;height:13px;border-radius:3px;display:inline-block;border:1px solid #0002}}
 </style>
