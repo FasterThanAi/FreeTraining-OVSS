@@ -275,3 +275,16 @@
 % five-fold Potsdam gain \scPots{} is an AVERAGE and four wins would misstate it.
 \newcommand{\qualLoss}{7.72}         % 2_13_1024_0_1536_512, full mIoU 41.04->33.32
 \newcommand{\qualLossRight}{26.1\%}  % of its changed pixels that became correct
+
+% ---- the open-vocabulary run on Indian UAV imagery (scripts/fig_vocabulary.py)
+% ⛔ NO GROUND TRUTH. These are per-class PIXEL SHARES with nodata excluded, not
+% accuracy. Nothing derived from them may be phrased as a correctness claim.
+\newcommand{\indTiles}{25}           % tiles cut from 5 OpenAerialMap scenes
+\newcommand{\indScenes}{5}
+\newcommand{\indGSD}{4--5\,cm}
+\newcommand{\indFloodA}{78.6}        % `water` under the settlement vocabulary
+\newcommand{\indFloodB}{79.1}        % `flood water` under the Indian one
+\newcommand{\indBldgA}{18.2}         % `concrete roof`
+\newcommand{\indBldgB}{18.3}         % `building`
+\newcommand{\indVegA}{100.0}         % solar-farm tile collapses to ONE class
+\newcommand{\indSolarB}{4.6}         % ⚠️ PARTIAL -- far below the panels' extent

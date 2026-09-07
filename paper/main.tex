@@ -943,6 +943,49 @@ average --- \scPots{}$\pm$\scPotsSD{}~mIoU over five folds, every fold positive 
 and can be wrong on any individual scene. A per-tile adaptive variant is the
 obvious next step and we have not tested one.
 
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{fig9_vocabulary}
+  \caption{Open-vocabulary segmentation on \indGSD{} UAV imagery of Indian
+  scenes, under two class lists supplied as plain words at inference. Same
+  weights, same forward pass; only the vocabulary differs. \textbf{Bottom:} a
+  building in flood water. The two vocabularies partition the scene almost
+  identically --- \indFloodA{}\% \texttt{water} against \indFloodB{}\%
+  \texttt{flood water}, \indBldgA{}\% \texttt{concrete roof} against
+  \indBldgB{}\% \texttt{building} --- so the regions are stable and only the
+  naming follows the words given. \textbf{Top:} a photovoltaic array. The
+  settlement vocabulary, which has no word for it, assigns \indVegA{}\% of the
+  tile to \texttt{vegetation}; adding \texttt{solar panel} recovers
+  \indSolarB{}\%, \best{well below the panels' visible extent}. ⛔ No ground
+  truth exists for this imagery, so these are pixel shares, not accuracy.}
+  \label{fig:vocab}
+\end{figure*}
+
+\paragraph{A vocabulary the benchmarks do not contain.} To see what the
+pipeline does where nothing has been tuned for it, we ran it unchanged on
+\indTiles{} tiles cut from \indScenes{} openly licensed UAV scenes over India at
+\indGSD{} --- a region absent from all three benchmarks --- under two class lists
+typed at inference (Figure~\ref{fig:vocab}). On a flooded building the two
+vocabularies recover the same partition to within half a point
+(\indFloodA{}\%/\indFloodB{}\% for the inundated area under \texttt{water} and
+\texttt{flood water}; \indBldgA{}\%/\indBldgB{}\% for the structure), so
+\best{the segmentation is stable under renaming and it is the labels that follow
+the vocabulary}. On a photovoltaic array the settlement vocabulary, having no
+word for panels, assigns \indVegA{}\% of the tile to a single class; supplying
+\texttt{solar panel} recovers \indSolarB{}\%.
+
+\best{That last number is our own argument arriving unprompted.} The panels are
+evidently visible to the model --- it fires on them --- but under one global
+threshold and no calibration it commits to a small fraction of their extent,
+which is the low-recall regime per-class thresholds exist to correct (the
+\texttt{tree} case of Section~\ref{sec:scaleresults} at \treeP{}\% precision and
+\treeR{}\% recall is the same shape). Here we cannot correct it: the imagery is
+unlabelled, and Section~\ref{sec:limitations} shows thresholds fitted elsewhere
+would not transfer. ⛔ We therefore claim nothing about accuracy on these
+scenes, only that the class list is an input and the model responds to it. The
+\calibTiles{} labelled tiles our correction needs are exactly what such a
+deployment must budget for, and this is what not having them looks like.
+
 \paragraph{Where the correction should not be shipped.} The transfer results
 (Section~\ref{sec:limitations}) are a deployment rule, not only a caveat:
 calibrate on the distribution to be evaluated, and do not pool across domains that
