@@ -146,7 +146,8 @@ class Engine:
         self.data_root = dl.get('data_root')
         pre = dl.get('data_prefix', {})
         self.img_prefix, self.ann_prefix = pre.get('img_path'), pre.get('seg_map_path')
-        self.reduce_zero = bool(dl.get('reduce_zero_label', False))
+        self.reduce_zero = dl.get('reduce_zero_label')   # often absent; see _encoding()
+        self._enc = None
         self.model = init_model(str(config), device=device)
         self.bg = int(getattr(self.model, 'bg_idx', 0))
         self.base_tau = float(getattr(self.model, 'prob_thd', 0.5) or 0.5)
@@ -184,17 +185,49 @@ class Engine:
                                 'an RGB-coded mask needs its colour map to decode')
                 return None
             g = np.array(im).astype(np.int32)
-            if self.reduce_zero:
+            if self._enc is None and not self._encoding(c.parent, self.n_gt_max):
+                return None
+            if self._enc == 'one':
                 g = np.where(g == 0, -1, g - 1)
             lo, hi = int(g.min()), int(g.max())
             if hi >= self.n_gt_max or lo < -1:
-                self._gt_why = (f'{c.name} holds ids {lo}..{hi}, outside '
-                                f'[-1, {self.n_gt_max - 1}] for this vocabulary — '
-                                'refusing to score against a mask it cannot read')
+                self._gt_why = (f'{c.name} holds ids {lo}..{hi} after decoding, '
+                                f'outside [-1, {self.n_gt_max - 1}]')
                 return None
             return g
         self._gt_why = 'no mask file found beside the image'
         return None
+
+    def _encoding(self, ann_dir, n):
+        """0-indexed (0..n-1) or 1-indexed with 0=ignore (0..n)? Decided from the
+        MASKS, once, not from the config.
+
+        ⚠️ reduce_zero_label is declared on the dataset class in mmseg, not under
+        test_dataloader, so reading it off the config silently returned False for
+        Potsdam and shifted every class id by one -- `low vegetation` was scored
+        as `tree`. The data answers this unambiguously and cannot go stale."""
+        from PIL import Image
+        files = sorted(p for p in ann_dir.iterdir()
+                       if p.suffix.lower() in ('.png', '.tif', '.tiff'))[:40]
+        hi = max((int(np.array(Image.open(str(f))).max()) for f in files),
+                 default=-1)
+        if hi == n:
+            self._enc = 'one'
+        elif hi == n - 1:
+            self._enc = 'zero'
+        else:
+            self._gt_why = (f'masks in {ann_dir.name} reach id {hi}; a {n}-class '
+                            f'set should reach {n - 1} (0-indexed) or {n} '
+                            f'(1-indexed with 0=ignore). Cannot decode.')
+            return False
+        cfgsays = self.reduce_zero
+        print(f'  ground truth: {self._enc}-indexed (max id {hi} over '
+              f'{len(files)} masks)'
+              + ('' if cfgsays is None else
+                 f'; config said reduce_zero_label={cfgsays}'
+                 + ('' if bool(cfgsays) == (self._enc == 'one')
+                    else '  ⚠️ DISAGREES — trusting the data')))
+        return True
 
     def set_vocab(self, text):
         import torch
