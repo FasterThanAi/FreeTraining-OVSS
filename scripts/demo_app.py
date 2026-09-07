@@ -153,12 +153,13 @@ class Engine:
         print(f'  ready. bg_idx={self.bg}, published tau={self.base_tau}, '
               f'reduce_zero_label={self.reduce_zero}')
 
-    def gt(self, image_path):
+    def gt(self, image_path, n_classes=None):
         """The mask for this tile, as 0-indexed class ids with -1 for ignore.
 
-        Returns None rather than guessing if the mask cannot be located -- a
-        wrong mask would print a confident IoU for the wrong answer."""
-        import matplotlib.image as mpimg
+        Returns None rather than guessing if the mask cannot be read -- a wrong
+        mask prints a confident IoU for the wrong answer, which is worse than
+        no IoU at all."""
+        self.n_gt_max = n_classes or self.model.num_cls
         p = Path(image_path)
         cands = []
         if self.data_root and self.img_prefix and self.ann_prefix:
@@ -169,14 +170,30 @@ class Engine:
         for ext in (p.suffix, '.png', '.tif'):
             cands.append(Path(str(p.parent).replace('img_dir', 'ann_dir')) / (p.stem + ext))
         for c in cands:
-            if c.exists():
-                g = mpimg.imread(str(c))
-                if g.ndim == 3:
-                    g = g[..., 0]
-                if g.dtype != np.uint8:
-                    g = (g * 255).round().astype(np.uint8) if g.max() <= 1.0 else g.astype(np.uint8)
-                g = g.astype(np.int32)
-                return (g - 1) if self.reduce_zero else g
+            if not c.exists():
+                continue
+            # ⛔ NOT matplotlib.imread. Segmentation masks are palette-mode PNGs
+            # whose pixel values ARE the class ids; imread expands the palette to
+            # RGB, so the array holds display colours and every IoU comes out ~0
+            # while still looking like a real number. PIL without .convert() keeps
+            # the raw ids.
+            from PIL import Image
+            im = Image.open(str(c))
+            if im.mode not in ('P', 'L', 'I', 'I;16'):
+                self._gt_why = (f'{c.name} is mode {im.mode}, not an index mask — '
+                                'an RGB-coded mask needs its colour map to decode')
+                return None
+            g = np.array(im).astype(np.int32)
+            if self.reduce_zero:
+                g = np.where(g == 0, -1, g - 1)
+            lo, hi = int(g.min()), int(g.max())
+            if hi >= self.n_gt_max or lo < -1:
+                self._gt_why = (f'{c.name} holds ids {lo}..{hi}, outside '
+                                f'[-1, {self.n_gt_max - 1}] for this vocabulary — '
+                                'refusing to score against a mask it cannot read')
+                return None
+            return g
+        self._gt_why = 'no mask file found beside the image'
         return None
 
     def set_vocab(self, text):
@@ -196,23 +213,38 @@ class Engine:
         return r.seg_logits.data.float().cpu().numpy()
 
 
-def iou(gt, pred, n):
-    """Per-class IoU over valid pixels. NaN where a class is in neither."""
+def iu(gt, pred, n):
+    """Per-class intersection and union over valid pixels, as raw counts.
+
+    Counts rather than ratios, so tiles can be POOLED. A mean of per-tile IoUs
+    is not the dataset IoU and the two can differ by tens of points."""
     v = gt >= 0
     g, p_ = gt[v], pred[v]
-    out = np.full(n, np.nan)
+    inter = np.zeros(n, np.int64)
+    union = np.zeros(n, np.int64)
     for c in range(n):
         gi, pi = g == c, p_ == c
-        u = int((gi | pi).sum())
-        if u:
-            out[c] = 100.0 * int((gi & pi).sum()) / u
+        inter[c] = int((gi & pi).sum())
+        union[c] = int((gi | pi).sum())
+    return inter, union
+
+
+def ratio(inter, union):
+    out = np.full(len(inter), np.nan)
+    nz = union > 0
+    out[nz] = 100.0 * inter[nz] / union[nz]
     return out
+
+
+def iou(gt, pred, n):
+    return ratio(*iu(gt, pred, n))
 
 
 def panels(eng, image_path, vocab_text, preset, tau_override=None):
     """Returns (names, dict of panels, summary markdown)."""
     import matplotlib.image as mpimg
     names = eng.set_vocab(vocab_text)
+    stats = {}
     lg = eng.logits(image_path)
     n = len(names)
     img = mpimg.imread(str(image_path))
@@ -224,13 +256,16 @@ def panels(eng, image_path, vocab_text, preset, tau_override=None):
     out = {'input': img, 'baseline': blend(img, colourise(base, n))}
     note = []
 
-    g = eng.gt(image_path)
-    if g is not None and g.shape == base.shape:
+    eng._gt_why = ''
+    g = eng.gt(image_path, n)
+    if g is not None and g.shape != base.shape:
+        eng._gt_why = f'mask is {g.shape}, prediction is {base.shape}'
+        g = None
+    if g is not None:
         out['truth'] = blend(img, colourise(np.where(g < 0, eng.bg, g), n))
     else:
-        g = None
-        note.append('_no ground-truth mask found for this tile — panels are '
-                    'qualitative only._')
+        note.append(f'_no usable ground truth ({eng._gt_why}) — panels are '
+                    'qualitative only, no IoU is reported._')
 
     ok = preset and len(preset.get('prob_thd', [])) == n
     if preset and not ok:
@@ -251,7 +286,9 @@ def panels(eng, image_path, vocab_text, preset, tau_override=None):
         moved = int(diff.sum())
         note.append(f'**{moved:,} pixels ({100 * moved / diff.size:.1f}%) change label.**')
         if g is not None:
-            ib, if_ = iou(g, base, n), iou(g, fit, n)
+            (i0, u0), (i1, u1) = iu(g, base, n), iu(g, fit, n)
+            stats.update(i0=i0, u0=u0, i1=i1, u1=u1)
+            ib, if_ = ratio(i0, u0), ratio(i1, u1)
             real = [c for c in range(n) if c != eng.bg]
             m0, m1 = np.nanmean(ib), np.nanmean(if_)
             r0, r1 = np.nanmean(ib[real]), np.nanmean(if_[real])
@@ -272,7 +309,7 @@ def panels(eng, image_path, vocab_text, preset, tau_override=None):
                 note.append(f'- `{names[c]}`: {d:+,} px')
     else:
         note.append('_Baseline only — no calibration fitted for this vocabulary._')
-    return names, out, '\n'.join(note)
+    return names, out, '\n'.join(note), stats
 
 
 # --------------------------------------------------------------------------- #
@@ -305,7 +342,7 @@ def render(note):
     return out
 
 
-def write_html(results, names, out_dir):
+def write_html(results, names, out_dir, summary=''):
     """Self-contained page. No server, no dependencies, opens on a phone."""
     out = Path(out_dir).expanduser()
     out.mkdir(parents=True, exist_ok=True)
@@ -345,12 +382,15 @@ table{{border-collapse:collapse;margin:8px 0;font-size:12px}}
 th,td{{border:1px solid #ddd;padding:3px 9px;text-align:right}}
 th:first-child,td:first-child{{text-align:left}} th{{background:#f4f4f4}}
 code{{background:#f0f0f0;padding:1px 4px;border-radius:3px;font-size:12px}}
+.summary{{background:#fff;border:1px solid #e3e3e3;border-radius:8px;
+padding:12px 16px;margin:0 0 20px;font-size:14px}}
 .legend{{margin:0 0 24px}} .key{{display:inline-flex;align-items:center;gap:5px;margin:0 12px 6px 0;font-size:13px}}
 .key i{{width:13px;height:13px;border-radius:3px;display:inline-block;border:1px solid #0002}}
 </style>
 <h1>Calibrating the decision, not the model</h1>
 <p class=sub>baseline vs per-class thresholds and argmax scaling &mdash; same model,
 same weights, no retraining</p>
+{f'<p class=summary>{summary}</p>' if summary else ''}
 <div class=legend>{legend}</div>
 {''.join(cards)}""")
     print(f'\n  wrote {out / "index.html"}  —  open it in a browser')
@@ -436,11 +476,27 @@ def main():
         raise SystemExit('no --images given, and no gradio to run interactively')
     pset = next(iter(presets.values()), None)
     results, names = [], []
+    pool = {}
     for f in files:
         print(f'  {Path(f).name}')
-        names, p, note = panels(eng, f, default_vocab, pset)
+        names, p, note, st = panels(eng, f, default_vocab, pset)
         results.append((Path(f).stem, p, note))
-    write_html(results, names, args.out)
+        for k, v in st.items():
+            pool[k] = pool.get(k, 0) + v
+    summary = ''
+    if 'u0' in pool:
+        b, c = ratio(pool['i0'], pool['u0']), ratio(pool['i1'], pool['u1'])
+        real = [i for i in range(len(names)) if i != eng.bg]
+        summary = (f'Pooled over {len(files)} tiles: '
+                   f'<b>mIoU {np.nanmean(b):.2f} &rarr; {np.nanmean(c):.2f} '
+                   f'({np.nanmean(c) - np.nanmean(b):+.2f})</b>, excluding '
+                   f'<code>{names[eng.bg]}</code> {np.nanmean(b[real]):.2f} &rarr; '
+                   f'{np.nanmean(c[real]):.2f} '
+                   f'({np.nanmean(c[real]) - np.nanmean(b[real]):+.2f}). '
+                   f'<i>Pooled over the tiles shown, not a dataset result &mdash; '
+                   f'too few tiles for a stable mIoU.</i>')
+        print('\n  ' + re.sub('<[^>]+>', '', summary))
+    write_html(results, names, args.out, summary)
 
 
 if __name__ == '__main__':
