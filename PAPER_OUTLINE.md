@@ -176,6 +176,14 @@ mIoU number here would have been misleading.
 | 5 | atom purity distribution + oracle ceiling, cc vs SLIC | ✅ `docs/fig5_atom_purity.{png,pdf}` |
 | 6 | GT co-occurrence heatmap (`PMI_bnd`) | ✅ from `cooccurrence_gt.py` |
 | **7** | **the method**: fitted τ vs the global 0.5 · per-class ΔIoU, both protocols · calibration curve | ✅ `docs/fig7_method.{png,pdf}` · `scripts/fig_method.py` |
+| **8** | ⭐ **the method running**: 4 Potsdam tiles × input/truth/baseline/ours — two gains, a no-op and **a loss** | ✅ `docs/fig8_qualitative.{png,pdf}` · `scripts/fig_qualitative.py` |
+| **9** | ⭐ **open vocabulary**: 2 Indian UAV tiles × two class lists typed at inference | ✅ `docs/fig9_vocabulary.{png,pdf}` · `scripts/fig_vocabulary.py` |
+
+⚠️ Figures 8 and 9 need a GPU (they run SAM 3); 2–5 and 7 are CPU-only.
+⛔ Figure 8's fourth row is a tile where the method LOSES 7.72 mIoU, and figure 9
+reports a PARTIAL solar-panel detection (4.6%). Neither is to be swapped for a
+better-looking tile: the five-fold gain is an average, and figure 9 has no ground
+truth at all.
 
 Figures 2–5 and 7 are rendered by `scripts/fig_mechanism.py`, `scripts/fig_results.py` and `scripts/fig_method.py`, all of which print every plotted number against its `WEEK3_RESULTS.md` section on render. A figure that has drifted from its source table is worse than no figure.
 

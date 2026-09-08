@@ -172,6 +172,45 @@ shrink. ConInfer's reproduction gate **failed** — report LoveDA with both numb
 39.33, ours 36.99), drop their OEM row. Potsdam pre-registered at 4.29% catch-all.
 Target EarthVision 2027 (~March 2027, **unverified**); **content freeze 1 Jan 2027.**
 
+### Demo, application figures and the venue — 7–8 Sep
+
+**The paper now has an application section and two result figures, and the venue is settled.**
+
+✅ **`scripts/demo_app.py`** — per tile: input / ground truth / baseline / calibrated / changed,
+with per-class IoU, a pooled IoU across tiles, and the share of changed pixels that became
+*correct*. Gradio if already importable, else a self-contained HTML page. ⛔ **It will not install
+Gradio into `segov3`** — clone the env if you must, never modify it.
+✅ **`scripts/fig_qualitative.py` → `docs/fig8_qualitative`** — four Potsdam tiles. ⚠️ **Row four
+is a tile where the method LOSES 7.72 mIoU and it stays in the figure**; the five-fold is
++4.86 ± 0.35, an average, and four wins would misrepresent it. ⛔ Tiles whose gain is mostly the
+catch-all (+8.65 → +2.01 excluded) are deliberately excluded.
+✅ **`scripts/make_tiles.py`** — cuts OpenAerialMap GeoTIFFs into square tiles (SAM 3 distorts
+non-square input) with a provenance manifest. `--source-meta` joins per-image OAM id, location,
+GSD and licence, because renaming a download breaks the id-from-filename chain. ⚠️ The PIL path
+refuses a decode above `--max-gib`; rasterio does windowed reads and recovers the GSD, in a
+**separate** env.
+✅ **`scripts/fig_vocabulary.py` → `docs/fig9_vocabulary`** — 25 tiles from 5 OAM UAV scenes over
+India at 4–5 cm, two class lists typed at inference. ⭐ **The result is the STABILITY**: a flooded
+building partitions to within half a point across a complete vocabulary change (`water` 78.6% vs
+`flood water` 79.1%; `concrete roof` 18.2% vs `building` 18.3%). ⚠️ **The solar farm is a PARTIAL
+detection — 100.0% one class under the settlement list, 4.6% `solar panel` when the word is
+supplied — and is written up as one.** ⛔ **No ground truth exists for this imagery**: every
+number is a per-class pixel share, never accuracy.
+⚠️ **Vocabulary revisions are recorded in `configs/README_vocabularies.md`.** Only `_b` was ever
+revised, once. ⛔ No further revisions — a missing class is reported as the model taking the
+nearest available word.
+
+⭐ **VENUE: IEEE TGRS.** Rolling, no deadline, and ROADMAP §7 named it plausible once §7.1
+(ConInfer) and §7.2 (a third dataset) landed — both done. ⛔ **No CVPR build and no second paper
+folder**: one source of truth, and `numbers.tex` is it. The EarthVision cut happens only if TGRS
+rejects, when reviewer comments will say what to keep.
+
+⛔ **A metric bug worth remembering, because it was in our favour.** The demo's per-tile mIoU used
+`nanmean` per rung, so deleting a false-positive class dropped it from the denominator and reported
+**+17.01 where the truth was +8.65**. That is §8.1's error — a metric moving without segmentation
+quality moving — inside the tool built to demonstrate the fix for it. Both rungs now average over
+the classes present in ground truth.
+
 ### Instrumentation complete — 21 Aug
 
 `measure_discard_rate.py` is now in git (it never had been), alongside `reference/` which pins

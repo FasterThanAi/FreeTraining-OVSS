@@ -13,6 +13,199 @@ should answer it with a `grep` instead of an archaeology session.
 
 ---
 
+## 2026-09-08 (Tue) — the application section, on Indian imagery
+
+**Two figures rendered, the deployment and India sections written, venue fixed on TGRS.**
+
+**The open-vocabulary run.** 25 tiles cut from 5 openly licensed OpenAerialMap UAV scenes over
+India at 4–5 cm, plus 32 from Chattogram, Bangladesh. Run unchanged under two class lists typed at
+inference. ⭐ **The result is the stability, not the pictures**: on a flooded building the two
+vocabularies partition the scene to within half a point — `water` **78.6%** vs `flood water`
+**79.1%**, `concrete roof` **18.2%** vs `building` **18.3%**. Same regions, different names, and
+the names follow the words. It called *brown, muddy* flood water `water`, so it is not a colour
+prior.
+
+⚠️ **The solar farm is a PARTIAL detection and is written up as one.** The settlement vocabulary
+has no word for photovoltaic panels and puts **100.0%** of that tile in `vegetation`; adding
+`solar panel` recovers **4.6%**, well below their visible extent. ⭐ That is our own argument
+arriving unprompted — the model can see the panels but under one global τ with no calibration it
+commits to a fraction of them, which is the `tree` shape (93.34 precision / 38.63 recall) that
+per-class thresholds move +21.17. Here it cannot be fixed: no labels, and §9e says borrowed
+thresholds are worse than none.
+
+⛔ **No ground truth exists for any of this imagery.** Every number above is a per-class pixel
+share with nodata excluded, and the figure caption says so. Nothing is an accuracy claim.
+
+**Written:** `scripts/fig_vocabulary.py` (fig 9), the `\subsection{A vocabulary the benchmarks do
+not contain}`, and `--source-meta` on `make_tiles.py` after renaming the downloads broke the
+provenance chain (`ind.tif` records `ind`, which nobody can look up on OAM).
+
+**Venue: IEEE TGRS.** Rolling, no deadline, and `ROADMAP.md` §7 named it as plausible once §7.1
+(ConInfer) and §7.2 (a third dataset) landed — both now done. ⛔ **No CVPR build.** One source, one
+paper; the EarthVision cut happens only if TGRS rejects, and it will be better informed then.
+
+**Bugs of mine, four in the demo, and the last one is the lesson:**
+
+| bug | how it presented |
+|---|---|
+| class list read off the model, not the config | 4 wrong classes, preset correctly refused |
+| `matplotlib.imread` on a palette PNG | ground truth showed *display colours*; grass scored as `tree` |
+| `reduce_zero_label` read from the config, where mmseg does not put it | every class id off by one |
+| ⛔ **per-rung `nanmean`** | **+17.01 where the truth was +8.65** |
+
+⭐ The first three produced obviously broken pictures and were caught by eye. The fourth produced a
+**plausible number in our own favour** — deleting a false-positive class dropped it from the
+denominator — and nothing visible would have revealed it. It is §8.1's error (a metric moving
+without segmentation quality moving) reappearing inside the tool built to demonstrate the fix for
+it. The page now prints a pooled IoU and the share of changed pixels that became *correct*, both
+of which are harder to fool.
+
+---
+
+## 2026-09-07 (Mon) — a demo that can be checked, and the qualitative figure
+
+**`scripts/demo_app.py`** — input / ground truth / baseline / calibrated / changed, per tile, with
+per-class IoU. Dual-mode: Gradio if already importable, otherwise a self-contained HTML page.
+⛔ It will not install Gradio into `segov3`; the three-way version deadlock is the only working
+combination and every number in the paper rests on it.
+
+**`scripts/fig_qualitative.py`** → `docs/fig8_qualitative`. Four Potsdam tiles: a normal urban
+scene (+3.13, `tree` +15.6, and `building`/`car` left within a point), a canopy the baseline misses
+entirely (+32.94), a tile it barely touches (14 pixels of 262,144), and ⭐ **a tile where it loses
+7.72 mIoU**. The loss row is in the figure deliberately — the Potsdam five-fold is +4.86 ± 0.35, an
+*average*, and four wins would misrepresent it.
+
+**Paper:** `\section{Deploying the correction}` written (~580 words) — what the correction costs to
+ship, that the vocabulary stays open and it degrades to the baseline class by class, what it looks
+like, and the transfer failure restated as a rule. First cut done: `fig:auc` and the co-occurrence
+prose moved to supplementary, `What else we built` became `The method` with the two levers promoted.
+
+⚠️ **Also caught:** `--images .../*.png | head -8` takes the alphabetically first tiles, which on a
+multi-scene directory is one scene. Same failure `WEEK3 §11` records for `--limit`, second
+occurrence.
+
+---
+
+## 2026-09-06 (Sun) — Potsdam: a second positive, and `tree` is finally explained
+
+**C − B = +4.86 ± 0.35, 5/5 folds, mean−2sd +4.16**, on 2016 tiles with every rung exact and
+both gates passed (cache 57.87/4.68%, search subsample 0.052 vs 0.15). Every real class
+improves; catch-all-excluded **+6.00**.
+
+⭐⭐ **The finding: `tree` +21.56.** POTSDAM_RESULTS recorded in September that `tree` had the
+largest precision–recall gap in the project (**+54.7**, precision 93.34 / recall 38.63) and
+that per-class τ moved it **+0.32** — an anomaly that weakened §9g's ρ = +0.713. The
+reachability run then measured it at **96.2% reachable but 19.2% self-reachable**: nearly all
+of `tree`'s residual is below threshold *with another class winning the argmax*, so lowering
+its own threshold returns those pixels wrongly labelled. **Scaling flips the argmax and
+collects it.** Three experiments now line up: the P−R gap says a class is under-firing,
+self-reachability says whether a threshold can reach it, and the scale is what reaches the
+rest.
+
+⚠️ `tree` is 72% of the gain, but excluding it the other four real classes still average
+**+2.11** and full mIoU is **+1.27** — comparable to LoveDA. Unlike OEM, where four of eight
+classes got worse and one class *was* the effect.
+
+⭐ Calibration is cheaper here than for thresholds alone: positive at every size with worst
+draws above +4.1 from **100 tiles**. And per-class τ alone is worth only +0.15 to +0.83 on
+Potsdam — **the scale is the method here and the threshold is the ablation.**
+
+⚠️ **Two of my checks fired wrongly and both are fixed.** The stability gate included the
+catch-all, whose scale `--objective real` does not score and therefore barely identifies — it
+spread 51% while every real class sat between 2.6% and 15.3%. And instability was vetoing the
+verdict *before* the gain was read; overfitting is an unstable **gain**, not unstable
+parameters, and +4.86 ± 0.35 over five folds is not overfitting. `road` at 15.3% is still over
+my 15% bar and **the bar was not moved** — the check order was. Both changes are post-hoc and
+recorded as such.
+
+**Potsdam VERIFIED end to end: 57.60 → 63.27.** Every rung within **0.05** mIoU of its cached
+prediction, every class within 0.23. Scale **+4.92** against the 5-fold's +4.86 ± 0.35.
+⭐⭐ **`tree` 37.92 → 59.09, +21.17 measured against +21.11 predicted** — September's
+unexplained anomaly, confirmed in the pipeline.
+
+⛔ **It took two rounds, and the first was my bug.** The deploy templates hardcoded
+`confidence_threshold=0.5` into every generated config. That is SAM 3's *decoder*
+instance-confidence threshold, passed into `Sam3Processor`, and it changes `seg_logits`
+themselves — so passes 2 and 3 ran a **different model** from pass 1. First attempt: 57.60 /
+57.18 / 61.71, with rung A exact and rungs B and C off by 1.2 and 1.6.
+
+⚠️ `cfg_loveda.py` happens to use 0.5, so it was a no-op on LoveDA and §9c's published
+verification is unaffected — **the bug could only surface on a second dataset, and it did,
+the first time one was tried.** It is in `tau_deploy.py` too.
+
+⭐ **The step that mattered was eliminating the alternative.** `diagnose_vector_tau.py`
+applied the segmentor rule per pixel with no binning and matched `confusion_at` **exactly**,
+vector and scalar. Had that failed, every cached sweep in the project would have inherited
+it — the oracle bounds, the cross-validations, the +1.18 headline. Exonerating the
+arithmetic left exactly one candidate. **And the tell throughout was that rung A reproduced:
+a control that works is what makes a broken result findable.**
+
+**ConInfer: the scale is a NULL, and my pre-registered C1 is falsified.** C − B =
+**−0.10 ± 0.14**, 1/5 folds, both gates passed (36.99 exactly, conf in [0.1601, 0.9611]).
+Per-class τ reproduces §7.1a at **+2.51 ± 0.34**. Catch-all-excluded +0.27, catch-all −2.31.
+
+⭐ **The pre-registration named this branch before the run:** *"C4 holds, C1 fails → the
+scales move but buy nothing."* And they do move — `water` fitted at **7.94**, a 15.9× span —
+and buy nothing.
+
+⛔ **Worse for me than C1: the REASONING behind C2 is contradicted.** I argued the gain tracks
+the argmax-lost share. Potsdam has the **lowest** argmax-lost mass (6.10%) and the **highest**
+scale gain (+4.92); ConInfer has 8.56% and −0.10. The mechanism is withdrawn.
+
+⭐ What three datasets do show is that **the two levers substitute**: τ +2.51 / scale −0.10 on
+ConInfer, τ +0.75 / scale +4.92 on Potsdam, τ +1.16 / scale +1.16 on LoveDA. Post-hoc, three
+points, and the totals are not constant (+5.67, +2.32, +2.41) — so it is a description, not a
+law, and it needs a fourth dataset before it goes in the paper as more than that.
+
+---
+
+## 2026-09-05 (Sat) — the scale is real, verified in the pipeline, and free
+
+**@ARGMAX_SCALING_RESULTS.md.** Full 1669-tile `--cache-full` (41.7 GB), gate passed exactly
+(47.37 / 29.68%). **C − B = +1.16 ± 0.19, 5/5 folds, mean−2sd = +0.78** — clears the bar. Total
+over the published baseline **+2.32**.
+
+✅ **End-to-end.** Three `eval.py` passes on 1469 held-out tiles. Predicted increment **+1.31**,
+measured **+1.34**; per-class `background` +1.55/+1.55, `building` +0.09/+0.09, `agricultural`
++0.17/+0.17. The segmentor printed its scale vector, so the config demonstrably reached the model.
+
+⚠️ **A subsampling offset I had to chase.** Rung 3's raw absolute predicted 49.27 against a
+measured 49.02 — a 0.25 miss that looked like a failure. It is not: the subsample carries a
+**+0.28** absolute offset (rung 2 exact 47.68 vs subsampled 47.96) which cancels in the
+increment. `reorder_deploy.py` now reports the debiased absolute, which for this run gives 48.97
+against 49.02. **The increment was always the trustworthy quantity and the script said so; the
+level was not.**
+
+⭐⭐ **The calibration budget does not rise.** 13 parameters instead of 6, and 200 tiles is still
+where every draw turns positive (increment +0.94, worst +0.66; at 100 the worst is −0.21). And
+the combined rule at **200** tiles (+1.60) beats thresholds alone at **800** (+1.26) — adding the
+scale is worth more than quadrupling the labels.
+
+⚠️ The deployment draw was unlucky for τ alone (+0.03 against the 5-fold's +1.16), which is why
+the 5-fold is the headline and this run is the verification.
+
+⛔ **LoveDA only.** OEM, Potsdam and ConInfer are untested, and §9e gives no reason to assume `w`
+transfers across domains any better than τ did.
+
+**OEM settling run — the subsample was NOT the cause, and OEM is the wrong test.**
+`--subsample 150000` made the scales *less* stable (15.7% → **28.6%**) and the increment
+weaker (+0.95 → **+0.40 ± 1.41**). Rung A — the published baseline, independent of the
+subsample — swings **39.64 → 49.79** across folds, and per-class τ itself comes out
+**+0.40 ± 1.34** with a fold at −1.87. **384 tiles over 5 folds is 77 evaluation tiles; the
+baseline's fold variance is 10 points against an effect of 0.4.** OpenEarthMap cannot measure
+either lever. A measurement limit, not a result.
+
+⚠️ **And the two runs were never comparable.** The fold partition came from the same RNG
+stream as the pixel subsampling, so raising `--subsample` reshuffled the folds. Fixed: the
+partition is drawn first from its own stream and depends on `--seed` alone. Verified by two
+subsample settings giving identical rungs A and B. **Two settings of one knob must differ in
+that knob alone.**
+
+⭐ **Potsdam is the transfer test, not OEM** — 2016 tiles (more than LoveDA), 403 per fold,
+512² so `--cache-full` is ~6 GB and ~35 GPU-minutes. Bigger and cheaper.
+
+---
+
 ## 2026-09-04 (Fri) — a statistic for what a threshold can actually reach
 
 **No measurement today — a script and a hypothesis, both written on the Mac.** The workstation
@@ -168,126 +361,6 @@ evaluation folds are small", which need opposite responses.
 six extra parameters; and the 500-tile subset makes rung B itself noisy (**+0.85 ± 0.94** here,
 against the published +1.18 ± 0.45, with fold 1 at −0.32). Next: the full 1669-tile `--cache-full`
 (~24 GB, 128 GB free) for real error bars, then an end-to-end segmentor run as §9c did for τ.
-
----
-
-## 2026-09-05 (Sat) — the scale is real, verified in the pipeline, and free
-
-**@ARGMAX_SCALING_RESULTS.md.** Full 1669-tile `--cache-full` (41.7 GB), gate passed exactly
-(47.37 / 29.68%). **C − B = +1.16 ± 0.19, 5/5 folds, mean−2sd = +0.78** — clears the bar. Total
-over the published baseline **+2.32**.
-
-✅ **End-to-end.** Three `eval.py` passes on 1469 held-out tiles. Predicted increment **+1.31**,
-measured **+1.34**; per-class `background` +1.55/+1.55, `building` +0.09/+0.09, `agricultural`
-+0.17/+0.17. The segmentor printed its scale vector, so the config demonstrably reached the model.
-
-⚠️ **A subsampling offset I had to chase.** Rung 3's raw absolute predicted 49.27 against a
-measured 49.02 — a 0.25 miss that looked like a failure. It is not: the subsample carries a
-**+0.28** absolute offset (rung 2 exact 47.68 vs subsampled 47.96) which cancels in the
-increment. `reorder_deploy.py` now reports the debiased absolute, which for this run gives 48.97
-against 49.02. **The increment was always the trustworthy quantity and the script said so; the
-level was not.**
-
-⭐⭐ **The calibration budget does not rise.** 13 parameters instead of 6, and 200 tiles is still
-where every draw turns positive (increment +0.94, worst +0.66; at 100 the worst is −0.21). And
-the combined rule at **200** tiles (+1.60) beats thresholds alone at **800** (+1.26) — adding the
-scale is worth more than quadrupling the labels.
-
-⚠️ The deployment draw was unlucky for τ alone (+0.03 against the 5-fold's +1.16), which is why
-the 5-fold is the headline and this run is the verification.
-
-⛔ **LoveDA only.** OEM, Potsdam and ConInfer are untested, and §9e gives no reason to assume `w`
-transfers across domains any better than τ did.
-
-**OEM settling run — the subsample was NOT the cause, and OEM is the wrong test.**
-`--subsample 150000` made the scales *less* stable (15.7% → **28.6%**) and the increment
-weaker (+0.95 → **+0.40 ± 1.41**). Rung A — the published baseline, independent of the
-subsample — swings **39.64 → 49.79** across folds, and per-class τ itself comes out
-**+0.40 ± 1.34** with a fold at −1.87. **384 tiles over 5 folds is 77 evaluation tiles; the
-baseline's fold variance is 10 points against an effect of 0.4.** OpenEarthMap cannot measure
-either lever. A measurement limit, not a result.
-
-⚠️ **And the two runs were never comparable.** The fold partition came from the same RNG
-stream as the pixel subsampling, so raising `--subsample` reshuffled the folds. Fixed: the
-partition is drawn first from its own stream and depends on `--seed` alone. Verified by two
-subsample settings giving identical rungs A and B. **Two settings of one knob must differ in
-that knob alone.**
-
-⭐ **Potsdam is the transfer test, not OEM** — 2016 tiles (more than LoveDA), 403 per fold,
-512² so `--cache-full` is ~6 GB and ~35 GPU-minutes. Bigger and cheaper.
-
----
-
-## 2026-09-06 (Sun) — Potsdam: a second positive, and `tree` is finally explained
-
-**C − B = +4.86 ± 0.35, 5/5 folds, mean−2sd +4.16**, on 2016 tiles with every rung exact and
-both gates passed (cache 57.87/4.68%, search subsample 0.052 vs 0.15). Every real class
-improves; catch-all-excluded **+6.00**.
-
-⭐⭐ **The finding: `tree` +21.56.** POTSDAM_RESULTS recorded in September that `tree` had the
-largest precision–recall gap in the project (**+54.7**, precision 93.34 / recall 38.63) and
-that per-class τ moved it **+0.32** — an anomaly that weakened §9g's ρ = +0.713. The
-reachability run then measured it at **96.2% reachable but 19.2% self-reachable**: nearly all
-of `tree`'s residual is below threshold *with another class winning the argmax*, so lowering
-its own threshold returns those pixels wrongly labelled. **Scaling flips the argmax and
-collects it.** Three experiments now line up: the P−R gap says a class is under-firing,
-self-reachability says whether a threshold can reach it, and the scale is what reaches the
-rest.
-
-⚠️ `tree` is 72% of the gain, but excluding it the other four real classes still average
-**+2.11** and full mIoU is **+1.27** — comparable to LoveDA. Unlike OEM, where four of eight
-classes got worse and one class *was* the effect.
-
-⭐ Calibration is cheaper here than for thresholds alone: positive at every size with worst
-draws above +4.1 from **100 tiles**. And per-class τ alone is worth only +0.15 to +0.83 on
-Potsdam — **the scale is the method here and the threshold is the ablation.**
-
-⚠️ **Two of my checks fired wrongly and both are fixed.** The stability gate included the
-catch-all, whose scale `--objective real` does not score and therefore barely identifies — it
-spread 51% while every real class sat between 2.6% and 15.3%. And instability was vetoing the
-verdict *before* the gain was read; overfitting is an unstable **gain**, not unstable
-parameters, and +4.86 ± 0.35 over five folds is not overfitting. `road` at 15.3% is still over
-my 15% bar and **the bar was not moved** — the check order was. Both changes are post-hoc and
-recorded as such.
-
-**Potsdam VERIFIED end to end: 57.60 → 63.27.** Every rung within **0.05** mIoU of its cached
-prediction, every class within 0.23. Scale **+4.92** against the 5-fold's +4.86 ± 0.35.
-⭐⭐ **`tree` 37.92 → 59.09, +21.17 measured against +21.11 predicted** — September's
-unexplained anomaly, confirmed in the pipeline.
-
-⛔ **It took two rounds, and the first was my bug.** The deploy templates hardcoded
-`confidence_threshold=0.5` into every generated config. That is SAM 3's *decoder*
-instance-confidence threshold, passed into `Sam3Processor`, and it changes `seg_logits`
-themselves — so passes 2 and 3 ran a **different model** from pass 1. First attempt: 57.60 /
-57.18 / 61.71, with rung A exact and rungs B and C off by 1.2 and 1.6.
-
-⚠️ `cfg_loveda.py` happens to use 0.5, so it was a no-op on LoveDA and §9c's published
-verification is unaffected — **the bug could only surface on a second dataset, and it did,
-the first time one was tried.** It is in `tau_deploy.py` too.
-
-⭐ **The step that mattered was eliminating the alternative.** `diagnose_vector_tau.py`
-applied the segmentor rule per pixel with no binning and matched `confusion_at` **exactly**,
-vector and scalar. Had that failed, every cached sweep in the project would have inherited
-it — the oracle bounds, the cross-validations, the +1.18 headline. Exonerating the
-arithmetic left exactly one candidate. **And the tell throughout was that rung A reproduced:
-a control that works is what makes a broken result findable.**
-
-**ConInfer: the scale is a NULL, and my pre-registered C1 is falsified.** C − B =
-**−0.10 ± 0.14**, 1/5 folds, both gates passed (36.99 exactly, conf in [0.1601, 0.9611]).
-Per-class τ reproduces §7.1a at **+2.51 ± 0.34**. Catch-all-excluded +0.27, catch-all −2.31.
-
-⭐ **The pre-registration named this branch before the run:** *"C4 holds, C1 fails → the
-scales move but buy nothing."* And they do move — `water` fitted at **7.94**, a 15.9× span —
-and buy nothing.
-
-⛔ **Worse for me than C1: the REASONING behind C2 is contradicted.** I argued the gain tracks
-the argmax-lost share. Potsdam has the **lowest** argmax-lost mass (6.10%) and the **highest**
-scale gain (+4.92); ConInfer has 8.56% and −0.10. The mechanism is withdrawn.
-
-⭐ What three datasets do show is that **the two levers substitute**: τ +2.51 / scale −0.10 on
-ConInfer, τ +0.75 / scale +4.92 on Potsdam, τ +1.16 / scale +1.16 on LoveDA. Post-hoc, three
-points, and the totals are not constant (+5.67, +2.32, +2.41) — so it is a description, not a
-law, and it needs a fourth dataset before it goes in the paper as more than that.
 
 ---
 
