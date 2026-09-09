@@ -8,7 +8,6 @@
 \usecolortheme{seahorse}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern,booktabs,graphicx,amsmath,amssymb}
-\usepackage[export]{adjustbox}
 \graphicspath{{../docs/}}
 
 \definecolor{acc}{HTML}{1F6F8B}
@@ -137,11 +136,35 @@ CPU, \best{no gradient steps}. Cost of fine-tuning: thousands of tiles, a
 training run, and the training-free property is lost.
 \end{column}
 \begin{column}{0.50\textwidth}
-\includegraphics[width=\linewidth,trim=0 {.50\height} 0 0,clip]{fig9_vocabulary.pdf}\\
-\footnotesize Indian UAV imagery, \indGSD{}. Same weights, two class lists typed
-at inference. \bad{No ground truth exists here} --- shares, not accuracy.
+\vspace{0.3em}
+\begin{block}{\small Measured, on Indian UAV imagery}
+\small
+\indTiles{} tiles, \indScenes{} openly licensed scenes, \indGSD{} --- a region
+absent from all three benchmarks. Run unchanged under two class lists typed at
+inference.
+\end{block}
+\vspace{0.2em}
+\begin{itemize}\small
+  \item \ok{The partition is stable under renaming:} \indFloodA{}\%
+        \texttt{water} vs \indFloodB{}\% \texttt{flood water};
+        \indBldgA{}\% \texttt{concrete roof} vs \indBldgB{}\% \texttt{building}.
+  \item \bad{The panels are only partly found:} \indVegA{}\% of the solar-farm
+        tile goes to one class when no word for them exists; \indSolarB{}\% with
+        \texttt{solar panel} supplied.
+\end{itemize}
 \end{column}
 \end{columns}
+\end{frame}
+
+\begin{frame}{2. Applications --- one scene, two vocabularies}
+\begin{center}
+\includegraphics[height=0.70\textheight]{fig9_vocabulary.pdf}
+\end{center}
+\footnotesize Same weights, same forward pass; only the class list differs.
+\best{Bottom:} a flooded building --- both vocabularies recover the same regions
+and only the names follow the words. \best{Top:} a photovoltaic array the
+settlement vocabulary has no word for. \bad{No ground truth exists for this
+imagery}, so these are pixel shares, not accuracy.
 \end{frame}
 
 % ===================================================================== 3
