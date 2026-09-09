@@ -7,18 +7,28 @@
 # "File not found: fig2_mechanism.pdf" happens on the day of the deadline.
 #
 #   bash scripts/make_overleaf_bundle.sh          -> ~/Desktop/overleaf_paper.zip
+#   bash scripts/make_overleaf_bundle.sh --slides   -> ~/Desktop/overleaf_slides.zip
+#
+# The slides share paper/numbers.tex and paper/refs.bib deliberately: no number
+# is typed twice, so a slide cannot disagree with the paper. The bundle must
+# therefore carry both, whichever document it is for.
 set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUT="${1:-$HOME/Desktop/overleaf_paper}"
+
+SRC=paper; NAME=overleaf_paper
+if [ "${1:-}" = "--slides" ]; then SRC=slides; NAME=overleaf_slides; shift; fi
+OUT="${1:-$HOME/Desktop/$NAME}"
 rm -rf "$OUT" "$OUT.zip"; mkdir -p "$OUT"
 
+# ⚠️ numbers.tex and refs.bib live in paper/ for BOTH documents. The slides
+# \input{../paper/numbers}; flattening rewrites that below.
 cp "$REPO/paper/numbers.tex" "$REPO/paper/refs.bib" "$OUT/"
 
 # Figures are collected from BOTH documents -- the supplementary is a separate
 # compile that shares numbers.tex and refs.bib, so it must ship in the same
 # project or its \input{numbers} fails.
-TEXFILES="$REPO/paper/main.tex"
-if [ -f "$REPO/paper/supplementary.tex" ]; then
+TEXFILES="$REPO/$SRC/main.tex"
+if [ "$SRC" = paper ] && [ -f "$REPO/paper/supplementary.tex" ]; then
   sed '/\\graphicspath/d' "$REPO/paper/supplementary.tex" > "$OUT/supplementary.tex"
   TEXFILES="$TEXFILES $REPO/paper/supplementary.tex"
   echo "  + supplementary.tex"
@@ -34,8 +44,19 @@ for f in $FIGS; do
   fi
 done
 
-# strip the graphicspath line; everything else is untouched
-sed '/\\graphicspath/d' "$REPO/paper/main.tex" > "$OUT/main.tex"
+# Flatten the two path assumptions that only hold inside the repo:
+#   \graphicspath{{../docs/}}   -> figures sit beside main.tex on Overleaf
+#   \input{../paper/numbers}    -> numbers.tex was copied to the bundle root
+#   \bibliography{../paper/refs} -> likewise
+sed -e '/\\graphicspath/d' \
+    -e 's|{\.\./paper/numbers}|{numbers}|g' \
+    -e 's|{\.\./paper/refs}|{refs}|g' \
+    "$REPO/$SRC/main.tex" > "$OUT/main.tex"
+
+if grep -q '\.\./' "$OUT/main.tex"; then
+  echo "  !! a ../ path survived flattening — Overleaf has no parent directory:" >&2
+  grep -n '\.\./' "$OUT/main.tex" >&2; exit 1
+fi
 
 cd "$(dirname "$OUT")" && zip -qr "$(basename "$OUT").zip" "$(basename "$OUT")"
 echo
@@ -43,4 +64,9 @@ echo "bundle: $OUT.zip"
 ls -1 "$OUT"
 echo
 echo "Overleaf: New Project -> Upload Project -> that .zip"
-echo "Then swap the two lines marked % TEMPLATE for the venue class."
+if [ "$SRC" = slides ]; then
+  echo "Overleaf compiler: pdfLaTeX. The reference frame needs BibTeX,"
+  echo "which Overleaf runs automatically."
+else
+  echo "Then swap the two lines marked % TEMPLATE for the venue class."
+fi
