@@ -172,6 +172,50 @@ shrink. ConInfer's reproduction gate **failed** — report LoveDA with both numb
 39.33, ours 36.99), drop their OEM row. Potsdam pre-registered at 4.29% catch-all.
 Target EarthVision 2027 (~March 2027, **unverified**); **content freeze 1 Jan 2027.**
 
+### ⭐ The objective SEPARATES — proved 11 Sep. Read @SEPARABILITY_RESULTS.md.
+
+**For a fixed argmax, a pixel predicted `c` either clears `τ_c` or becomes the catch-all — it can
+never become another real class.** So `TP_c`, `FP_c`, `FN_c` depend on `τ_c` alone and the
+**`real` objective is a sum of single-variable terms.** Measured at **exactly 0.000000** on all 19
+class-sweeps across LoveDA, Potsdam and OEM.
+⭐ **Coordinate ascent is therefore EXACT, not greedy** — one sweep per class is the global
+optimum (`rounds=1 == rounds=6` everywhere), and the cost is `N×201` rather than `201^N`.
+⛔ **It does NOT hold for `--objective all`**: the catch-all couples the vector, an explicit
+counterexample exists, and Potsdam shows `max |Δτ| = 0.0050` under `all` against `0.0000` under
+`real`. **LoveDA's 0.0000 under `all` is a coincidence of that dataset.**
+
+⚠️ **§9d's stated mechanism is WRONG and must be restated.** It says raising one threshold
+"changes every other class's optimum" — false for the real classes. ⭐ The correct version is
+stronger: *the objective separates, so each threshold is the peak of that class's own IoU curve,
+whose location depends on the full score distribution; a scalar summary such as precision does not
+locate that peak.* This also explains why the fitted thresholds are **not monotone in precision**
+(`road` 69.7% → 0.675, `barren` 50.9% → 0.375) — the curve's **shape** decides. Conclusion
+unchanged.
+
+⭐ **How much of the oracle the fit captures — put this in limitations.** Held-out real-class
+mIoU: **LoveDA 83%** (47.46→48.70 of 48.96), **Potsdam 73%**, ⛔ **OpenEarthMap 11%**
+(47.28→47.56 of 49.80). **OEM's shortfall is one class**: `water` fitted **0.710** against an
+oracle **0.240**, IoU 69.18 → **55.02**, a 14.16 loss. Fix water alone and +0.28 becomes **+2.14**.
+⚠️ **Not a sample-size problem** — OEM calibrates on 26% of its tiles against LoveDA's 12%.
+⛔ **Do not re-download OEM's full 500-tile split**: it would not fix this and would invalidate
+every recorded OEM number.
+
+⛔ **The obvious fix FAILS — tested, negative.** Three selection rules on calibration data only:
+plain argmax (deployed), inner-CV mean, and the one-standard-error rule (⭐ named as the
+principled choice *before* the run). Δ vs published: LoveDA **+1.23 / +1.23 / +0.76**, Potsdam
+**+0.90 / +1.00 / +0.55**, OEM **+0.28 / +0.15 / +0.54**. **1se is −0.19 worse than what is
+already deployed; `cv` is −0.01.** Neither helps.
+⭐ **Why:** 1se cannot distinguish *flat because uninformative* from *flat near a genuinely
+displaced optimum*. On OEM it pinned six of eight classes to the published τ; on LoveDA it dragged
+`water` 0.175 → 0.320 and lost 2.66 — **the one class that needed moving.**
+⭐⭐ **What it reframes:** OEM `water` at the published 0.100 scores **69.18** against an oracle
+69.84 — it never needed calibrating, while `road` had +3.59 available. **The open question is not
+"pick a better threshold" but "which classes should be calibrated at all?"** ⚠️ That is a
+per-class restatement of **§9f**, which returned a negative at dataset level on two datasets.
+⛔ **Do not try a fourth selection rule** — shrinkage, a different SE multiplier, a
+variance-weighted blend all founder on the same obstacle. "Do not look for a thirteenth statistic",
+one level down.
+
 ### Review presentation and the per-class table — 9–10 Sep
 
 **Two decks, both driven by `paper/numbers.tex` so no number is typed twice.**

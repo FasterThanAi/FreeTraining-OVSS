@@ -13,6 +13,46 @@ should answer it with a `grep` instead of an archaeology session.
 
 ---
 
+## 2026-09-11 (Fri) — the objective separates; the fix it suggested does not work
+
+**Read @SEPARABILITY_RESULTS.md.** One proved result, one wrong claim found, one clean negative.
+
+⭐ **The `real` objective SEPARATES across classes.** For a fixed argmax a pixel predicted `c`
+either clears `τ_c` or becomes the catch-all — never another real class — so `TP/FP/FN` for `c`
+depend on `τ_c` alone. Measured at **exactly 0.000000** on **19 class-sweeps across three
+datasets**. Consequences: coordinate ascent is **exact rather than greedy** (one sweep = six,
+everywhere), and the cost is `N×201` against `201^N` — on LoveDA **1,206 vs 6.6×10¹³**.
+⛔ **Not true for `--objective all`.** A counterexample turns up in three random tables, and
+Potsdam shows it in real data (`max |Δτ| = 0.0050` under `all`, `0.0000` under `real`). LoveDA's
+0.0000 under `all` was a coincidence — which is exactly why it was worth checking rather than
+generalising from one dataset.
+
+⚠️ **§9d's stated mechanism is false.** It claims raising one threshold "changes every other
+class's optimum". It does not. The conclusion holds; the reason needed replacing, and the
+replacement is provable rather than asserted — and it explains the non-monotonicity in precision
+that the coupling story could not.
+
+⭐ **Captured share of the oracle, held out:** LoveDA **83%**, Potsdam **73%**, ⛔ OEM **11%**.
+OEM's shortfall is **one class**: `water` fitted 0.710 against an oracle 0.240, **IoU 69.18 →
+55.02**. Its calibration curve peaks near 0.7 and its held-out curve near 0.1 — the peak was noise
+and the argmax rule followed it.
+
+⛔ **The obvious fix does not work, and I proposed it.** A one-standard-error rule — among
+thresholds statistically tied with the best, take the one nearest the published τ — was named as
+the principled choice *before* the run. Result: **−0.19 mean against what is already deployed**
+(LoveDA −0.47, Potsdam −0.35, OEM +0.26). Inner-CV averaging is −0.01, i.e. nothing.
+⭐ **The mechanism is the useful part:** 1se cannot tell *flat because uninformative* from *flat
+near a genuinely displaced optimum*. On LoveDA it dragged `water` 0.175 → 0.320 and lost 2.66 —
+the one class that actually needed to move.
+
+⭐⭐ **And it reframes the question.** OEM `water` at the published 0.100 scores 69.18 against an
+oracle 69.84 — it never needed calibrating at all, while `road` had +3.59 available. So the open
+problem is not *pick a better threshold* but *which classes should be calibrated at all* — a
+per-class restatement of §9f, which was a negative at dataset level. ⛔ Do not try a fourth
+selection rule.
+
+---
+
 ## 2026-09-10 (Thu) — the review deck, and a table that was never computed
 
 **Presentation for the mid-project review, and the per-class evidence behind the method.**
