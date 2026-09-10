@@ -78,6 +78,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import labels                                                     # noqa: E402
 from tau_oracle import confusion_at, per_class_iou, miou, NBINS   # noqa: E402
 from tau_cv import fit as fit_tau, obj_miou                       # noqa: E402
+from tau_domain import read_map                                   # noqa: E402
 
 
 # --------------------------------------------------------------------------- #
@@ -223,6 +224,20 @@ def main():
                          'exact histograms before the run refuses to report C')
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--limit', type=int, default=0)
+    # <<< SUBSTITUTION TEST: restrict the run to one stratum of the cache.
+    # The claim under test ("where the threshold collects a lot, the scale
+    # collects little") is post-hoc over three datasets. LoveDA's own domains
+    # give two more points for free -- the full cache already exists -- and
+    # they carry the widest tau-gain contrast in the project (rural +2.77 vs
+    # urban +0.10, WEEK3 §9e), so they are a sharp directional test.
+    ap.add_argument('--map', default=None,
+                    help='tile\tdomain file from confound_split.py --make-map')
+    ap.add_argument('--domain', default=None,
+                    help='keep only tiles whose --map domain is this')
+    ap.add_argument('--control', type=int, default=0, metavar='N',
+                    help='ignore --domain; draw N tiles at random instead. The '
+                         'noise floor for a stratum of that size (§9f used the '
+                         'same device). Use --seed to vary the draw.')
     ap.add_argument('--sizes', type=int, nargs='*', default=None,
                     help='ALSO run a calibration learning curve at these sizes. '
                          'The combined rule fits 2N-1 parameters where thresholds '
@@ -242,6 +257,33 @@ def main():
     files = sorted(Path(args.cache).expanduser().glob('*.npz'))
     if args.limit:
         files = files[:args.limit]
+
+    # <<< SUBSTITUTION TEST. --domain and --control are mutually exclusive: one
+    # selects a stratum, the other measures what a stratum of that size does by
+    # chance. Running both at once would silently report a random subset under a
+    # domain's name.
+    if args.domain and args.control:
+        raise SystemExit('--domain and --control are mutually exclusive.')
+    if args.domain:
+        if not args.map:
+            raise SystemExit('--domain needs --map.')
+        stems = [f.stem for f in files]
+        doms = read_map(args.map, stems)
+        want = args.domain.strip().lower()
+        seen = sorted(set(doms))
+        if want not in seen:
+            raise SystemExit(f'domain `{want}` not in the map; found {seen}.')
+        files = [f for f, d in zip(files, doms) if d == want]
+        print(f'  --domain {want}: {len(files)} of {len(stems)} tiles')
+    elif args.control:
+        if args.control > len(files):
+            raise SystemExit(f'--control {args.control} > {len(files)} tiles.')
+        pick = np.random.default_rng(args.seed + 7777).choice(
+            len(files), size=args.control, replace=False)
+        files = [files[i] for i in sorted(pick)]
+        print(f'  --control: {len(files)} tiles drawn at random (seed '
+              f'{args.seed}) — this is a NOISE FLOOR, not a stratum')
+
     T = len(files)
     if not T:
         raise SystemExit(f'no .npz under {args.cache}')

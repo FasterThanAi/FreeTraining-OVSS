@@ -498,7 +498,9 @@ not simply splitting a fixed pool.
 |---|---|
 | ✅ LoveDA, 5-fold, verified end to end | +1.16 ± 0.19 over per-class τ |
 | ✅ Calibration budget | unchanged at ~200 tiles |
-| ⛔ **Other datasets** | **untested** — OEM, Potsdam, ConInfer all still open |
+| ✅ Potsdam, 5-fold, verified end to end | **+4.86 ± 0.35** over per-class τ |
+| ✅ ConInfer (CLIP), 5-fold | **−0.10 ± 0.14** — a clean null, C1 falsified |
+| ⚠️ OpenEarthMap | **underpowered, not untested** — 384 tiles cannot resolve a ~1 mIoU effect; the baseline swings 10 points across folds |
 | ⛔ Domain transfer | untested; §9e showed τ alone does not transfer, and there is no reason to assume `w` does |
 | ⚠️ Larger families | a per-class scale is the *simplest* reordering. A general one is larger still, and unbounded by anything here |
 

@@ -425,7 +425,7 @@ per-class τ, 5/5 folds, mean−2sd = +0.78, total +2.32.** Every real class imp
 still, and the combined rule at 200 (+1.60) beats τ alone at 800 (+1.26). ⭐ The fit rediscovered
 §7.7 unprompted: `background` → 0.41, `water` → 2.55, and §7.7 found every mechanism-(B) pixel is
 water. ⚠️ Quote the **increment**, not a subsampled absolute (the subsample carries a ~0.28 offset
-that cancels in the increment). ⛔ **LoveDA only — OEM, Potsdam and ConInfer are untested.**
+that cancels in the increment). ✅ **All four cells are now measured, and the two levers SUBSTITUTE:** LoveDA +1.16 τ / **+1.16** scale, Potsdam +0.75 / **+4.92**, ConInfer **+2.51** / **−0.10** (a clean null, pre-registered, C1 falsified). ⚠️ OpenEarthMap is **underpowered, not missing** — 384 tiles swing 10 points across folds against a ~1 mIoU effect, so it cannot measure either lever. ⭐ **Where the threshold collects a lot, the scale collects nothing, and vice versa** — post-hoc over three points, NOT pre-registered, and gated on a fourth before the paper may state it.
 
 ⛔ **A TWELFTH label-free attempt, and it fails too — @REACHABILITY_RESULTS.md, 4 Sep.**
 "Reachable" discard (below τ with a real-class argmax, so a threshold can touch it) vs
