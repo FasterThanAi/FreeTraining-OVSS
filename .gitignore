@@ -33,3 +33,22 @@ logs/
 
 # editor / backup copies
 *.bak
+
+# LaTeX build artefacts (the .tex is the source of truth; the PDF is regenerable)
+slides/*.aux
+slides/*.bbl
+slides/*.blg
+slides/*.fdb_latexmk
+slides/*.fls
+slides/*.log
+slides/*.nav
+slides/*.out
+slides/*.snm
+slides/*.toc
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.fdb_latexmk
+paper/*.fls
+paper/*.log
+paper/*.out

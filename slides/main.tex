@@ -3,24 +3,22 @@
 %  Every number is a macro from paper/numbers.tex; nothing is typed twice.
 %  Build:  cd slides && latexmk -pdf main.tex     (or pdflatex x2)
 % ============================================================================
-\documentclass[aspectratio=169,10pt]{beamer}
-\usetheme{default}
-\usecolortheme{seahorse}
+\documentclass[aspectratio=169]{beamer}
+\usetheme{Boadilla}
+\usecolortheme{default}
+\usefonttheme{serif}
 \usepackage[T1]{fontenc}
-\usepackage{lmodern,booktabs,graphicx,amsmath,amssymb}
-\graphicspath{{../docs/}}
+\usepackage{xcolor,bookmark,amsmath,amssymb,graphicx,booktabs}
+\graphicspath{{../docs/}{./}}
 
-\definecolor{acc}{HTML}{1F6F8B}
-\definecolor{warn}{HTML}{C0392B}
-\definecolor{good}{HTML}{2E8B57}
-\setbeamercolor{structure}{fg=acc}
-\setbeamercolor{frametitle}{fg=white,bg=acc}
+% --- house colours, matching the department template ---------------------
+\setbeamercolor{block title}{bg=blue!70!black, fg=white}
+\setbeamercolor{block body}{bg=blue!5}
 \setbeamertemplate{navigation symbols}{}
-\setbeamertemplate{footline}[frame number]
-\setbeamertemplate{itemize items}[circle]
-\setbeamerfont{frametitle}{size=\large}
-\setbeamerfont{footnote}{size=\tiny}
-
+\setbeamertemplate{caption}{\insertcaption}
+\definecolor{acc}{HTML}{1F3F8B}
+\definecolor{warn}{HTML}{B02418}
+\definecolor{good}{HTML}{1E6B3A}
 \newcommand{\best}[1]{\textcolor{acc}{\textbf{#1}}}
 \newcommand{\bad}[1]{\textcolor{warn}{#1}}
 \newcommand{\ok}[1]{\textcolor{good}{#1}}
@@ -28,22 +26,35 @@
 \newcommand{\suppref}[1]{supplementary}
 \input{../paper/numbers}
 
-\title{Calibrating the Decision, Not the Model}
-\subtitle{Per-class thresholds and argmax scaling for training-free\\
-open-vocabulary segmentation of remote sensing imagery}
-\author{Priyanshu Kumar \and Raj Gautam \and Shounak Chakraborty \and K Sathya Babu}
-\institute{Indian Institute of Information Technology Design and Manufacturing, Kurnool}
+% --- metadata ------------------------------------------------------------
+\title[\textsc{Mid-Project Review}]
+{\textsc{Calibrating the Decision, Not the Model:\\
+Per-Class Thresholds and Argmax Scaling for Training-Free\\
+Open-Vocabulary Segmentation of Remote Sensing Imagery}}
+\subtitle{\textsc{Mid-Project Review}}
+\author[\textsc{Priyanshu Kumar}]
+{ \textsc{\textbf{Priyanshu Kumar} \quad \textbf{Raj Gautam}} \\
+  \small{under the supervision of} \\
+  \small{Dr.\ Shounak Chakraborty \& Prof.\ K Sathya Babu} }
+\institute[]
+{
+  \IfFileExists{iiitdm_kurnool.png}{\includegraphics[height=1.5cm]{iiitdm_kurnool.png}\\}{}
+  \textsc{Department of Computer Science and Engineering,\\
+  Indian Institute of Information Technology Design and Manufacturing, Kurnool}
+}
 \date{\today}
 
 \begin{document}
 
-{\setbeamertemplate{footline}{}\begin{frame}\titlepage\end{frame}}
+\frame{\titlepage}
 
-\begin{frame}{Outline}\small\tableofcontents\end{frame}
+\begin{frame}{\textsc{Presentation Outline}}
+    \small\tableofcontents[hideallsubsections]
+\end{frame}
 
 % ===================================================================== 1
 \section{Introduction}
-\begin{frame}{1. Introduction --- the task}
+\begin{frame}{\textsc{1. Introduction --- the task}}
 \textbf{Open-vocabulary semantic segmentation of aerial imagery.}
 \begin{itemize}
   \item Input: an image \emph{and a list of class names, as plain words}.
@@ -62,7 +73,7 @@ score $S_{\text{pres}}$, a dense semantic map, and instance masks. SegEarth-OV3
 fuses these and thresholds the result.
 \end{frame}
 
-\begin{frame}{1. Introduction --- the contribution in one sentence}
+\begin{frame}{\textsc{1. Introduction --- the contribution in one sentence}}
 \begin{block}{}
 A single confidence threshold is the wrong \emph{shape} for a multi-class
 open-vocabulary pipeline. Fitting \best{one threshold per class}, and
@@ -89,7 +100,7 @@ tiles, not by cache arithmetic.
 
 % ===================================================================== 2
 \section{Motivation \& Applications}
-\begin{frame}{2. Motivation --- the baseline throws land cover away}
+\begin{frame}{\textsc{2. Motivation --- the baseline throws land cover away}}
 \begin{columns}[T]
 \begin{column}{0.52\textwidth}
 On LoveDA validation, at the published $\tau=0.5$:
@@ -116,7 +127,7 @@ Whole water regions dropped to \bg{}.
 \end{columns}
 \end{frame}
 
-\begin{frame}{2. Applications --- why a cheap correction matters}
+\begin{frame}{\textsc{2. Applications --- why a cheap correction matters}}
 \begin{columns}[T]
 \begin{column}{0.48\textwidth}
 \textbf{Disaster response.} Flood extent from UAV imagery within hours. No
@@ -156,7 +167,7 @@ inference.
 \end{columns}
 \end{frame}
 
-\begin{frame}{2. Applications --- one scene, two vocabularies}
+\begin{frame}{\textsc{2. Applications --- one scene, two vocabularies}}
 \begin{center}
 \includegraphics[height=0.70\textheight]{fig9_vocabulary.pdf}
 \end{center}
@@ -169,7 +180,7 @@ imagery}, so these are pixel shares, not accuracy.
 
 % ===================================================================== 3
 \section{Problem Statement}
-\begin{frame}{3. Problem statement --- formulation}
+\begin{frame}{\textsc{3. Problem statement --- formulation}}
 Let $\mathcal{C}=\{1,\dots,N\}$ be the vocabulary and $s_c(p)\in[0,1]$ the
 score the pipeline assigns class $c$ at pixel $p$.
 
@@ -205,7 +216,7 @@ the \emph{raw} score $s_{c^\star}$, so $\boldsymbol{w}$ acts only on the
 \end{block}
 \end{frame}
 
-\begin{frame}{3. Why per-class $\tau$ is the \emph{complete} family --- and $w$ is not}
+\begin{frame}{\textsc{3. Why per-class $\tau$ is the \emph{complete}} family --- and $w$ is not}
 \textbf{Claim.} Given a fixed \texttt{argmax}, any strictly increasing per-class
 recalibration $g_c$ composed with a global $\tau$ collapses to a per-class
 threshold vector:
@@ -234,7 +245,7 @@ addresses.
 
 % ===================================================================== 4
 \section{Literature Survey}
-\begin{frame}{4. Literature survey --- the lineage (1/2)}
+\begin{frame}{\textsc{4. Literature survey --- the lineage (1/2)}}
 \scriptsize
 \begin{tabular}{@{}p{2.5cm}p{2.0cm}p{8.4cm}@{}}
 \toprule
@@ -252,7 +263,7 @@ GroupViT \cite{groupvit} & CVPR 2022 & Learns segment grouping from text supervi
 \end{tabular}
 \end{frame}
 
-\begin{frame}{4. Literature survey --- direct competitors and tools (2/2)}
+\begin{frame}{\textsc{4. Literature survey --- direct competitors and tools (2/2)}}
 \scriptsize
 \begin{tabular}{@{}p{2.5cm}p{2.0cm}p{8.4cm}@{}}
 \toprule
@@ -276,7 +287,7 @@ LoveDA \cite{loveda} / OEM \cite{openearthmap} & NeurIPS'21 / WACV'23 & The benc
 
 % ===================================================================== 5
 \section{Research Gaps}
-\begin{frame}{5. Research gaps}
+\begin{frame}{\textsc{5. Research gaps}}
 \begin{enumerate}
   \item \best{The decision rule is unexamined.} Every method in this family ends
         in \texttt{argmax} + one global $\tau$, tuned per dataset. All effort
@@ -301,7 +312,7 @@ LoveDA \cite{loveda} / OEM \cite{openearthmap} & NeurIPS'21 / WACV'23 & The benc
 
 % ===================================================================== 6
 \section{Objectives}
-\begin{frame}{6. Objectives}
+\begin{frame}{\textsc{6. Objectives}}
 \begin{enumerate}
   \item \textbf{Reproduce} SegEarth-OV3 exactly, so every later number is
         measured against a baseline that runs on our hardware.
@@ -322,7 +333,7 @@ LoveDA \cite{loveda} / OEM \cite{openearthmap} & NeurIPS'21 / WACV'23 & The benc
 
 % ===================================================================== 7
 \section{Experimental Setup \& Results}
-\begin{frame}{7. Experimental setup}
+\begin{frame}{\textsc{7. Experimental setup}}
 \begin{columns}[T]
 \begin{column}{0.52\textwidth}
 \textbf{Datasets}
@@ -364,7 +375,7 @@ LoveDA \cite{loveda} / OEM \cite{openearthmap} & NeurIPS'21 / WACV'23 & The benc
 \end{columns}
 \end{frame}
 
-\begin{frame}{7. Results --- both levers, five-fold}
+\begin{frame}{\textsc{7. Results --- both levers, five-fold}}
 \begin{center}\small
 \begin{tabular}{lcccc}
 \toprule
@@ -391,7 +402,7 @@ Folds positive              & 5/5 & 5/5 & --- & 5/5 \\
 \end{itemize}
 \end{frame}
 
-\begin{frame}{7. Results --- the method, visually}
+\begin{frame}{\textsc{7. Results --- the method, visually}}
 \begin{center}
 \includegraphics[height=0.72\textheight]{fig8_qualitative.pdf}
 \end{center}
@@ -401,7 +412,7 @@ mIoU} and is included deliberately: the five-fold gain is
 \scPots{}$\pm$\scPotsSD{}, an \emph{average}.
 \end{frame}
 
-\begin{frame}{7. Results --- what cannot be done without labels}
+\begin{frame}{\textsc{7. Results --- what cannot be done without labels}}
 \begin{columns}[T]
 \begin{column}{0.55\textwidth}
 \textbf{12 label-free rules tested. All fail.}
@@ -429,7 +440,7 @@ one value is wrong for different classes \emph{in opposite directions}.
 \end{columns}
 \end{frame}
 
-\begin{frame}{7. Honest limitations}
+\begin{frame}{\textsc{7. Honest limitations}}
 \begin{itemize}
   \item \bad{Thresholds do not transfer across a domain shift.} Fitted on
         LoveDA-rural, applied to urban: \bad{$-1.11$ mIoU} --- \emph{worse than
@@ -452,13 +463,13 @@ reach it.
 
 % ===================================================================== 8
 \section{References}
-\begin{frame}[allowframebreaks]{8. References}
+\begin{frame}[allowframebreaks]{\textsc{8. References}}
 \scriptsize
 \bibliographystyle{ieeetr}
 \bibliography{../paper/refs}
 \end{frame}
 
-\begin{frame}{Summary}
+\begin{frame}{\textsc{Summary}}
 \begin{block}{What was built}
 Not a new architecture. \best{Two lines of arithmetic} on top of an existing
 pipeline: a per-class threshold vector and a per-class scale before the
@@ -474,6 +485,13 @@ pipeline: a per-class threshold vector and a per-class scale before the
 \end{itemize}
 \vspace{0.5em}
 \centering\textbf{Target venue: IEEE Transactions on Geoscience and Remote Sensing}
+\end{frame}
+
+\begin{frame}{\textsc{}}
+    \centering
+    \vspace{2cm}
+    \Huge
+    \textbf{Thank You}
 \end{frame}
 
 \end{document}
