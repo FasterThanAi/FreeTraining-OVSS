@@ -13,6 +13,72 @@ should answer it with a `grep` instead of an archaeology session.
 
 ---
 
+## 2026-09-10 (Thu) — the review deck, and a table that was never computed
+
+**Presentation for the mid-project review, and the per-class evidence behind the method.**
+
+**`slides/review.tex`** — a second, shorter deck beside the full one, following the committee's
+mandated eight sections. Restyled to the department's Boadilla template (small-caps titles, blue
+blocks, the Telugu/Hindi masthead). Rewritten for a formal register after the first draft read as
+conversational.
+
+⭐ **Objectives split into completed and in-progress on purpose.** Reproduce / quantify / design
+are done; the scene-adaptive formulation, the head-fusion question and wider transfer are open.
+A review deck that presents the work as finished invites the question of why it is still running.
+
+**`slides/speaker_notes.tex`** — one entry per slide: purpose, the lines to deliver, and the
+question most likely to follow with an answer. The failure tile and the partial solar detection
+are both marked *point at this before anyone else does*.
+
+⭐ **`scripts/pr_table.py`** — per-class precision / recall / IoU under each rule. Every result in
+this project is reported as IoU, which hides the mechanism; only `water` and `road` had ever been
+recorded by hand. The full LoveDA table reproduces the deployment run exactly (47.16 → 48.35) and
+makes the argument visible:
+
+| | precision | recall | fitted τ |
+|---|---|---|---|
+| `water` | 89.7 → 86.3 | 54.0 → **63.2** | 0.5 → **0.175** |
+| `road` | 69.7 → **73.4** | 70.6 → 66.3 | 0.5 → **0.675** |
+
+**Four classes move down, two move up, spread 0.175–0.675.** ⭐ And the ordering is **not monotone
+in precision** — `barren` at 50.9 precision takes 0.375 while `road` at 69.7 takes 0.675 — which is
+§9d's coupling result reproduced independently, and the reason no per-class formula replaces the
+search.
+
+⚠️ **`road` −0.54 and `agricultural` −0.25 are real per-class losses** accepted because the mean
+improved. Report the table, never the mean alone.
+
+**Bugs of mine, both from guessing instead of reading:**
+
+- `pr_table` read `L.bg_idx`, which does not exist. `Labels` exposes `.bg` — the catch-all's **mask
+  value**, 1-indexed because 0 is no-data — and every other consumer converts with `bg-1`. Guessing
+  an attribute name from a sibling script rather than from `labels.py` is what broke it.
+- The institute logo sat in `slides/` on the Mac and never reached the workstation: `.gitignore`
+  has a blanket `*.png`, so `git status` never showed it. Exempted by name. Also renamed
+  `iiitk _name with logo.png` — a space in a filename is fragile in `graphicx`.
+
+---
+
+## 2026-09-09 (Wed) — the full presentation, and a LaTeX trap
+
+**`slides/main.tex`** — 8-section deck to the committee's mandated structure, 19 works cited
+against a minimum of 10. ⛔ **No number typed in it**: every figure is a macro from
+`paper/numbers.tex`, so a slide cannot disagree with the manuscript.
+
+**`scripts/make_overleaf_bundle.sh --slides`** — the workstation's TeX Live had no `beamer.cls`
+until `texlive-latex-recommended` went in, so the bundler learned to flatten the slides too. It
+rewrites `\input{../paper/numbers}` and `\bibliography{../paper/refs}` alongside the existing
+`\graphicspath` strip, and **refuses to ship a bundle in which any `../` survived** — Overleaf has
+no parent directory, and that failure surfaces as a missing file on the day it is needed.
+
+⚠️ **`trim=0 {.50\height} 0 0` is invalid** in `\includegraphics`. `\height` is an `adjustbox`
+key, not a length `graphicx`'s `trim` accepts, and loading `adjustbox[export]` does not change
+that. Beamer stopped at a `?` prompt rather than failing cleanly, which turned one error into a
+cascade of `.cls not found` messages. Removed, and the India figure got its own full slide —
+better design than the crop it replaced.
+
+---
+
 ## 2026-09-08 (Tue) — the application section, on Indian imagery
 
 **Two figures rendered, the deployment and India sections written, venue fixed on TGRS.**

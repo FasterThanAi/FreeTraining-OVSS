@@ -172,6 +172,36 @@ shrink. ConInfer's reproduction gate **failed** — report LoveDA with both numb
 39.33, ours 36.99), drop their OEM row. Potsdam pre-registered at 4.29% catch-all.
 Target EarthVision 2027 (~March 2027, **unverified**); **content freeze 1 Jan 2027.**
 
+### Review presentation and the per-class table — 9–10 Sep
+
+**Two decks, both driven by `paper/numbers.tex` so no number is typed twice.**
+`slides/main.tex` is the full version; **`slides/review.tex` is the one to use for the
+mid-project review** — shorter, styled to the department's Boadilla template, and following the
+committee's mandated eight sections. `slides/speaker_notes.tex` gives one entry per slide with the
+lines to deliver and the likely question.
+⭐ **Objectives are split into completed and in-progress deliberately** (reproduce / quantify /
+design are done; scene-adaptive parameters, head fusion and wider transfer are open). ⛔ Do not
+present the project as finished in a review deck.
+⚠️ `scripts/make_overleaf_bundle.sh --slides` bundles the slides for Overleaf, flattening
+`\input{../paper/numbers}` and `\bibliography{../paper/refs}` and refusing any surviving `../`.
+
+⭐ **`scripts/pr_table.py` — per-class precision / recall / IoU under each rule.** Everything else
+here is reported as IoU, which hides the mechanism. The LoveDA table reproduces the deployment run
+exactly (47.16 → 48.35) and shows the argument directly: `water` 0.5 → **0.175** trading precision
+89.7 → 86.3 for recall 54.0 → **63.2**; `road` 0.5 → **0.675** trading the other way (69.7 →
+**73.4** / 70.6 → 66.3). **Four classes move down, two up, spread 0.175–0.675.**
+⭐ **The ordering is NOT monotone in precision** — `barren` at 50.9 takes 0.375 while `road` at
+69.7 takes 0.675 — reproducing §9d's coupling result independently, and it is the cleanest answer
+to *"why not derive the threshold from precision?"*
+⚠️ **`road` −0.54 and `agricultural` −0.25 are real per-class losses**, accepted because the mean
+improved. Quote the table, never the mean alone.
+⚠️ Rung C needs a `--cache-full` run: a scale changes the argmax and a histogram cache fixes it.
+
+⚠️ **Two absolute LoveDA figures exist and must not be conflated.** The 5-fold total is
+**+2.32** (+1.18 τ, +1.16 scale). The end-to-end verified deployment run is **47.65 → 49.02** on
+1469 held-out tiles — **+1.37**, because lever 1 contributed only +0.03 on that particular
+200-tile draw. Different protocols; quote them separately, with the spread.
+
 ### Demo, application figures and the venue — 7–8 Sep
 
 **The paper now has an application section and two result figures, and the venue is settled.**
