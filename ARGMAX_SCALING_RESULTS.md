@@ -483,9 +483,26 @@ nothing; where the threshold collects little, the scale collects a great deal.**
 +2.51 / −0.10 and Potsdam's +0.75 / +4.92 are the two extremes; LoveDA's +1.16 / +1.16 sits
 between them.
 
+> ⛔⛔ **RETIRED 11 Sep — refuted on its first committed prediction. @SUBSTITUTION_RESULTS.md.**
+> LoveDA's own domains carry a **35×** spread in the τ gain (rural +2.77, urban +0.08). If the
+> levers substituted, their scale gains had to differ. They are **+1.22 and +1.25** — a
+> difference of **+0.03 against a standard error of 0.35**, where the effect substitution was
+> read off spans 5 points. **A refutation from power, not a null from weakness.** Substitution
+> goes the way of the argmax-lost mechanism it replaced, and is not to be quoted.
+>
+> ⭐ **What the same run found instead: the levers are INDEPENDENT.** The scale gain is
+> invariant to what the threshold collected, consistent with the two acting on disjoint error
+> mass — τ on the 94.0% below threshold, `w` on the 6.0% lost at the argmax plus the 9.9%
+> confused with a real class. ⚠️ Two strata of one dataset; it inherits the same gate.
+
+<details>
+<summary>The claim as written before it was tested (retained — the caveat was right)</summary>
+
 ⚠️ **Stated as an observation over three points, not a law.** It is post-hoc — it was not
 pre-registered, and the pre-registered mechanism failed. It should be tested on a fourth
 dataset before it appears in the paper as anything more than a description of these three.
+
+</details>
 
 ⚠️ Note also that the *totals* are not constant (+5.67, +2.32, +2.41), so the two levers are
 not simply splitting a fixed pool.

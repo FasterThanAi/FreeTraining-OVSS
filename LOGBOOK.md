@@ -13,6 +13,36 @@ should answer it with a `grep` instead of an archaeology session.
 
 ---
 
+## 2026-09-11 (Thu) — substitution refuted, and urban comes back
+
+**@SUBSTITUTION_RESULTS.md.** Four `argmax_reorder.py` arms off the existing 1669-tile
+`--cache-full`, no GPU: rural (992), urban (677), and random controls at both sizes.
+Predictions committed in `prereg/predict_substitution_domains.md` (`1b5ad24`) first.
+
+⛔ **Substitution is dead.** Rural and urban span **35×** in τ gain (+2.77 vs +0.08) and their
+scale gains are **+1.22 ± 0.53** and **+1.25 ± 0.56** — a **+0.03** difference against se
+**0.35**, where the three-dataset range substitution was read off spans 5 points. **Refuted
+with power**, not a null from weakness. Retired in place in `ARGMAX_SCALING_RESULTS.md` with
+the original text folded into a `<details>`, same as the argmax-lost mechanism before it.
+
+⭐⭐ **The real find: urban is repaired.** On identical folds, lever 1 gives +0.08 ± 0.22
+(2/5, fails the gate) and **lever 2 gives +1.25 ± 0.56 (5/5, passes)**. The standing
+"+1.18 is a rural result" caveat now scopes to lever 1 only. Per-domain totals **rural +3.99,
+urban +1.33**, both positive in both metrics.
+
+⭐ **Free reproduction of §9e** — rural τ +2.77 ± 0.92, identical, through a different script,
+cache and fold partition. ⭐ The fitted `w` differs between domains on **`forest` alone**
+(2.43 vs 1.33, 1.83×; six others within 25%), which is §9g's "opposite regimes" class —
+recovered with no domain labels. ⛔ So `w` does not transfer either.
+
+⚠️ Also fixed two stale status lines claiming OEM/Potsdam/ConInfer were untested for lever 2;
+all three were measured 6 Sep (OEM underpowered, not missing). ⚠️ And a fourth instance of
+generated verdict prose contradicting its own table — the `--control` arms are told they may
+be reading "a partial or mixed cache" when the randomness is the design.
+
+**Next:** verify urban's +1.25 end-to-end in the segmentor (§9c's rule), then lever 3 —
+per-class head fusion, the only remaining global choice SegEarth-OV3 makes.
+
 ## 2026-09-11 (Fri) — the objective separates; the fix it suggested does not work
 
 **Read @SEPARABILITY_RESULTS.md.** One proved result, one wrong claim found, one clean negative.

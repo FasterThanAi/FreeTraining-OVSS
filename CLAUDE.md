@@ -172,6 +172,38 @@ shrink. ConInfer's reproduction gate **failed** — report LoveDA with both numb
 39.33, ours 36.99), drop their OEM row. Potsdam pre-registered at 4.29% catch-all.
 Target EarthVision 2027 (~March 2027, **unverified**); **content freeze 1 Jan 2027.**
 
+### ⭐⭐ URBAN IS REPAIRED — lever 2 works where lever 1 fails. @SUBSTITUTION_RESULTS.md, 11 Sep.
+
+⛔ The standing caveat — *"the +1.18 is a RURAL result; urban is not distinguishable from zero"* —
+**is now scoped to lever 1 only.** On the identical 677 urban tiles and identical folds:
+
+| LoveDA urban | mean | sd | folds+ | gate (`mean−2sd>0` and 5/5) |
+|---|---|---|---|---|
+| lever 1 — per-class τ | +0.08 | 0.22 | 2/5 | ⛔ fail |
+| ⭐ **lever 2 — per-class scale** | **+1.25** | **0.56** | **5/5** | ✅ **PASS** |
+
+⭐ **Per-domain totals: rural +3.99, urban +1.33** — positive on both halves of LoveDA under the
+project's own gate, and in **both** metrics (rural full +1.22 / excluded **+1.96**; urban +1.25 /
++1.37). ⚠️ Rural's catch-all pays −3.20, so rural's excluded figure is the larger one.
+⚠️ **Still quote the breakdown** — the claim narrows from *"urban does not work"* to *"on urban the
+gain comes from the second lever"*, it does not disappear.
+✅ **§9e reproduced for free**: rural τ +2.77 ± 0.92, identical to §9e, through a different script,
+cache and fold partition.
+⭐ **`water` and `forest` carry both domains** — §9g's 85%-of-the-gap classes — and the fitted `w`
+differs between domains on `forest` alone (**2.43 rural vs 1.33 urban, 1.83×**; six of seven other
+classes agree within 25%), matching §9g's "opposite regimes" (recall 9.9 vs 68.9). ⛔ **`w` does
+not transfer across domains either** — the calibrate-on-your-own-distribution rule now covers both
+levers.
+⚠️ **A cached-histogram prediction.** §9c's rule applies: verify end-to-end in the segmentor before
+it is written up.
+⚠️ **Random controls bound VARIANCE, not effect** — a random LoveDA subset genuinely has the gain,
+so its mean is positive by construction. They show a stratum has ~half a random draw's fold spread
+(0.53/0.56 vs 1.21/0.93) and that both controls fail the gate the strata pass. The urban claim
+rests on the lever-vs-lever comparison on shared folds, not on them.
+⚠️ ⛔ **`argmax_reorder.py`'s verdict prose is wrong on `--control` arms** — it calls an
+intentionally random draw a "partial or mixed cache". Fourth occurrence of this failure mode
+(WEEK3 §11). Tables correct, prose wrong; do not quote a control arm's verdict section.
+
 ### ⭐ The objective SEPARATES — proved 11 Sep. Read @SEPARABILITY_RESULTS.md.
 
 **For a fixed argmax, a pixel predicted `c` either clears `τ_c` or becomes the catch-all — it can
@@ -425,7 +457,7 @@ per-class τ, 5/5 folds, mean−2sd = +0.78, total +2.32.** Every real class imp
 still, and the combined rule at 200 (+1.60) beats τ alone at 800 (+1.26). ⭐ The fit rediscovered
 §7.7 unprompted: `background` → 0.41, `water` → 2.55, and §7.7 found every mechanism-(B) pixel is
 water. ⚠️ Quote the **increment**, not a subsampled absolute (the subsample carries a ~0.28 offset
-that cancels in the increment). ✅ **All four cells are now measured, and the two levers SUBSTITUTE:** LoveDA +1.16 τ / **+1.16** scale, Potsdam +0.75 / **+4.92**, ConInfer **+2.51** / **−0.10** (a clean null, pre-registered, C1 falsified). ⚠️ OpenEarthMap is **underpowered, not missing** — 384 tiles swing 10 points across folds against a ~1 mIoU effect, so it cannot measure either lever. ⭐ **Where the threshold collects a lot, the scale collects nothing, and vice versa** — post-hoc over three points, NOT pre-registered, and gated on a fourth before the paper may state it.
+that cancels in the increment). ✅ **All four cells are now measured, and the two levers SUBSTITUTE:** LoveDA +1.16 τ / **+1.16** scale, Potsdam +0.75 / **+4.92**, ConInfer **+2.51** / **−0.10** (a clean null, pre-registered, C1 falsified). ⚠️ OpenEarthMap is **underpowered, not missing** — 384 tiles swing 10 points across folds against a ~1 mIoU effect, so it cannot measure either lever. ⛔ **The "levers substitute" reading is RETIRED — refuted 11 Sep, @SUBSTITUTION_RESULTS.md.** LoveDA's domains span **35×** in τ gain (rural +2.77, urban +0.08) and their scale gains are **+1.22 / +1.25** — a **+0.03** difference against se **0.35**, where substitution's own range is 5 points. A refutation from power. ⭐ **They are INDEPENDENT**: the scale gain is invariant to what the threshold collected, consistent with disjoint error mass (τ → the 94.0% below threshold; `w` → the 6.0% argmax-lost + 9.9% real-class confusion). ⚠️ Two strata of one dataset — same gate, needs a fourth.
 
 ⛔ **A TWELFTH label-free attempt, and it fails too — @REACHABILITY_RESULTS.md, 4 Sep.**
 "Reachable" discard (below τ with a real-class argmax, so a threshold can touch it) vs
