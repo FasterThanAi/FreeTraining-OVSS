@@ -1,0 +1,452 @@
+% ============================================================================
+%  Speaker notes for review.tex --- one entry per slide.
+%  Build:  cd slides && latexmk -pdf speaker_notes.tex
+%  ⛔ No number is typed here either; macros come from paper/numbers.tex.
+% ============================================================================
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,xcolor,amsmath,booktabs,enumitem,titlesec}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
+
+\definecolor{acc}{HTML}{1F3F8B}
+\definecolor{warn}{HTML}{B02418}
+\newcommand{\best}[1]{\textcolor{acc}{\textbf{#1}}}
+\newcommand{\bad}[1]{\textcolor{warn}{#1}}
+\newcommand{\ok}[1]{\textcolor{acc}{#1}}
+\newcommand{\bg}{\texttt{background}}
+\newcommand{\suppref}[1]{}
+\input{../paper/numbers}
+
+\titleformat{\section}{\large\bfseries\color{acc}}{\thesection.}{0.6em}{}
+\newcommand{\why}[1]{\par\smallskip\noindent\textbf{Why this slide exists.} #1}
+\newcommand{\say}[1]{\par\smallskip\noindent\textbf{What to say.} #1}
+\newcommand{\ask}[2]{\par\smallskip\noindent\textbf{Likely question:} \emph{#1}\\
+  \textbf{Answer:} #2}
+\newcommand{\care}[1]{\par\smallskip\noindent\bad{\textbf{Be careful.}} #1}
+
+\title{\textbf{Mid-Project Review --- Speaker Notes}\\
+\large Per-Class Threshold Calibration for Training-Free Open-Vocabulary\\
+Semantic Segmentation of Remote Sensing Imagery}
+\author{Priyanshu Kumar \and Raj Gautam}
+\date{Companion to \texttt{review.pdf}}
+
+\begin{document}
+\maketitle
+
+\noindent\textbf{How to use this.} One entry per slide, in order. Each gives the
+purpose of the slide, the line of argument to deliver, and the question most
+likely to follow. Total speaking time at this level of detail is roughly
+\textbf{18--22 minutes}, which leaves room for discussion in a thirty-minute slot.
+
+\medskip
+\noindent\best{The single thread running through the talk:} the pipeline is not
+wrong about \emph{what} it sees; it is wrong about \emph{when to commit}. Every
+slide either establishes that, quantifies it, or corrects it.
+
+% ---------------------------------------------------------------- 1
+\section{Title}
+\say{Give the title, the two of you, and the supervisors. One sentence of
+orientation: ``This work improves an existing open-vocabulary segmentation
+pipeline for aerial imagery without training any network weights.'' Then move
+on --- do not explain the method here.}
+
+\section{Presentation Outline}
+\say{Read the eight section names in about ten seconds. The purpose is to signal
+that the mandated structure is followed, not to summarise.}
+
+% ---------------------------------------------------------------- 2
+\section{Introduction}
+\why{The committee may not know this sub-field. Three things must land before
+anything else: what the task is, what the baseline does, and what we changed.}
+
+\say{``In ordinary semantic segmentation the class list is fixed at training
+time. In \emph{open-vocabulary} segmentation the class list is an \emph{input} ---
+you supply words at inference, and the model segments them. No weights are
+trained; the vocabulary can change from one image to the next.''
+
+\smallskip
+``Our baseline is SegEarth-OV3, which applies Meta's SAM~3 to remote sensing. For
+each word you give it, SAM~3 returns a score map. The pipeline then takes the
+highest-scoring class per pixel, and if that score is below a threshold $\tau$ it
+discards the answer and calls the pixel `background'.''
+
+\smallskip
+``We reproduced their published result exactly --- \best{47.38 against a
+published 47.4} --- so every number after this is measured against a baseline we
+control, on our own hardware.''
+
+\smallskip
+``Our contribution is to that final decision: one threshold per class, and one
+scale per class before the comparison. \best{No weights are trained.}''}
+
+\ask{Why not just train the model?}{Because the setting is training-free by
+definition: the class list is not known in advance, so there is nothing fixed to
+train for. Fine-tuning also needs labelled data in the thousands of tiles, which
+is exactly what a new region does not have.}
+
+\care{Do not say ``unsupervised''. The vocabulary is given, so the correct terms
+are \emph{training-free} and \emph{annotation-free}.}
+
+% ---------------------------------------------------------------- 3
+\section{Motivation --- the baseline discards land cover}
+\why{This is the slide that justifies the entire project. If the committee
+accepts that a large, recoverable residual exists and that no simple fix reaches
+it, everything downstream follows.}
+
+\say{``We instrumented the baseline to ask a question its own paper does not:
+how much real land cover does it throw away? On LoveDA, at their own published
+threshold, \best{29.68\% of all real-class pixels} --- 323 million --- are
+assigned to the catch-all class.''
+
+\smallskip
+``More precisely: the pipeline is not mostly \emph{wrong}, it is mostly
+\emph{silent}. Discard exceeds genuine class confusion by three to one.''
+
+\smallskip
+``The clearest case is \texttt{water}. Precision \best{89.5\%}, recall
+\best{54.7\%}. When it says water it is right nine times out of ten --- and it
+finds barely half the water in the image. Those missing pixels are not
+misclassified. They fall below the threshold and are discarded.''
+
+\smallskip
+``The obvious response is to lower the threshold. We tried it: \bad{$-5.54$
+mIoU}, because you gain 1.73 wrong pixels for every right one. We also tried
+removing the presence gate: \bad{$-11.97$}. Both global adjustments cost more
+than they return.''
+
+\smallskip
+``So the correction cannot be global. \best{It has to act per class} --- which is
+the rest of the talk.''}
+
+\ask{Isn't a low recall just the model being bad at water?}{No, and the precision
+number is why. A model that is genuinely bad at a class is wrong when it fires.
+This one is right 89.5\% of the time it fires. The information is present; the
+decision rule refuses to use it.}
+
+% ---------------------------------------------------------------- 4
+\section{Motivation --- the discard, visualised}
+\why{The previous slide is numbers. This is the same fact as a picture, and it is
+what people remember.}
+
+\say{``Four panels, one LoveDA tile. Input, ground truth, the baseline's
+prediction, and in the last panel the pixels it sent to background.''
+
+\smallskip
+``Look at the ground truth: the top of the tile is water. Look at the
+prediction: that region is gone. And in the last panel you can see it was
+\emph{discarded}, not confused with another class --- \best{19\% of this single
+tile}.''
+
+\smallskip
+``The threshold that caused this was tuned for the dataset as a whole. It is a
+reasonable value on average and the wrong value for water.''}
+
+\ask{Is this tile representative?}{It is one tile chosen to show the mechanism
+clearly. The dataset-wide figure is the 29.68\% on the previous slide, measured
+over all 1669 validation images.}
+
+% ---------------------------------------------------------------- 5
+\section{Application domains}
+\why{Establishes that the training-free setting is not an academic convenience
+but the operational reality in several domains.}
+
+\say{``Where does an open vocabulary actually matter? Three cases.''
+
+\smallskip
+``\textbf{Disaster response.} After a flood you have UAV imagery within hours and
+no labelled data for that district. You cannot train anything in time.''
+
+\smallskip
+``\textbf{Infrastructure.} A class like \texttt{solar panel} appears in no
+land-cover benchmark. Here you can simply type it.''
+
+\smallskip
+``\textbf{Settlement mapping.} The vocabulary changes between surveys ---
+\texttt{tin roof}, \texttt{unpaved road}, \texttt{water tank}.''
+
+\smallskip
+``The relevant number is the deployment cost: our correction needs
+\best{about \calibTiles{} labelled tiles and no training run}. Fine-tuning
+instead would need thousands of labelled tiles and would forfeit the
+training-free property that made the pipeline attractive.''}
+
+% ---------------------------------------------------------------- 6
+\section{Problem statement --- formulation}
+\why{The committee asked for a mathematical formulation. This slide is that, and
+it should take under two minutes.}
+
+\say{``$s_c(p)$ is the score class $c$ gets at pixel $p$. The baseline takes the
+\texttt{argmax} --- the highest-scoring class --- and keeps it only if that score
+clears one global $\tau$; otherwise the pixel becomes the catch-all class $b$.''
+
+\smallskip
+``\texttt{argmax} simply means `which class scored highest'. \texttt{max} gives
+the value, \texttt{argmax} gives which one it was.''
+
+\smallskip
+``We change two things. First, $\tau$ becomes a \emph{vector}: each class gets
+its own threshold. Second, we multiply each class's score by a fitted weight
+$w_c$ \emph{before} the comparison, so the weight can change \emph{which} class
+wins.''
+
+\smallskip
+``Both are fitted by coordinate ascent on about \calibTiles{} labelled tiles, and
+--- this is the point --- \best{no network weights are modified}. The threshold
+is applied to the raw score, so $w$ only affects the \texttt{argmax}.''}
+
+\ask{Isn't fitting on labelled data just supervision through the back door?}{The
+baseline already tunes its single $\tau$ on labelled data --- 0.5 for LoveDA, 0.1
+for OpenEarthMap. We spend the same kind of budget on $N$ parameters instead of
+one. It is the same protocol, not a new one.}
+
+% ---------------------------------------------------------------- 7
+\section{Completeness of the per-class threshold family}
+\why{\best{This is the intellectual core of the work.} If a committee member asks
+``what is actually novel here?'', this slide is the answer. Do not rush it.}
+
+\say{``A natural objection is: why thresholds? Why not recalibrate the scores in
+some cleverer way?''
+
+\smallskip
+``The proposition answers that. Take \emph{any} strictly increasing per-class
+transformation of the scores, and compare against a global threshold. Because the
+transformation is increasing, you can invert it --- and the comparison becomes
+exactly a per-class threshold.''
+
+\smallskip
+``So \best{per-class thresholds are not one option among many. They are the
+complete family} of everything reachable by rescaling scores \emph{after} the
+\texttt{argmax}. Nothing in that family can beat them.''
+
+\smallskip
+``Scaling \emph{before} the \texttt{argmax} is different, because it changes
+which class wins. That is a strictly larger family --- and it is not decoration.
+We measured that \best{6\% of discarded pixels are cases where the catch-all
+class won the \texttt{argmax} outright}. A threshold cannot change an
+\texttt{argmax}, so no threshold anywhere can fix those. That is precisely what
+the second parameter set is for.''}
+
+\ask{So the second lever subsumes the first --- why keep both?}{They are fitted
+together and reported as two stages so the contribution of each is visible. The
+first stage is also the one with the completeness guarantee, which is worth
+stating separately.}
+
+% ---------------------------------------------------------------- 8
+\section{Literature survey}
+\why{Committee requirement: a minimum of ten works. Fourteen are listed.}
+
+\say{Do not read the table. Walk the three groups in about a minute:
+
+\begin{itemize}[nosep,leftmargin=1.4em]
+  \item \textbf{Rows 1--7} --- how dense prediction was extracted from
+        vision--language models: CLIP, then MaskCLIP removing pooling, then a
+        line of attention corrections.
+  \item \textbf{Rows 8--11} --- the remote-sensing line, ending at our baseline
+        SegEarth-OV3, and ConInfer as the nearest contemporary work.
+  \item \textbf{Rows 12--14} --- the tools we borrow: calibration, classical
+        thresholding, classical spatial refinement.
+\end{itemize}}
+
+\care{You have read SegEarth-OV3, ConInfer and SAM~3 in full. If asked about a
+row you have only skimmed, say so plainly and describe what it contributes ---
+that is a normal and acceptable answer.}
+
+% ---------------------------------------------------------------- 9
+\section{Research gaps}
+\why{Connects the literature to the contribution. Each gap should map to
+something the work then does.}
+
+\say{``\textbf{Gap one.} Every method in this family ends the same way: an
+\texttt{argmax}, then one global threshold. All the research effort goes into
+producing better \emph{scores}. Nobody has asked whether the \emph{rule} applied
+to those scores is the right shape.''
+
+\smallskip
+``\textbf{Gap two.} Papers report mIoU. None reports how much real land cover
+ends up in the catch-all class, or whether it can be recovered. We measured it.''
+
+\smallskip
+``\textbf{Gap three.} mIoU averages classes \emph{equally}. So a `background'
+class --- which in LoveDA means `everything else' --- owns one seventh of the
+score regardless of whether it means anything. A method can appear to improve or
+degrade while land-cover quality is unchanged. We observed this in both
+directions and therefore report two metrics throughout.''}
+
+% ---------------------------------------------------------------- 10
+\section{Objectives}
+\why{Separates what is finished from what is not. \best{Do not present the
+project as complete.}}
+
+\say{``Three objectives are met. Reproduce the baseline exactly, so our numbers
+mean something. Quantify what it discards and test whether any global
+adjustment recovers it --- none does. And design a correction that trains no
+weights.''
+
+\smallskip
+``Three remain open. The fitted parameters are currently \emph{constant across
+tiles}, so they are right on average and can be wrong on an individual scene; a
+scene-adaptive version is the natural next step. SAM~3's two heads are combined
+by a fixed maximum, which is another unexamined decision of the same kind. And
+the evaluation needs widening to establish when the correction transfers.''}
+
+\ask{What is the biggest remaining risk?}{Transfer. The fitted parameters are
+specific to a data distribution, so a deployment must calibrate on the
+distribution it will run on. Characterising that boundary properly is the main
+open item.}
+
+% ---------------------------------------------------------------- 11
+\section{Experimental setup}
+\why{Establishes that the evaluation is complete and honest before any result is
+shown.}
+
+\say{``Three datasets, and \best{every image in each is used}. LoveDA
+validation is 1669 tiles at 0.3\,m; Potsdam is 2016 tiles at 5\,cm;
+OpenEarthMap is \oemTiles{} tiles.''
+
+\smallskip
+``Two points about the protocol matter. \best{Calibration and evaluation tiles
+are always disjoint} --- we never fit and test on the same image. And the
+baseline is \emph{recomputed} on the same held-out tiles, so the two rules are
+compared on identical pixels rather than against a published number.''
+
+\smallskip
+``We also keep a validation gate: any instrumented run must still reproduce
+47.37 mIoU and 29.68\% discard. If either moves, the instrumentation changed the
+model and the run is discarded.''}
+
+\ask{Why only \oemTiles{} tiles of OpenEarthMap?}{That is the public
+redistribution we could obtain; the official split is 500. We say so wherever
+that dataset appears.}
+
+% ---------------------------------------------------------------- 12
+\section{Results}
+\why{The main quantitative claim.}
+
+\say{``Read the table by column. On LoveDA the two stages give
+\best{\methodGain{}} and \best{\scLove{}}, total \best{\loveTotal{}}. On Potsdam,
+\best{\potsTotal{}}. On OpenEarthMap the headline is $+0.30$ --- but under the
+catch-all-excluded metric it is \best{\mrOemReal{}}, larger than LoveDA's. That
+is gap three from earlier, appearing in our own results.''
+
+\smallskip
+``\best{Every fold is positive} on both datasets where we ran the full protocol.''
+
+\smallskip
+``The row that matters most is the verification. These gains were first computed
+from a cached statistic. We then ran the actual pipeline end to end on Potsdam:
+\best{\eePotsA{} $\rightarrow$ \eePotsB{} $\rightarrow$ \eePotsC{}} on 1816
+held-out tiles, \best{every stage within 0.05 mIoU} of what we predicted.''
+
+\smallskip
+``The largest single change is Potsdam \texttt{tree}: \best{\treeIoUa{} to
+\treeIoUb{}}. Its precision is \treeP{}\% and its recall \treeR{}\% --- the same
+asymmetry as \texttt{water} on LoveDA, and exactly what the method is built to
+correct.''}
+
+\ask{Is a one-to-two point gain significant?}{Five-fold cross-validation with
+every fold positive, and the Potsdam gain is \potsTotal{}. For comparison, the
+gap between the baseline and the previous state of the art in this family is of
+the same order --- and this costs no training.}
+
+% ---------------------------------------------------------------- 13
+\section{Results --- qualitative}
+\why{Shows the correction acting, and shows a failure. \best{Point at the failure
+before anyone else does.}}
+
+\say{``Four Potsdam tiles. Input, ground truth, baseline, ours. \best{The network,
+its weights and the forward pass are identical between the last two columns} ---
+only the decision rule differs.''
+
+\smallskip
+``Row one: a normal urban scene. \texttt{tree} improves, and the classes that
+were already well calibrated --- \texttt{building}, \texttt{car} --- are left
+within a point of where they were. The correction does not churn.''
+
+\smallskip
+``Row two: the baseline misses a canopy entirely; the correction recovers it.''
+
+\smallskip
+``Row three: fourteen pixels change out of a quarter of a million. Where nothing
+is miscalibrated, nothing happens.''
+
+\smallskip
+``\bad{Row four is a tile where we lose \qualLoss{} mIoU.} It is in the figure
+deliberately. Our parameters are constant across tiles, so they are correct on
+average --- \potsTotal{} over the dataset --- and can be wrong on one scene. That
+is the limitation, and it is the open objective on the previous slide.''}
+
+% ---------------------------------------------------------------- 14
+\section{Application study}
+\why{Demonstrates the method outside the benchmarks, on imagery from India.}
+
+\say{``\indTiles{} tiles from \indScenes{} openly licensed UAV scenes over India
+at \indGSD{} --- a region in none of the three benchmarks. We ran it unchanged
+under two different class lists, typed at inference.''
+
+\smallskip
+``The finding is the \emph{stability}. A flooded building is partitioned almost
+identically by both vocabularies: \indFloodA{}\% under \texttt{water} against
+\indFloodB{}\% under \texttt{flood water}; \indBldgA{}\% under
+\texttt{concrete roof} against \indBldgB{}\% under \texttt{building}. \best{The
+same regions are recovered; only the names follow the words supplied.}''
+
+\smallskip
+``The second case is a failure and worth stating. A solar farm: with no word for
+panels, \indVegA{}\% of the tile goes to one class. Supply \texttt{solar panel}
+and it recovers \indSolarB{}\% --- \bad{below the panels' visible extent}.''
+
+\smallskip
+``\bad{There is no ground truth for this imagery}, so these are pixel shares, not
+accuracy. We make no accuracy claim on these scenes.''}
+
+\ask{Why not calibrate on the Indian imagery too?}{It is unlabelled, and our
+transfer results show that parameters fitted elsewhere would not help. The
+\calibTiles{} labelled tiles are what such a deployment would have to budget for
+--- which is the honest cost of the method.}
+
+% ---------------------------------------------------------------- 15
+\section{Application study --- one scene, two vocabularies}
+\say{``Same weights, same forward pass. Only the class list differs between the
+second and third columns. Lower row, the flooded building --- recovered
+consistently under both. Upper row, the photovoltaic array, for which the first
+vocabulary has no corresponding class at all.''}
+
+% ---------------------------------------------------------------- 16
+\section{Project timeline}
+\say{``Work to date: the baseline and the measurement in August; the two
+parameter sets and their verification through September; the application study
+this month. Also in August we built a semantic co-occurrence prior, evaluated it
+and \emph{rejected} it --- it did not earn its place, and that is recorded.''
+
+\smallskip
+``Remaining: the scene-adaptive formulation and the head-fusion question through
+December, then writing, with submission targeted at a journal in the first
+quarter of 2027.''}
+
+\ask{Why was the co-occurrence prior dropped?}{We measured it against a plain
+neighbour vote. It added two tenths of a point, and a \emph{perfect} matrix added
+three tenths. The idea was sound and the measurement did not support it, so it is
+reported as an ablation rather than a contribution.}
+
+% ---------------------------------------------------------------- 17
+\section{References and closing}
+\say{Do not read them. ``Fourteen key references; the full bibliography is in the
+manuscript.'' Then thank the committee and invite questions.}
+
+\bigskip\hrule\bigskip
+\section*{Three things to have ready}
+\begin{enumerate}[leftmargin=1.6em]
+  \item \best{``What is novel?''} --- the completeness proposition. Per-class
+        thresholds are the complete family given a fixed \texttt{argmax}; scaling
+        before the \texttt{argmax} is provably larger, and reaches the 6\% of
+        errors a threshold cannot.
+  \item \best{``Is this just a SAM~3 quirk?''} --- no. The same correction was
+        applied to a CLIP-based pipeline, where it is worth \cnCV{}$\pm$\cnCVsd{}~mIoU,
+        larger than on SAM~3. One architecture is a result; two is a property.
+  \item \best{``What is left?''} --- scene-adaptive parameters, the head-fusion
+        question, and characterising when the correction transfers. Say this
+        plainly; the work is not finished.
+\end{enumerate}
+
+\end{document}
