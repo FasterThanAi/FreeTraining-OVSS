@@ -69,7 +69,11 @@ def main():
     args = ap.parse_args()
 
     L = labels.from_cache(args.cache)
-    nc, bg = L.n, L.bg_idx
+    # ⚠️ Labels.bg is the catch-all's MASK VALUE (1-indexed, since mask value 0 is
+    # no-data). The confusion matrix is 0-indexed, so it is bg-1 here -- the same
+    # conversion tau_cv.py:124 makes. Reading the attribute name off another
+    # script rather than off labels.py is what broke the first version.
+    nc, bg = L.n, L.bg - 1
     files = sorted(Path(args.cache).expanduser().glob('*.npz'))
     if not files:
         raise SystemExit(f'⛔ no .npz in {args.cache}')
