@@ -157,3 +157,62 @@ If your teammate merged code into `main` while you were working:
 | **Share work** | `git push -u origin feature/feature-name` |
 | **Integrate code** | Open Pull Request on GitHub & ask teammate to review |
 | **Keep `.gitignore` clean** | Never commit virtual environments, raw datasets, or model weights! |
+
+---
+
+## ⚠️ Two machines, one branch: set `pull.rebase` once
+
+This project is worked on from the **Mac** and the **Linux workstation**, both pushing to
+`main`. Whenever both have committed since the last sync, a plain `git pull` aborts with:
+
+```
+hint: You have divergent branches and need to specify how to reconcile them.
+fatal: Need to specify how to reconcile divergent branches.
+```
+
+Nothing is broken and nothing is lost. Git simply refuses to guess whether to merge or rebase.
+
+**Fix it once, on each machine:**
+
+```bash
+cd ~/FreeTraining-OVSS
+git config pull.rebase true
+```
+
+⭐ Rebase is the right default here: it replays your local commits **on top of** what is on
+GitHub, so history stays linear and readable. Merge would litter the log with "Merge branch
+'main'" commits that record nothing.
+
+**When it happens, before fixing, look at what diverged:**
+
+```bash
+git log --oneline origin/main..HEAD   # commits only YOU have
+git log --oneline HEAD..origin/main   # commits only GitHub has
+git status --short                    # uncommitted work
+```
+
+⚠️ **If a local-only commit is one you do not recognise, stop and read it.** On a two-machine
+setup that usually means the same file was edited on both sides, and replaying blind can produce
+a conflict that is easier to understand before the rebase than during it.
+
+Then:
+
+```bash
+git pull --rebase && git push
+```
+
+⚠️ Rebase refuses to run over a dirty tree. Either commit the work first, or `git stash`,
+pull, and `git stash pop`.
+
+### The symptom that wastes the most time
+
+A failed pull means **nothing new arrives** — so a script another session just pushed appears
+missing:
+
+```
+python: can't open file '.../scripts/tau_curves.py': [Errno 2] No such file or directory
+```
+
+That is not a missing file. It is the failed pull, one error earlier in the scrollback.
+**Fix the pull first, then re-run.**
+
