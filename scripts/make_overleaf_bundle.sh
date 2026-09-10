@@ -38,9 +38,13 @@ fi
 # upload is a small thing, but a stale one that a caption still points at is not.
 FIGS=$(grep -ho 'includegraphics\[[^]]*\]{[^}]*}' $TEXFILES \
        | sed 's/.*{//;s/}//' | sort -u)
+# ⚠️ Not every image lives in docs/. The institute masthead sits beside the
+# document that uses it (slides/), so look there before declaring one missing --
+# adding it to the title page is what broke this bundler on 10 Sep.
 for f in $FIGS; do
-  if [ -f "$REPO/docs/$f" ]; then cp "$REPO/docs/$f" "$OUT/"; echo "  + $f"
-  else echo "  !! MISSING: docs/$f — regenerate with scripts/fig_*.py" >&2; exit 1
+  if   [ -f "$REPO/docs/$f" ]; then cp "$REPO/docs/$f" "$OUT/"; echo "  + $f"
+  elif [ -f "$REPO/$SRC/$f" ]; then cp "$REPO/$SRC/$f" "$OUT/"; echo "  + $f (from $SRC/)"
+  else echo "  !! MISSING: $f — not in docs/ or $SRC/; regenerate with scripts/fig_*.py" >&2; exit 1
   fi
 done
 
