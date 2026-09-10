@@ -102,7 +102,10 @@ def main():
         folds = np.array([iou_curve(PT[f].sum(0).astype(np.int64), c) for f in inner])
         with np.errstate(invalid='ignore'):
             mu = np.nanmean(folds, 0)
-            se = np.nanstd(folds, 0, ddof=1) / np.sqrt(max(np.isfinite(folds).sum(0), 1))
+            # ⚠️ np.maximum, not the builtin max: the count is one PER GRID POINT,
+            # and a class absent from a fold contributes nan there rather than 0.
+            n_ok = np.maximum(np.isfinite(folds).sum(0), 1)
+            se = np.nanstd(folds, 0, ddof=1) / np.sqrt(n_ok)
         heldc = iou_curve(Hheld, c)
 
         i_plain = int(np.nanargmax(pooled))
