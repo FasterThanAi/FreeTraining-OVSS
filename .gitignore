@@ -55,3 +55,4 @@ paper/*.fdb_latexmk
 paper/*.fls
 paper/*.log
 paper/*.out
+slides/*.pdf
