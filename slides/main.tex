@@ -38,7 +38,11 @@ Open-Vocabulary Segmentation of Remote Sensing Imagery}}
   \small{Dr.\ Shounak Chakraborty \& Prof.\ K Sathya Babu} }
 \institute[]
 {
-  \IfFileExists{iiitdm_kurnool.png}{\includegraphics[height=1.5cm]{iiitdm_kurnool.png}\\}{}
+  % Official institute masthead (Telugu / logo / Hindi). Falls back to the
+  % square logo, then to text alone, so the deck builds anywhere.
+  \IfFileExists{iiitdm_banner.png}
+    {\includegraphics[width=0.86\textwidth]{iiitdm_banner.png}\\[0.35em]}
+    {\IfFileExists{iiitdm_logo.png}{\includegraphics[height=1.4cm]{iiitdm_logo.png}\\}{}}
   \textsc{Department of Computer Science and Engineering,\\
   Indian Institute of Information Technology Design and Manufacturing, Kurnool}
 }

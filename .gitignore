@@ -12,6 +12,9 @@ data/
 outputs/
 work_dirs/
 *.png
+# ...except the institute identity used by the slides
+!slides/iiitdm_banner.png
+!slides/iiitdm_logo.png
 !resources/*.png
 !docs/*.png
 results.xlsx
