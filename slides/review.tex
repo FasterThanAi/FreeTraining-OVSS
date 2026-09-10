@@ -1,0 +1,425 @@
+% ============================================================================
+%  Mid-project review --- the committee's mandated 8-section structure, short.
+%  Focus: SegEarth-OV3 (SAM 3). ConInfer appears only as a generality check.
+%  ⛔ No number is typed here. Every figure is a macro from paper/numbers.tex.
+%  Build:  cd slides && latexmk -pdf review.tex
+% ============================================================================
+\documentclass[aspectratio=169]{beamer}
+\usetheme{Boadilla}
+\usecolortheme{default}
+\usefonttheme{serif}
+\usepackage[T1]{fontenc}
+\usepackage{xcolor,bookmark,amsmath,amssymb,graphicx,booktabs}
+\graphicspath{{../docs/}{./}}
+
+\setbeamercolor{block title}{bg=blue!70!black, fg=white}
+\setbeamercolor{block body}{bg=blue!5}
+\setbeamertemplate{navigation symbols}{}
+\definecolor{acc}{HTML}{1F3F8B}
+\definecolor{warn}{HTML}{B02418}
+\definecolor{good}{HTML}{1E6B3A}
+\newcommand{\best}[1]{\textcolor{acc}{\textbf{#1}}}
+\newcommand{\bad}[1]{\textcolor{warn}{#1}}
+\newcommand{\ok}[1]{\textcolor{good}{#1}}
+\newcommand{\bg}{\texttt{background}}
+\input{../paper/numbers}
+
+\title[\textsc{Mid-Project Review}]
+{\textsc{Calibrating the Decision, Not the Model:\\
+Per-Class Thresholds and Argmax Scaling for Training-Free\\
+Open-Vocabulary Segmentation of Remote Sensing Imagery}}
+\subtitle{\textsc{Mid-Project Review}}
+\author[\textsc{Priyanshu Kumar}]
+{ \textsc{\textbf{Priyanshu Kumar} \quad \textbf{Raj Gautam}} \\
+  \small{under the supervision of} \\
+  \small{Dr.\ Shounak Chakraborty \& Prof.\ K Sathya Babu} }
+\institute[]
+{
+  \IfFileExists{iiitdm_kurnool.png}{\includegraphics[height=1.4cm]{iiitdm_kurnool.png}\\}{}
+  \textsc{Department of Computer Science and Engineering,\\
+  Indian Institute of Information Technology Design and Manufacturing, Kurnool}
+}
+\date{\today}
+
+\begin{document}
+
+\frame{\titlepage}
+
+\begin{frame}{\textsc{Presentation Outline}}
+    \small\tableofcontents[hideallsubsections]
+\end{frame}
+
+% ===================================================================== 1
+\section{Introduction}
+\begin{frame}{\textsc{1. Introduction}}
+\small
+\textbf{Open-vocabulary semantic segmentation of aerial imagery.} The input is an
+image \emph{and a list of class names as plain words}; the output is a class for
+every pixel. \best{Training-free}: no weights are trained, and the class list can
+change at inference without retraining.
+
+\vspace{0.35em}
+\textbf{Our baseline: SegEarth-OV3} (Li \emph{et al.}, 2025) applies SAM~3 to
+remote sensing. Per class prompt SAM~3 emits a presence score, a dense semantic
+map and instance masks; SegEarth-OV3 fuses them and thresholds the result.
+\ok{Reproduced on our hardware at 47.38 against a published 47.4.}
+
+\vspace{0.5em}
+\begin{block}{The contribution, in one sentence}
+A single confidence threshold is the wrong \emph{shape} for a multi-class
+pipeline. Fitting \best{one threshold per class}, and \best{one scale per class
+before the \texttt{argmax}}, on the same supervision budget the baseline already
+spends tuning its single $\tau$ --- \best{with no weights trained} --- recovers a
+real gain on every dataset we tested.
+\end{block}
+\end{frame}
+
+% ===================================================================== 2
+\section{Motivation \& Applications}
+\begin{frame}{\textsc{2. Motivation --- the baseline discards land cover}}
+\small
+On LoveDA validation, at SegEarth-OV3's own published $\tau=0.5$:
+\begin{itemize}
+  \item \best{29.68\%} of all real-class pixels are assigned to \bg{} ---
+        \best{323 million pixels}.
+  \item Discard outnumbers real-class confusion \best{3:1}. \best{The dominant
+        error is silence, not error.}
+  \item \texttt{water}: precision \best{89.5\%}, recall \best{54.7\%}. Right nine
+        times in ten when it fires; finds half of what is there.
+\end{itemize}
+\vspace{0.4em}
+\begin{block}{Every global fix costs more than it returns}
+\begin{tabular}{@{}ll@{}}
+lower $\tau$ to 0.1 & \bad{$-5.54$ mIoU}, 1.73 wrong pixels per 1 right \\
+remove presence gating & \bad{$-11.97$ mIoU} \\
+do nothing & 29.68\% of land cover discarded \\
+\end{tabular}
+\end{block}
+\vspace{0.3em}
+\best{So the correction has to be selective and per-class, not global.} That is
+the motivation for everything that follows.
+\end{frame}
+
+\begin{frame}{\textsc{2. Motivation --- what the discard looks like}}
+\begin{center}
+\includegraphics[width=0.96\textwidth]{2524.png}
+\end{center}
+\vspace{0.2em}
+\footnotesize A LoveDA tile: \textbf{image} / \textbf{ground truth} /
+\textbf{SegEarth-OV3 at $\tau=0.5$} / \textbf{pixels discarded to \bg{}}.
+Whole water regions are dropped --- not misclassified, but declared unknown,
+because their confidence falls below a threshold tuned for the dataset as a
+whole rather than for \texttt{water}.
+\end{frame}
+
+\begin{frame}{\textsc{2. Applications}}
+\small
+\begin{columns}[T]
+\begin{column}{0.50\textwidth}
+\textbf{Where an open vocabulary is the point}
+\begin{itemize}\small
+  \item \textbf{Disaster response.} Flood extent from UAV imagery within hours.
+        No labelled data for the affected district, no time to train.
+  \item \textbf{Renewable-energy infrastructure.} \texttt{solar panel} is a class
+        \emph{no} land-cover benchmark contains --- supplied here as two words.
+  \item \textbf{Informal settlement mapping.} \texttt{tin roof},
+        \texttt{unpaved road}, \texttt{water tank}: a vocabulary that changes
+        with every survey.
+\end{itemize}
+\vspace{0.4em}
+\begin{block}{\small Cost of deployment}
+\small
+Ours: \best{$\sim$\calibTiles{} labelled tiles, minutes of CPU, no gradient
+steps.} Fine-tuning instead: thousands of labelled tiles, a training run, and
+the training-free property is lost.
+\end{block}
+\end{column}
+\begin{column}{0.48\textwidth}
+\textbf{Measured on Indian UAV imagery}\\
+\footnotesize \indTiles{} tiles, \indScenes{} openly licensed scenes,
+\indGSD{} --- a region absent from every benchmark. Run unchanged under two
+class lists typed at inference.
+\vspace{0.3em}
+\begin{itemize}\footnotesize
+  \item \ok{The segmentation is stable under renaming:} a flooded building
+        partitions the same way under both vocabularies ---
+        \indFloodA{}\% \texttt{water} vs \indFloodB{}\% \texttt{flood water},
+        \indBldgA{}\% \texttt{concrete roof} vs \indBldgB{}\% \texttt{building}.
+  \item \bad{And a class with no word is lost:} \indVegA{}\% of a solar-farm tile
+        goes to one class until \texttt{solar panel} is supplied, which recovers
+        \indSolarB{}\%.
+\end{itemize}
+\vspace{0.2em}
+\footnotesize\bad{No ground truth exists for this imagery} --- these are pixel
+shares, not accuracy.
+\end{column}
+\end{columns}
+\end{frame}
+
+% ===================================================================== 3
+\section{Problem Statement}
+\begin{frame}{\textsc{3. Problem statement --- formulation}}
+\small
+Let $\mathcal{C}=\{1,\dots,N\}$ be the vocabulary and $s_c(p)\in[0,1]$ the score
+the pipeline assigns class $c$ at pixel $p$.
+
+\vspace{0.3em}
+\textbf{The baseline decision rule} (one global $\tau$, tuned per dataset):
+\[
+  \hat{y}(p)=
+  \begin{cases}
+    \arg\max_{c} s_c(p), & \text{if } \max_c s_c(p) \ge \tau\\[2pt]
+    b \ (\textsf{catch-all}), & \text{otherwise}
+  \end{cases}
+\]
+
+\textbf{What we fit instead}, on $\sim$\calibTiles{} labelled tiles:
+\[
+  \hat{y}(p)=
+  \begin{cases}
+    c^\star, & \text{if } s_{c^\star}(p) \ge \boldsymbol{\tau_{c^\star}}\\
+    b, & \text{otherwise}
+  \end{cases}
+  \qquad
+  c^\star = \arg\max_{c}\ \boldsymbol{w_c}\, s_c(p)
+\]
+
+\vspace{0.2em}
+\begin{block}{Objective}
+$(\boldsymbol{w},\boldsymbol{\tau})=\arg\max \operatorname{mIoU}_{\text{real}}$
+by coordinate ascent. \best{No network weights are touched.} The threshold reads
+the \emph{raw} score, so $\boldsymbol{w}$ acts only on the \texttt{argmax}.
+\end{block}
+\end{frame}
+
+\begin{frame}{\textsc{3. Why per-class $\tau$ is the \emph{complete} family}}
+\small
+\textbf{Claim.} Given a fixed \texttt{argmax}, any strictly increasing per-class
+recalibration $g_c$ composed with a global $\tau$ collapses to a per-class
+threshold vector:
+\[
+  g_c(s)\ \ge\ \tau \quad\Longleftrightarrow\quad s\ \ge\ g_c^{-1}(\tau)\;=\;\tau_c .
+\]
+\begin{itemize}
+  \item \best{Per-class $\tau$ therefore exhausts everything reachable by
+        rescaling scores after the \texttt{argmax}.} Nothing in that family can
+        beat it --- which is why the first lever is not an arbitrary choice.
+  \item Scaling \emph{before} the \texttt{argmax} changes \emph{which} class
+        wins, so it is a \best{strictly larger family}.
+\end{itemize}
+\vspace{0.3em}
+\begin{block}{Measured consequence}
+\best{6.0\%} of LoveDA's catch-all assignments are cases where the catch-all
+\emph{won the \texttt{argmax}} at $s \ge \tau$. \bad{Lowering a threshold cannot
+change an \texttt{argmax}}, so that residual is unreachable by lever one --- and
+it is exactly what lever two addresses.
+\end{block}
+\end{frame}
+
+% ===================================================================== 4
+\section{Literature Survey}
+\begin{frame}{\textsc{4. Literature survey}}
+\centering\scriptsize
+\setlength{\tabcolsep}{3pt}\renewcommand{\arraystretch}{1.15}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{|c|p{4.4cm}|c|p{7.6cm}|}
+\hline
+\textbf{No.} & \textbf{Work} & \textbf{Year} & \textbf{Contribution / relevance} \\ \hline
+1 & \textbf{CLIP} \cite{clip} & 2021 & Image--text contrastive pretraining; origin of the open-vocabulary paradigm. \\ \hline
+2 & \textbf{MaskCLIP} \cite{maskclip} & 2022 & First to extract dense predictions from CLIP by removing pooling. \\ \hline
+3 & \textbf{GroupViT} \cite{groupvit} & 2022 & Learns segment grouping from text supervision alone. \\ \hline
+4 & \textbf{SCLIP} \cite{sclip} & 2023 & Correlative self-attention; the codebase SegEarth-OV3 derives from. \\ \hline
+5 & \textbf{SAM} \cite{sam} & 2023 & Promptable class-agnostic segmentation; masks without a fixed label set. \\ \hline
+6 & \textbf{ClearCLIP} \cite{clearclip} & 2024 & Isolates which CLIP components harm dense prediction. \\ \hline
+7 & \textbf{ProxyCLIP} \cite{proxyclip} & 2024 & Self-supervised features as structural guidance. \\ \hline
+8 & \textbf{SegEarth-OV} \cite{segearthov} & 2025 & Feature upsampler + global bias subtraction for remote sensing; defines the evaluation protocol. \\ \hline
+9 & \textbf{SAM~3} \cite{sam3} & 2025 & Presence, semantic and instance heads in one promptable model. \\ \hline
+10 & \best{SegEarth-OV3} \cite{segearthov3} & 2025 & SAM~3 for RS: dual-head fusion + presence gating. \best{Our baseline, reproduced at 47.38 vs 47.4.} \\ \hline
+11 & \textbf{ConInfer} \cite{coninfer} & 2026 & GMM over self-supervised patches fused with the VLM prior. Nearest competitor; used here only as a generality check. \\ \hline
+12 & \textbf{Guo \emph{et al.}} \cite{calibration} & 2017 & Modern networks are systematically miscalibrated. \best{The premise we exploit.} \\ \hline
+13 & \textbf{Otsu} \cite{otsu} & 1979 & Classical automatic thresholding; one of our label-free baselines. \\ \hline
+14 & \textbf{DenseCRF} \cite{densecrf} & 2011 & The classical spatial-context answer we position against. \\ \hline
+\end{tabular}}
+\end{frame}
+
+% ===================================================================== 5
+\section{Research Gaps}
+\begin{frame}{\textsc{5. Research gaps}}
+\small
+\begin{enumerate}
+  \item \best{The decision rule is unexamined.} Every method in this family ends
+        in \texttt{argmax} plus one global $\tau$, tuned per dataset. All effort
+        goes into the \emph{scores}; nobody asks whether the \emph{rule} on top
+        of them has the right shape.
+  \vspace{0.35em}
+  \item \best{The discarded residual is never quantified.} SegEarth-OV3 reports
+        mIoU; it does not report that \best{29.68\%} of real-class pixels on
+        LoveDA are assigned to \bg{}.
+  \vspace{0.35em}
+  \item \best{Catch-all classes distort the metric in both directions.} mIoU is
+        an \emph{unweighted} mean, so a catch-all owns $1/N$ of it however
+        meaningless. We measure it inflating a result on one dataset and
+        deflating one on another.
+  \vspace{0.35em}
+  \item \best{No published bound on what is achievable without labels.} If a
+        label-free rule could set the thresholds, the calibration cost would
+        vanish. Nobody has tested whether one exists.
+\end{enumerate}
+\end{frame}
+
+% ===================================================================== 6
+\section{Objectives}
+\begin{frame}{\textsc{6. Objectives}}
+\small
+\begin{enumerate}
+  \item \textbf{Reproduce} SegEarth-OV3 exactly, so every later number rests on a
+        baseline that runs on our own hardware.
+        \hfill \ok{$\checkmark$ 47.38 vs published 47.4}
+  \item \textbf{Quantify} the residual it discards, and test whether any global
+        knob reaches it.
+        \hfill \ok{$\checkmark$ 29.68\%; all three knobs cost more than they return}
+  \item \textbf{Design} a correction that trains no weights and spends only the
+        supervision budget the baseline already spends.
+        \hfill \ok{$\checkmark$ two levers}
+  \item \textbf{Verify} it end-to-end with the official evaluator, not by
+        arithmetic on a cache.
+        \hfill \ok{$\checkmark$ every rung within 0.05 mIoU}
+  \item \textbf{Bound} what is achievable with no labels at all.
+        \hfill \ok{$\checkmark$ 12 attempts, all bounded, with a stated mechanism}
+  \item \textbf{Demonstrate} on imagery and a vocabulary no benchmark covers.
+        \hfill \ok{$\checkmark$ Indian UAV scenes, \indGSD{}}
+\end{enumerate}
+\end{frame}
+
+% ===================================================================== 7
+\section{Experimental Setup \& Results}
+\begin{frame}{\textsc{7. Experimental setup}}
+\small
+\begin{columns}[T]
+\begin{column}{0.52\textwidth}
+\textbf{Datasets --- every image used}
+\begin{itemize}\small
+  \item \textbf{LoveDA} val: \best{1669} tiles, $1024^2$, 0.3\,m, 7 classes
+  \item \textbf{ISPRS Potsdam}: \best{2016} tiles, 5\,cm, 6 classes
+  \item \textbf{OpenEarthMap}: \oemTiles{} of 500 tiles, 0.25--0.5\,m, 9 classes
+  \item \textbf{OpenAerialMap (India)}: \indTiles{} tiles, \bad{no ground truth}
+\end{itemize}
+\vspace{0.4em}
+\textbf{Baselines}
+\begin{itemize}\small
+  \item \textbf{SegEarth-OV3} --- reproduced, our primary baseline
+  \item $\tau$ sweep, presence removal, per-class Otsu, 12 label-free rules
+  \item ConInfer --- a generality check on a different backbone
+\end{itemize}
+\end{column}
+\begin{column}{0.46\textwidth}
+\textbf{Protocol}
+\begin{itemize}\small
+  \item 5-fold cross-validation; calibration and evaluation tiles
+        \best{always disjoint}
+  \item The baseline is recomputed on the \emph{same} held-out tiles, so both
+        are scored on identical pixels
+  \item Both metrics reported: full mIoU \emph{and} catch-all-excluded
+\end{itemize}
+\vspace{0.4em}
+\textbf{Hardware}
+\begin{itemize}\small
+  \item RTX 2000 Ada, 16\,GB, 70\,W cap
+  \item One LoveDA pass $\approx$ 24 min
+  \item \best{Fitting the correction: minutes of CPU}
+\end{itemize}
+\vspace{0.3em}
+\footnotesize\bad{Validation gate:} every instrumented run must still reproduce
+47.37 mIoU and 29.68\% discard, or the patch changed behaviour.
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{\textsc{7. Results --- which dataset, how much}}
+\small
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+ & \textbf{LoveDA} & \textbf{Potsdam} & \textbf{OpenEarthMap} & \textit{ConInfer} \\
+ & \small 1669 tiles & \small 2016 tiles & \small \oemTiles{} tiles & \small \textit{CLIP} \\
+\midrule
+SegEarth-OV3 (reproduced) & 47.38 & \eePotsA{} & 44.16 & \textit{\cnRepro{}} \\
+\midrule
+Lever 1: per-class $\tau$  & $\methodGain{}\pm0.45$ & $+0.59$ & $+0.30$ & \textit{$+2.51$} \\
+Lever 2: argmax scaling    & $\scLove{}\pm\scLoveSD{}$ & $\scPots{}\pm\scPotsSD{}$ & --- & \textit{$-0.10$} \\
+\midrule
+\textbf{Total $\Delta$ mIoU} & \best{\loveTotal{}} & \best{\potsTotal{}} & $+0.30$ & \textit{$+2.51$} \\
+Catch-all-excluded          & \scLoveExcl{} & \potsExcl{} & \best{\mrOemReal{}} & \textit{\cnReal{}} \\
+Folds positive              & \ok{5/5} & \ok{5/5} & --- & \ok{5/5} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.5em}
+\begin{itemize}\small
+  \item \ok{Verified end-to-end by the official evaluator}: Potsdam
+        \eePotsA{} $\rightarrow$ \eePotsB{} $\rightarrow$ \eePotsC{} on 1816
+        held-out tiles, every rung within \best{0.05} mIoU of its prediction.
+  \item \best{Potsdam \texttt{tree}: \treeIoUa{} $\rightarrow$ \treeIoUb{} IoU}
+        --- precision \treeP{}\%, recall \treeR{}\%, exactly the asymmetry the
+        method targets.
+  \item \best{OpenEarthMap is positive under the recommended metric}
+        (\mrOemReal{}) even though full mIoU looks flat --- its catch-all owns a
+        ninth of the mean and pays for the gain.
+  \item \footnotesize\textit{ConInfer is shown only to answer ``is this a SAM~3
+        quirk?'' --- it is not: the correction transfers to a CLIP backbone.}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{\textsc{7. Results --- the method, tile by tile}}
+\begin{center}
+\includegraphics[height=0.70\textheight]{fig8_qualitative.pdf}
+\end{center}
+\vspace{0.2em}
+\footnotesize Four Potsdam tiles. \textbf{Same weights, same forward pass --- only
+the decision rule differs.} A normal urban scene where \texttt{tree} improves
+while already-calibrated classes are left alone; a canopy the baseline misses
+entirely; a tile the correction barely touches; and
+\bad{a tile where it loses \qualLoss{}~mIoU}, included deliberately because the
+five-fold gain \scPots{}$\pm$\scPotsSD{} is an \emph{average}.
+\end{frame}
+
+\begin{frame}{\textsc{7. Honest limitations}}
+\small
+\begin{itemize}
+  \item \bad{Thresholds do not transfer across a domain shift.} Fitted on
+        LoveDA-rural and applied to urban: \bad{$-1.11$ mIoU} --- \emph{worse
+        than not calibrating at all}. Pooling both domains also loses most of
+        the gain.
+  \item \bad{The gain is not uniform.} LoveDA rural $+2.77$, urban $+0.10$. Our
+        headline is a benchmark-level figure, not a claim about every stratum
+        of it.
+  \item \bad{No label-free rule predicts \emph{whether} calibration will pay}
+        either, on two datasets. The \calibTiles{}-tile cost buys the answer and
+        the question together.
+  \item \bad{The fitted vectors are constant across tiles}, so they are right on
+        average and can be wrong on an individual scene.
+  \item \bad{OpenEarthMap is \oemTiles{} of 500 tiles}, a public redistribution
+        rather than the official split.
+\end{itemize}
+\vspace{0.3em}
+\footnotesize \best{Every negative in this project is reported with an oracle
+bound}, so the reader learns where the remaining headroom is rather than only
+that we failed to reach it.
+\end{frame}
+
+% ===================================================================== 8
+\section{References}
+\begin{frame}[allowframebreaks]{\textsc{8. References}}
+\scriptsize
+\bibliographystyle{ieeetr}
+\bibliography{../paper/refs}
+\end{frame}
+
+\begin{frame}{\textsc{}}
+    \centering
+    \vspace{2cm}
+    \Huge
+    \textbf{Thank You}
+\end{frame}
+
+\end{document}
