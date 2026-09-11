@@ -100,6 +100,36 @@ metric argument gets stronger with every dataset.
 
 ---
 
+## How the Potsdam caches are produced — ⚠️ this was missing and cost a round trip
+
+Neither this file nor `LOGBOOK.md` recorded the command, so reproducing a Potsdam cache meant
+re-deriving the paths from `cfg_potsdam.py`. Recorded now.
+
+```bash
+cd ~/SegEarth-OV-3
+ls data/Potsdam/img_dir/val | wc -l            # must be 2016
+
+python ~/FreeTraining-OVSS/scripts/measure_discard_rate.py \
+  --config configs/cfg_potsdam.py --tau 0.1 \
+  --img-dir data/Potsdam/img_dir/val \
+  --ann-dir data/Potsdam/ann_dir/val \
+  --out ~/outputs/potsdam_full            # add --cache-full for lever 2 (rung C)
+                                          # add --cache-heads for lever 3 (both heads)
+```
+
+⚠️ **`--img-dir` and `--ann-dir` do NOT follow `--config`** — they default to LoveDA's paths,
+and the script refuses to run rather than evaluate one dataset over another's imagery. That
+guard is why this is a note and not a wrong table.
+
+| flag | stores | disk, 2016 tiles |
+|---|---|---|
+| *(none)* | `conf`, `pred`, `gt`, `spres`, per-head top-1 | ~1 GB |
+| `--cache-full` | + the fused per-class stack `logits` | ~6 GB |
+| `--cache-heads` | + **both** head stacks `sem`, `inst` (implies `--cache-full`) | **~19 GB** |
+
+⛔ **The gate**: any Potsdam cache must reproduce **57.87 mIoU / 4.68% discard**. Check
+`discard_summary.md` before anything reads the cache.
+
 ## Engineering notes
 
 ⚠️ **`labels.py` cries wolf on Potsdam.** It warns that the segmentor sends sub-τ
