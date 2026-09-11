@@ -13,6 +13,29 @@ should answer it with a `grep` instead of an archaeology session.
 
 ---
 
+## 2026-09-11 (Thu) — lever 4 is a null too, and the family is closed
+
+**@PRESENCE_POWER_RESULTS.md.** Per-class presence weight, LoveDA full 1669 tiles, no GPU.
+**E − C = +0.16 ± 0.36, 4/5 folds, mean−2sd −0.57.** Null. Levers 1 and 2 reproduce on the same
+run at **+1.17 ± 0.44** against the recorded +1.18 ± 0.45.
+
+⭐⭐ **The fitted γ is exact:** Spearman(median S_pres, γ) = **+0.886, exact p = 0.017** over six
+real classes, and **`forest` — the most-gated and worst class — takes the lowest γ (0.44) in every
+fold.** That was M2, named before the run.
+
+⭐⭐ **Four levers now, and the pattern is clean: everything that reshapes the DECISION works
+(τ +1.18, scale +1.16); everything that reshapes the EVIDENCE does not (fusion +0.04/+0.22,
+presence +0.16).** Post-hoc and labelled as such — but the decision side is exhausted by
+construction, so there is no lever 5 to run. ⭐ Both null levers diagnosed correctly before failing
+to help, which is a bound with an explanation rather than a dead end.
+
+⛔ **A verdict-logic bug I wrote this session**: the "stayed at γ = 1" band was ±0.15 against a
+grid step of 0.2, reporting 0 of 7 where the honest count is 3 of 7. Fifth occurrence of
+table-right-prose-wrong. Band now computed from the grid.
+
+**Next: the paper.** Four levers, two positive and verified end-to-end, two negative with
+mechanisms. Content freeze 1 Jan.
+
 ## 2026-09-11 (Thu) — lever 3 tested on two datasets and NOT adopted
 
 **@HEAD_FUSION_RESULTS.md.** Per-class head fusion, `ρ = 1` exactly the published `max`.

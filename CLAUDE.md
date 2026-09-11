@@ -172,6 +172,47 @@ shrink. ConInfer's reproduction gate **failed** — report LoveDA with both numb
 39.33, ours 36.99), drop their OEM row. Potsdam pre-registered at 4.29% catch-all.
 Target EarthVision 2027 (~March 2027, **unverified**); **content freeze 1 Jan 2027.**
 
+### ⛔⭐ LEVER 4 IS A NULL TOO — and the four-lever family is CLOSED. @PRESENCE_POWER_RESULTS.md, 11 Sep.
+
+`s_c = P_fused_c · S_pres_c^γ_c`, γ = 1 the published rule. LoveDA, **full 1669 tiles**, no GPU.
+**E − C = +0.16 ± 0.36, 4/5 folds, mean−2sd −0.57.** ⛔ Null. ✅ Levers 1 and 2 reproduce almost
+exactly on the same run (**+1.17 ± 0.44** against the recorded +1.18 ± 0.45), so the run is sound.
+
+⭐⭐ **But the fitted γ is exact and predicted:** **Spearman(median `S_pres`, γ) = +0.886 over the
+six real classes, exact p = 12/720 = 0.017.** Classes the gate barely touches want **more** of it;
+the one it crushes wants **least**. ⭐ **`forest` — most-gated real class, worst class in the
+dataset — takes γ 0.44, the lowest of any class, in every fold.** That was M2, the sharp
+prediction, named before the run.
+
+⭐⭐ **THE STOPPING POINT, pre-registered.** Four levers, one protocol, one budget, one gate:
+
+| lever | changes | acts | result |
+|---|---|---|---|
+| **1** per-class τ | which label a score earns | **after** the argmax | ✅ **+1.18** |
+| **2** per-class scale | which class wins | **at** the argmax | ✅ **+1.16** |
+| 3 head fusion | the score itself | **before** the argmax | ⛔ +0.04 / +0.22 |
+| 4 presence weight | the score itself | **before** the argmax | ⛔ **+0.16** |
+
+⭐ **Everything that reshapes the DECISION works; everything that reshapes the EVIDENCE does not.**
+⚠️ **Post-hoc over four levers, NOT a law** — the last post-hoc reading here ("the levers
+substitute") was refuted within a week. What makes it a stopping point is that the decision side is
+**exhausted by construction**: per-class τ is *provably* complete after a fixed argmax, and the only
+thing left at the argmax is a general reordering, unbounded against 200 tiles. ⛔ **There is no
+lever 5.**
+⭐ **Both null levers diagnosed correctly before failing to help** — lever 3 recovered the
+things/stuff duality unsupervised, lever 4 the presence ordering at p 0.017. The mechanisms are
+real; levers 1–2 already reach that mass by another route. A bound with an explanation.
+
+⚠️ **91 of 1669 tiles have `S_pres ≤ 0.001`**, where the ungate is clamped to a no-op — γ cannot act
+on 5.5% of tiles. ⚠️ **Synonym approximation**: presence is applied per *query*, `spres` cached per
+*class*, so `building,house` / `forest,tree` / `barren,bareland,soil` are approximate — and `forest`
+is one. The **M5 correlation is unaffected** (a statement about the fit, not a deployment).
+⚠️ `background`'s γ is **not identified** under `--objective real` (folds 2.0/0.2/2.0/0.2/2.0); do
+not quote its row. ⚠️ **LoveDA only** — Potsdam is a CPU hour away if the null is questioned.
+⛔ **A verdict-logic bug, the fifth of this exact kind and the first written in-session:** the
+"stayed at γ = 1" band was ±0.15 against a **grid step of 0.2**, so it reported **0 of 7** where the
+honest count is **3 of 7**. Band is now computed from the grid. Table right, prose wrong, again.
+
 ### ⛔ LEVER 3 (per-class head fusion) IS NOT ADOPTED — @HEAD_FUSION_RESULTS.md, 11 Sep.
 
 `s_c = max(a_c·P_sem_c, b_c·P_inst_c)`, `max(a,b)=1`, `ρ_c = b_c/a_c`, **ρ = 1 is exactly the

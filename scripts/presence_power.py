@@ -260,7 +260,12 @@ def main():
     md.append('\n`γ < 1` = this class wants **less** presence gating; `γ > 1` = **more**; '
               '`γ = 1` = the published gate is already right.\n')
 
-    stay = int((np.abs(Gm - 1.0) < 0.15).all(axis=0).sum())
+    # ⛔ The band must respect the GRID. It was 0.15 against a grid step of 0.2,
+    # so a class could only register as "stayed at 1" by landing exactly on 1.0
+    # in all five folds -- the test was stricter than the grid can express, and
+    # it reported 0 of 7 where the honest count is 3. Half a step plus a margin.
+    _band = float(GAMMA[1] - GAMMA[0]) / 2 + 0.05
+    stay = int((np.abs(Gm - 1.0) <= _band).all(axis=0).sum())
     gate_ok = (m - 2 * sd) > 0 and pos == args.folds
     md.append('## Verdict\n')
     if gate_ok:
@@ -275,7 +280,9 @@ def main():
     else:
         md.append(f'⛔ **Null: {m:+.2f} ± {sd:.2f}**, {pos}/{args.folds} folds positive. '
                   f'A per-class presence weight buys nothing on top of levers 1 and 2.')
-    md.append(f'\n⭐ **{stay} of {nc} classes keep γ = 1 in every fold** — the published gate '
+    md.append(f'\n⭐ **{stay} of {nc} classes keep γ within ±{_band:.2f} of 1 in every '
+              f'fold** (the γ grid steps by {GAMMA[1]-GAMMA[0]:.1f}, so a tighter band than half '
+              f'a step cannot be satisfied) — the published gate '
               f'is already right for those, and that is a result about the baseline whichever '
               f'way E − C goes.')
     md.append(f'\n⚠️ **`background`\'s γ is only weakly identified under `--objective real`**, '
