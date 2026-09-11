@@ -111,13 +111,12 @@ def load(files, nsub, nc, rng, need_gate):
             keep = rng.choice(keep, size=nsub, replace=False)
         sem = z['sem'].astype(np.float32).reshape(nc, -1)[:, keep]
         inst = z['inst'].astype(np.float32).reshape(nc, -1)[:, keep]
-        sp = z['spres'].astype(np.float32)
-        nviews.add(sp.shape[0])
-        # one presence scalar per class; under >1 view this is a mean and the
-        # gate below is what decides whether that is good enough.
-        pres = np.nanmean(sp, axis=0)
-        pres = np.where(np.isfinite(pres), pres, 1.0)[:nc]
-        SEM.append(sem); INST.append(inst); PRES.append(pres)
+        nviews.add(z['spres'].shape[0])
+        # ⭐ The cached stacks are ALREADY presence-gated and ALREADY collapsed
+        # from queries to classes (measure_discard_rate --cache-heads does both,
+        # in that order, because max commutes). So nothing is applied here, and
+        # `max(sem, inst)` must equal `logits` outright.
+        SEM.append(sem); INST.append(inst); PRES.append(np.ones(nc, np.float32))
         G.append(gt[keep].astype(np.int32) - 1)
         if need_gate:
             LG.append(z['logits'].astype(np.float32).reshape(nc, -1)[:, keep]
@@ -129,7 +128,7 @@ def hists(SEM, INST, PRES, G, idx, rho, w, nc, nbins):
     """(gt, pred, conf-bin) histogram over the tiles in `idx`, at this rho."""
     H = np.zeros((nc, nc, nbins + 1), np.int64)
     for t in idx:
-        s = fuse(SEM[t], INST[t], rho) * PRES[t][:, None]
+        s = fuse(SEM[t], INST[t], rho)
         pred = np.argmax(s * w[:, None], axis=0)
         conf = s[pred, np.arange(s.shape[1])]        # RAW score, as in the segmentor
         b = np.clip(np.rint(conf * nbins).astype(np.int64), 0, nbins)
@@ -219,11 +218,11 @@ def main():
     for t in range(len(SEM)):
         if LG[t] is None:
             continue
-        recon = fuse(SEM[t], INST[t], one) * PRES[t][:, None]
+        recon = fuse(SEM[t], INST[t], one)
         gate_err += float(np.abs(recon - LG[t]).mean()); gate_n += 1
     gate_err = gate_err / gate_n if gate_n else float('inf')
     ok = gate_n > 0 and gate_err <= args.gate
-    print(f'  identity gate: mean |max(sem,inst)·presence − logits| = '
+    print(f'  identity gate: mean |max(sem,inst) − logits| = '
           f'{gate_err:.5f} (bar {args.gate})  {"PASS" if ok else "FAIL"}')
     if not ok:
         raise SystemExit(

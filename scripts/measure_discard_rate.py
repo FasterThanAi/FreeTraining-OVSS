@@ -263,14 +263,31 @@ def main():
         cache_dir = Path(args.cache_dir) if args.cache_dir else out / 'cache'
         cache_dir.mkdir(parents=True, exist_ok=True)
         free_gb = shutil.disk_usage(cache_dir).free / 2**30
-        # ~2.5 MB/image compressed; the full stack adds ~2 bytes per class-pixel,
-        # which for 7 classes at 1024^2 is ~15 MB before compression.
-        need_gb = ((0.075 if args.cache_heads else 0.025)
-                   if args.cache_full else 0.0025) * len(names)
-        print(f'  cache -> {cache_dir}  (need ~{need_gb:.1f} GB, free {free_gb:.1f} GB)')
+        # ⛔ This estimate WAS a hardcoded per-tile constant calibrated on LoveDA
+        # (1024^2, 7 classes). Potsdam is 512^2 with 6 classes -- a quarter the
+        # pixels -- so the constant over-estimated it ~5x and REFUSED a run that
+        # had ample disk. A guard that fires when nothing is wrong stops being
+        # read (WEEK3 §11), and this one blocked a correct command outright.
+        #
+        # Measured from the actual tile geometry instead. Per tile, uncompressed:
+        #   base    15*H*W   conf/conf2 (f16) + pred/pred2/gt (u8) + 3 head top-1s
+        #   full  + 2*N*H*W  the fused per-class stack
+        #   heads + 4*N*H*W  both head stacks
+        with Image.open(Path(args.img_dir) / f'{names[0]}{ext}') as _probe:
+            _w, _h = _probe.size
+        _n = int(getattr(model, 'num_cls', 0)) or int(getattr(model, 'num_queries', 8))
+        _per = 15 + (2 * _n if args.cache_full else 0) + (4 * _n if args.cache_heads else 0)
+        need_gb = _per * _w * _h * len(names) / 2**30
+        print(f'  cache -> {cache_dir}  ({_w}x{_h}, {_n} classes -> '
+              f'~{_per * _w * _h / 2**20:.1f} MB/tile uncompressed)')
+        print(f'  need ~{need_gb:.1f} GB before compression, free {free_gb:.1f} GB')
         if free_gb < need_gb * 1.2:
-            sys.exit(f'ERROR: not enough disk for the cache. Use --no-cache, or '
-                     f'--cache-dir on a bigger volume.')
+            sys.exit(
+                f'ERROR: not enough disk for the cache ({need_gb:.1f} GB needed, '
+                f'{free_gb:.1f} free).\n'
+                f'  --sample {max(1, int(len(names) * free_gb / (need_gb * 1.5)))} '
+                f'--seed 0   would fit, or use --cache-dir on a bigger volume, '
+                f'or --no-cache.')
 
     global CLASSES, N, BACKGROUND
     _lab = labels.from_model(model, cfg.get('model', cfg))
@@ -398,6 +415,26 @@ def main():
             # them to top-1 -- so this adds no model work, only disk.
             head_stacks = {}
             if args.cache_heads:
+                # ⚠️ `last_inst`/`last_sem` are (num_QUERIES, H, W) -- snapshotted
+                # before the synonym collapse -- while `logits` is (num_CLS,H,W).
+                # LoveDA has 11 queries for 7 classes (`building,house`,
+                # `forest,tree`, `barren,bareland,soil`), so the two are NOT the
+                # same axis and reshaping one as the other is silent corruption.
+                #
+                # ⚠️ Presence is also applied per QUERY, inside the crop loop,
+                # while these stacks are pre-presence. So gate first, THEN
+                # collapse -- and both are exact because max commutes:
+                #   max_q max(s_q, i_q)*p_q == max( max_q s_q*p_q, max_q i_q*p_q )
+                # which is what makes `max(sem, inst) == logits` an exact gate
+                # for a single-view forward, and what lets a per-class rho be
+                # applied to the collapsed stacks without changing its meaning.
+                pres = getattr(model, 'last_presence', None)
+                if getattr(model, 'use_presence_score', True) and \
+                        pres is not None and getattr(pres, 'size', 0):
+                    pv = np.nanmean(np.asarray(pres, dtype=np.float32), axis=0)
+                    pv = np.where(np.isfinite(pv), pv, 1.0)
+                else:
+                    pv = None
                 for key, attr in (('inst', 'last_inst'), ('sem', 'last_sem')):
                     hl = getattr(model, attr, None)
                     if hl is None:
@@ -410,6 +447,13 @@ def main():
                         hl = torch.nn.functional.interpolate(
                             hl[None], size=lg.shape[-2:], mode='bilinear',
                             align_corners=False)[0]
+                    if pv is not None and pv.shape[0] == hl.shape[0]:
+                        hl = hl * torch.as_tensor(
+                            pv, dtype=hl.dtype, device=hl.device).view(-1, 1, 1)
+                    if qidx is not None and hl.shape[0] != lg.shape[0]:
+                        qi = torch.as_tensor(qidx, device=hl.device)
+                        hl = torch.stack([hl[qi == c].max(0)[0]
+                                          for c in range(lg.shape[0])])
                     head_stacks[key] = hl.cpu().numpy().astype(np.float16)
 
             k = min(2, lg.shape[0])
