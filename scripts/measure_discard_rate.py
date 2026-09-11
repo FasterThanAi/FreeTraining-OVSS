@@ -136,11 +136,23 @@ def main():
     # vocabulary arm a CPU pass over ONE set of model outputs -- which is not
     # merely cheaper than re-running, it is a cleaner intervention, because the
     # arms then differ in the vocabulary and in nothing else at all.
+    # <<< HEAD FUSION (lever 3): the segmentor fuses the two heads with a
+    # hardcoded, class-INDEPENDENT `max`, even though SegEarth-OV3's own
+    # motivation for having two heads is that the right one is class-dependent
+    # (things -> instance, stuff -> semantic). Fitting that choice per class
+    # needs both full stacks, not the top-1 the cross-head keys store.
+    ap.add_argument('--cache-heads', action='store_true',
+                    help='also store the full per-class stacks of BOTH heads '
+                         '(`inst`, `sem`), pre-presence. Implies --cache-full, '
+                         'because `logits` is the gate: max(inst,sem)*presence '
+                         'must reproduce it. ~3x the disk of --cache-full.')
     ap.add_argument('--cache-full', action='store_true',
                     help='also store the full per-class score stack `logits` '
                          '(N, H, W) float16. ~10x the cache size; required by '
                          'vocab_intervention.py and by nothing else.')
     args = ap.parse_args()
+    if args.cache_heads:
+        args.cache_full = True   # <<< HEAD FUSION: `logits` is the gate
 
     out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
     # LoveDA ships .png, OpenEarthMap .tif. Detect rather than assume.
@@ -253,7 +265,8 @@ def main():
         free_gb = shutil.disk_usage(cache_dir).free / 2**30
         # ~2.5 MB/image compressed; the full stack adds ~2 bytes per class-pixel,
         # which for 7 classes at 1024^2 is ~15 MB before compression.
-        need_gb = (0.025 if args.cache_full else 0.0025) * len(names)
+        need_gb = ((0.075 if args.cache_heads else 0.025)
+                   if args.cache_full else 0.0025) * len(names)
         print(f'  cache -> {cache_dir}  (need ~{need_gb:.1f} GB, free {free_gb:.1f} GB)')
         if free_gb < need_gb * 1.2:
             sys.exit(f'ERROR: not enough disk for the cache. Use --no-cache, or '
@@ -380,6 +393,25 @@ def main():
                 except Exception as e:
                     print(f'    ({attr} capture failed on {name}: {e})')
 
+            # <<< HEAD FUSION: the FULL stacks, pre-presence. `last_inst` and
+            # `last_sem` already hold them -- the block above merely reduces
+            # them to top-1 -- so this adds no model work, only disk.
+            head_stacks = {}
+            if args.cache_heads:
+                for key, attr in (('inst', 'last_inst'), ('sem', 'last_sem')):
+                    hl = getattr(model, attr, None)
+                    if hl is None:
+                        raise SystemExit(
+                            f'--cache-heads needs `{attr}` on the segmentor. '
+                            f'Copy reference/segearthov3_segmentor.py over the '
+                            f'one in the SegEarth-OV-3 clone and re-run.')
+                    hl = hl.float()
+                    if hl.shape[-2:] != lg.shape[-2:]:
+                        hl = torch.nn.functional.interpolate(
+                            hl[None], size=lg.shape[-2:], mode='bilinear',
+                            align_corners=False)[0]
+                    head_stacks[key] = hl.cpu().numpy().astype(np.float16)
+
             k = min(2, lg.shape[0])
             top = torch.topk(lg, k=k, dim=0)
             vals = top.values.cpu().numpy()
@@ -396,6 +428,7 @@ def main():
                 **fused_arrays,                             # <<< P_fused, pre-gating
                 **({'logits': lg.cpu().numpy().astype(np.float16)}
                    if args.cache_full else {}),             # <<< VOCABULARY INTERVENTION
+                **head_stacks,                              # <<< HEAD FUSION
             )
 
         if i % 100 == 0 or i == len(names):
