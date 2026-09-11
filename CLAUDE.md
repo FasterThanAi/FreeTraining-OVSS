@@ -172,6 +172,42 @@ shrink. ConInfer's reproduction gate **failed** — report LoveDA with both numb
 39.33, ours 36.99), drop their OEM row. Potsdam pre-registered at 4.29% catch-all.
 Target EarthVision 2027 (~March 2027, **unverified**); **content freeze 1 Jan 2027.**
 
+### ⛔ LEVER 3 (per-class head fusion) IS NOT ADOPTED — @HEAD_FUSION_RESULTS.md, 11 Sep.
+
+`s_c = max(a_c·P_sem_c, b_c·P_inst_c)`, `max(a,b)=1`, `ρ_c = b_c/a_c`, **ρ = 1 is exactly the
+published rule** so rung D nests rung C. Fitted on top of both existing levers.
+**Potsdam +0.04 ± 0.11 (3/5), LoveDA +0.22 ± 0.21 (5/5, mean−2sd −0.19).** Neither clears the gate.
+⭐ **The method stays two levers, which is a cleaner story than three.**
+
+⭐⭐ **But the fitted ρ is the finding, and it was predicted in advance.** With no supervision about
+which class is which, the fit recovers SegEarth-OV3's own things/stuff duality: Potsdam `car`
+**2.33** (instance) vs `building` **0.53** (semantic); LoveDA `road` **3.83** vs `forest` **0.25**.
+Potsdam keeps `max` for **4 of 6** classes, LoveDA for only **1 of 7** — the two datasets disagree
+about how wrong the hardcoded rule is.
+
+⛔ **Object scale does NOT decide which head a class wants — committed prediction, refuted.**
+`building` takes **0.53 at 5 cm** and **0.51 at 30 cm**, a **1.04×** ratio across a 6× GSD
+difference. `prereg/predict_head_fusion_loveda.md` predicted the opposite sign. No third
+explanation is offered.
+
+⛔⭐ **§4.5's reading is CORRECTED, and this project has been quoting it wrong since week one.**
+§4.5 is cited throughout as *"`building` returns 14 instance masks, `road` returns 2"*, read as the
+instance head failing on stuff. **The fit says `road` wants the instance head most (3.83) and
+`building` least (0.51)** — and §4.5's own table has the answer in the column nobody quoted:
+`road`'s **2** masks score **0.81–0.85**, `building`'s **14** score **0.51–0.77**. ⭐ **The fusion
+follows the scores, which is what `max` reads; the counts are never seen downstream.** The
+things/stuff duality stands; the inference from *fragment count* to *which head should win* does not.
+
+✅ **The query→class collapse is validated** — LoveDA has 11 prompts for 7 classes
+(`building,house`, `forest,tree`, `barren,bareland,soil`) and the identity gate is **0.00000**.
+⚠️ LoveDA ran on an **800-tile `--sample`** (a full `--cache-heads` is ~97 GB), so levers 1 and 2
+are noisier there (+0.79 ± 0.74, +1.05 ± 0.69) than their recorded +1.18 / +1.16. Quote the
+increment.
+⚠️ **L5 failed (1 of 7 classes at ρ ≈ 1, predicted ≥ 3), so the fit was checked before L1 was read**,
+as the pre-registration requires: gate exact, ρ stable across folds (`forest` 0.25 ×5, `water`
+1.00 ×5), levers 1–2 reproduce, unit tests return ρ = 1 on a null. The suspicion is discharged with
+evidence; L5's failure is a finding about LoveDA, not a fault.
+
 ### ⭐⭐ URBAN IS REPAIRED — lever 2 works where lever 1 fails. @SUBSTITUTION_RESULTS.md, 11 Sep.
 
 ⛔ The standing caveat — *"the +1.18 is a RURAL result; urban is not distinguishable from zero"* —

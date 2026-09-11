@@ -13,6 +13,31 @@ should answer it with a `grep` instead of an archaeology session.
 
 ---
 
+## 2026-09-11 (Thu) — lever 3 tested on two datasets and NOT adopted
+
+**@HEAD_FUSION_RESULTS.md.** Per-class head fusion, `ρ = 1` exactly the published `max`.
+**Potsdam +0.04 ± 0.11 (3/5), LoveDA +0.22 ± 0.21 (5/5, mean−2sd −0.19).** Neither clears the
+gate; the method stays two levers.
+
+⭐⭐ **The fitted ρ is the result.** With no supervision it recovers the things/stuff duality —
+Potsdam `car` 2.33 vs `building` 0.53, LoveDA `road` 3.83 vs `forest` 0.25 — and Potsdam keeps
+`max` for 4 of 6 classes against LoveDA's 1 of 7.
+
+⛔ **The object-scale hypothesis is refuted.** `building` takes **0.53 at 5 cm and 0.51 at 30 cm**,
+a 1.04× ratio across a 6× GSD difference, against a committed prediction of the opposite sign.
+
+⛔⭐ **And §4.5 has been quoted wrong since week one.** "building 14 masks / road 2" is cited
+throughout as the instance head failing on stuff; the fit says road wants the instance head *most*.
+§4.5's own table explains it — road's 2 masks score **0.81–0.85**, building's 14 score
+**0.51–0.77**. **The fusion reads the scores, not the counts.** The duality stands; the inference
+from fragment count to head preference does not.
+
+✅ Query→class collapse validated (LoveDA's 11 prompts → 7 classes, gate 0.00000). Two bugs were
+caught by unit tests before any GPU time: τ frozen inside the ρ search, and ties breaking to a grid
+endpoint rather than the published rule. ⚠️ L5 failed, so the fit was checked before L1 was read,
+per the prereg — gate exact, ρ stable, levers 1–2 reproduce. **Next: lever 4, the per-class
+presence weight — CPU only, full splits, caches already exist.**
+
 ## 2026-09-11 (Thu) — substitution refuted, and urban comes back
 
 **@SUBSTITUTION_RESULTS.md.** Four `argmax_reorder.py` arms off the existing 1669-tile
