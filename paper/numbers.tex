@@ -300,3 +300,28 @@
 \newcommand{\loveTotal}{+2.32}       % 1.18 (tau) + 1.16 (scale), 5-fold
 \newcommand{\potsTotal}{+5.67}       % 57.60 -> 63.27, eval.py, 1816 held-out tiles
 \newcommand{\potsExcl}{+6.00}        % Potsdam catch-all-excluded, 5-fold
+
+% ---- how much of the residual comes back -----------------------------------
+% @DISCARD_AFTER_RESULTS.md, 12 Sep. scripts/discard_after.py, LoveDA full 1669
+% tiles, 5-fold held out. The accounting identity
+%   discard_A - discard_X == recovered - newly discarded
+% is verified as exact integers on every run. Rates from a 40k px/tile
+% subsample (42.9M real-class px scored); measure_discard_rate.py owns the
+% absolutes at the published tau.
+\newcommand{\raDiscA}{29.25\%}       % rung A, published tau
+\newcommand{\raDiscB}{26.77\%}       % rung B, per-class tau
+\newcommand{\raDiscC}{25.01\%}       % rung C, + per-class scale
+\newcommand{\raDrop}{4.24}           % points, A -> C
+\newcommand{\raRecov}{4.65\%}        % recovered vs A, rung C
+\newcommand{\raNew}{0.40\%}          % newly discarded, rung C -- NEVER quote
+                                     % \raRecov without this one (WEEK1 8.2)
+\newcommand{\raCorrect}{79.2\%}      % of recovered, landing on the right class
+\newcommand{\raWPR}{0.26}            % wrong per right, ours
+\newcommand{\raTauCorrect}{36.6\%}   % of recovered, tau->0.1 = 1/(1+\tauRatio)
+\newcommand{\raFactor}{6.6}          % \tauRatio / \raWPR
+% per class, rung C. The four whose tau moved DOWN recover well; the two whose
+% tau moved UP recover almost nothing and get it wrong -- by design.
+\newcommand{\raWaterA}{31.9\%}
+\newcommand{\raWaterC}{18.6\%}
+\newcommand{\raWaterOk}{95.0\%}
+\newcommand{\raRoadDelta}{+0.1}      % road DISCARDS MORE, deliberately

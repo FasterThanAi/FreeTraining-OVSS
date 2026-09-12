@@ -85,6 +85,11 @@ the same reason in both: the fit must sacrifice a pathologically calibrated
 catch-all that owns a ninth of the metric. That exclusion is itself a recommendation: mIoU is an
 unweighted mean, so a catch-all owns $1/N$ of the score however meaningful it is,
 and we observe it moving the headline in both directions.
+The correction also demonstrably reaches the residual the first paragraph is about:
+held out, it lowers the discard rate from \raDiscA{} to \raDiscC{}, and
+\best{\raCorrect{} of the pixels it recovers land on the correct class ---
+\raWPR{} wrong per right, against \tauRatio{} for the global threshold sweep that
+reaches the same mass.}
 A \emph{second} correction follows from the same argument. Per-class thresholds are
 provably everything available \emph{after} the argmax, so we also fit one multiplier
 per class \emph{before} it, on the same tiles and still training nothing. This
@@ -330,6 +335,22 @@ recovers 85.3M correct agricultural pixels while creating
 147.9M false ones --- \tauRatio{} wrong per right. A scalar
 threshold carries no information about \emph{which} class a region plausibly is,
 so it cannot recover selectively.
+
+\paragraph{And the method recovers it selectively, which is the whole claim.}
+Every discard figure above is measured at the published $\tau$, so it is fair to
+ask how much of the residual the correction of Sec.~\ref{sec:method} actually
+returns. Held out over five folds on all 1669 tiles, the discard rate falls from
+\raDiscA{} to \raDiscC{}: \raRecov{} of real-class pixels are recovered and
+\raNew{} newly discarded, a net \raDrop{} points. \best{Of the recovered pixels,
+\raCorrect{} land on the correct class --- \raWPR{} wrong per right, against
+\tauRatio{} for the threshold sweep that reaches the same residual.} The
+per-class split is the mechanism in miniature: the four classes whose fitted
+threshold moves \emph{down} recover heavily and accurately (\texttt{water}
+\raWaterA{}~$\to$~\raWaterC{} at \raWaterOk{} correct), while
+\texttt{road}, whose threshold moves \emph{up} to $0.675$, discards
+\raRoadDelta{} points \emph{more} than the baseline and thereby raises its
+precision. The correction is not a recovery method; it recovers where recovery
+is cheap and discards harder where it is not.
 
 \paragraph{Presence gating is a correlate, not a cause.} A presence-gating hypothesis of our own was refuted by counterfactual and is reported as a correlate only (\suppref{sup:presence}).
 
