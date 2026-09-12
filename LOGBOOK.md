@@ -13,6 +13,30 @@ should answer it with a `grep` instead of an archaeology session.
 
 ---
 
+## 2026-09-12 (Fri) — lever 5 run and null; the experimental programme closes
+
+**@AFFINE_RESULTS.md.** I closed the decision-side family after lever 4 by asserting it was
+"exhausted by construction". That skipped **vector scaling** (`w_c·s_c + b_c`), which the
+calibration literature puts next. Run: **−0.07 ± 0.18, 2/5 folds.** ⭐ The family is now closed by
+**measurement**, which is the stronger statement, and it is the row a reviewer who knows Guo et al.
+would ask for. ⚠️ Third lever running I predicted as a small positive and got a null.
+
+⭐ **N3 held exactly and explains it:** `background` is the only negative bias (−0.12) against
++0.00…+0.08 for every real class — one statement, *suppress the catch-all where scores are small*.
+⭐⭐ And WEEK1 §7.7 already says why that is worth nothing: background assignments are **94% the τ
+rule, 6% argmax wins**, so `b` addresses 6% of the mechanism and lever 2 already reorders it.
+
+**`freeze_selection.py`.** Should `road`/`agricultural` keep the published τ? ⛔ No — the hand-named
+arm *loses* 0.07, the honest inner-CV rule loses 0.07, and ⭐⭐ **choosing on the evaluation fold is
+worth only +0.08.** The question closes by an **upper bound**, not another failed rule. Rung B
+lands at +1.18, reproducing §9b, so the per-class fit is not overfitting.
+
+**@DISCARD_AFTER_RESULTS.md §3a.** Recovery replicates on Potsdam: 4.69% → 3.64%, **64.0%** correct.
+⚠️ The 1.73 contrast stays labelled LoveDA — Potsdam's published τ is already 0.1.
+
+**Five levers, two positive, three null, all pre-registered. The experimental line is closed.
+Next is the paper.**
+
 ## 2026-09-12 (Fri) — the residual comes back, and lever 3's null is explained
 
 **@DISCARD_AFTER_RESULTS.md.** The discard rate after calibration had never been measured — every

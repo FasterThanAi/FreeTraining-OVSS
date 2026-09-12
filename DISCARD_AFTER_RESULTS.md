@@ -72,6 +72,27 @@ argmax, and land wrong.
 
 ---
 
+## 3a. ⭐ Potsdam — it replicates
+
+**12 Sep, 2016 tiles @ τ = 0.1, 5-fold held out.**
+
+| | discard A → C | change | recovered, **correct** | wrong per right |
+|---|---|---|---|---|
+| **LoveDA** | 29.25% → **25.01%** | **−4.24** | **79.2%** | **0.26** |
+| **Potsdam** | 4.69% → **3.64%** | **−1.05** | **64.0%** | **0.56** |
+
+⭐ **The correction recovers, and most of what it recovers is right, on both datasets.** Potsdam's
+residual is six times smaller to begin with (4.69% against 29.25%), so a smaller absolute change is
+expected; the recovery *quality* is the transferable part and it holds.
+
+⚠️ **The 1.73 comparison is a LoveDA number and does not transfer.** §8.2's τ→0.1 sweep was run on
+LoveDA, whose published τ is 0.5. **Potsdam's published τ is already 0.1**, so "lower it to 0.1" is
+not an available alternative there and the contrast cannot be drawn. Potsdam's **64.0%** stands on
+its own — most of what it recovers is correct — and the 0.26-vs-1.73 line must stay labelled as
+LoveDA's.
+
+---
+
 ## 4. What to put in the paper
 
 ⭐ **Add the 79.2% vs 36.6% comparison to the results section.** It is the single most direct answer

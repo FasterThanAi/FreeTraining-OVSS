@@ -172,6 +172,35 @@ shrink. ConInfer's reproduction gate **failed** — report LoveDA with both numb
 39.33, ours 36.99), drop their OEM row. Potsdam pre-registered at 4.29% catch-all.
 Target EarthVision 2027 (~March 2027, **unverified**); **content freeze 1 Jan 2027.**
 
+### ⛔ LEVER 5 (affine) IS A NULL — the decision side closes by measurement. @AFFINE_RESULTS.md, 12 Sep.
+
+`pred = argmax_c(w_c·s_c + b_c)`, threshold still reads the raw score. **LoveDA, full 1669 tiles:
+−0.07 ± 0.18, 2/5 folds, mean−2sd −0.43.** ✅ Levers 1 and 2 reproduce on the same run (+1.16, +1.22).
+⚠️ **Third lever in a row I predicted as a small positive and got a null.** State that pattern —
+the decision-side family looked larger from the inside than it is.
+
+⭐ **N3 held exactly and explains the null.** `background` is the **only** negative bias
+(**−0.12**) against +0.00 to +0.08 for every real class. Since only *differences* matter to an
+argmax, that is one statement: **suppress the catch-all where scores are small.** ⭐⭐ **And WEEK1
+§7.7 already says why it buys nothing** — background assignments are **94.0% the τ rule / 6.0%
+argmax wins**, so `b` addresses 6% of the mechanism and lever 2 already reorders that same 6%.
+**The fit found the right thing to do and there was almost nothing to do it to.**
+⚠️ N5 failed (1 of 7 classes at b=0, predicted ≥2), so the fit was checked first per the branch
+table — tests pass, levers 1–2 reproduce, `barren`/`forest`/`agricultural` stable across folds.
+
+### ⛔ AND "WHICH CLASSES TO CALIBRATE" CLOSES BY AN UPPER BOUND. `scripts/freeze_selection.py`, 12 Sep.
+
+Four arms, LoveDA 1669 tiles: published everywhere **47.31**; all fitted **48.49**; hand-named
+`road,agricultural` frozen **48.42 (−0.07)**; inner-CV selection **48.42 (−0.07)**; ⭐ **choosing on
+the EVALUATION fold 48.57 (+0.08)**.
+⭐⭐ **Even peeking is worth +0.08 mIoU, so there is nothing to select.** That closes §9f's
+per-class restatement by an **upper bound** rather than by another failed rule — strictly stronger
+than the 1se negative, where only *our* rule failed. ⛔ **Fit every class.**
+⚠️ Freezing `road` and `agricultural` by name — chosen by reading LoveDA's own held-out table — is
+**not deployable** and it *loses* 0.07 anyway. `road` gains +0.10 on average (negative in only 2/5
+folds); `agricultural` −0.21. ✅ And rung B lands at **+1.18**, reproducing §9b exactly, so the
+per-class fit is **not** overfitting — those two classes are simply marginal.
+
 ### ⭐⭐ THE RESIDUAL DOES COME BACK — and 6.6× more accurately than lowering τ. @DISCARD_AFTER_RESULTS.md, 12 Sep.
 
 ⛔ **This had never been measured.** Every discard figure in the project is at the **published** τ,
@@ -199,7 +228,11 @@ cheap and discards harder where it is not.
 
 ⚠️ **My prediction was wrong** — I expected the total to barely move and only redistribute. It fell
 **4.24 points**; redistribution holds for two of six classes.
-⚠️ Rates from a 40k px/tile subsample (42.9M real px). ⚠️ LoveDA only; Potsdam is a CPU run away.
+⭐ **REPLICATED ON POTSDAM, 12 Sep:** 4.69% → **3.64%** (−1.05), **64.0%** of recoveries correct,
+0.56 wrong per right. Most of what the method recovers is right on **both** datasets.
+⚠️ **The 1.73 contrast is LoveDA's and does not transfer** — Potsdam's published τ is already 0.1,
+so "lower it to 0.1" is not an available alternative there. Keep that line labelled.
+⚠️ Rates from a 40k px/tile subsample (42.9M real px on LoveDA).
 ⛔ **Never quote `recovered` without `newly discarded`** — §8.2's error; the script refuses to.
 
 ### ⭐ WHY lever 3 is null — measured, and it is ONE class. @HEAD_FUSION_RESULTS.md §3b.
@@ -240,11 +273,14 @@ prediction, named before the run.
 | 4 presence weight | the score itself | **before** the argmax | ⛔ **+0.16** |
 
 ⭐ **Everything that reshapes the DECISION works; everything that reshapes the EVIDENCE does not.**
-⚠️ **Post-hoc over four levers, NOT a law** — the last post-hoc reading here ("the levers
-substitute") was refuted within a week. What makes it a stopping point is that the decision side is
-**exhausted by construction**: per-class τ is *provably* complete after a fixed argmax, and the only
-thing left at the argmax is a general reordering, unbounded against 200 tiles. ⛔ **There is no
-lever 5.**
+⚠️ **Post-hoc over the levers, NOT a law** — the last post-hoc reading here ("the levers
+substitute") was refuted within a week.
+⛔ **CORRECTED 12 Sep: "there is no lever 5" was an OVER-CLAIM and is withdrawn.** It skipped
+**vector scaling** (`w_c·s_c + b_c`), a bounded family the calibration literature puts immediately
+after the diagonal case — one extra parameter per class, not an unbounded reordering. It was run:
+**−0.07 ± 0.18, 2/5 folds. @AFFINE_RESULTS.md.** ⭐ **The decision side is now closed by measurement
+rather than by assertion**, which is the stronger statement, and lever 5 is the row a reviewer who
+knows Guo et al. would ask for.
 ⭐ **Both null levers diagnosed correctly before failing to help** — lever 3 recovered the
 things/stuff duality unsupervised, lever 4 the presence ordering at p 0.017. The mechanisms are
 real; levers 1–2 already reach that mass by another route. A bound with an explanation.
