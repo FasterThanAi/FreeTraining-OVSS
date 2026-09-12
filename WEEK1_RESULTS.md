@@ -23,7 +23,12 @@ real-class pixels discarded at τ = 0.5** · 🟢 **Confusion analysis complete*
 | OS | Ubuntu (XFCE) |
 
 > **VRAM outcome:** ✅ No OOM. LoveDA runs at its native **1024×1024** (the test pipeline
-> contains no `Resize` step), and the segmentor does sliding-window inference internally.
+> contains no `Resize` step). ⛔ **CORRECTED 13 Sep: the claim that "the segmentor does
+> sliding-window inference internally" is FALSE.** `slide_crop` defaults to `0` and no config
+> sets it, so `predict()` takes the whole-image branch and `slide_inference()` is never called.
+> Measured, not inferred: `head_fusion.py` and `presence_power.py` both report
+> **`views per tile: [1]`** over 800 LoveDA and 2016 Potsdam tiles. ⭐ SAM 3 resizes every input
+> to **1008×1008**, so a 1024² tile is seen at ~1:1 and never at higher effective resolution.
 > 16 GB was sufficient. No fp16/autocast or resolution reduction was needed, so the result
 > remains directly comparable to the paper's 47.4.
 
@@ -681,7 +686,10 @@ Two consequences:
 
 The n=1 caveat is resolved. The instrumented run
 (`~/outputs/week2_tau0.5_instrumented`, τ=0.5) records per-class `S_pres` for every tile.
-`spres_max` = highest presence score over the six real classes, max across sliding-window crops.
+`spres_max` = highest presence score over the six real classes. ⚠️ *Originally written as
+"max across sliding-window crops" — there is only **one** view per tile (see §1), so the max is
+over classes alone and the `(n_views, n_cls)` array has a single row. The numbers are unaffected;
+the description was wrong.*
 
 | Tile set (τ=0.5) | n | mean `spres_max` | median | p90 |
 |---|---|---|---|---|
@@ -701,13 +709,17 @@ Two refinements to how §9.2 must be described:
    illustrative worst case, never as the typical one.
 2. **Quote the threshold.** 198 catastrophic / 77 healthy are **τ=0.5** counts. §7.4's 55 / 958
    are **τ=0.1**. Both correct; neither is meaningful without its τ.
-3. **Two different code paths — say so.** `sam3_smoke_test.py`, which produced the §9.2 table,
-   does a **single whole-image forward**. The eval path runs **sliding-window** inference, so
-   `_inference_single_view` is called once per *crop* and there is one `S_pres` per crop, not
-   per tile. The figures above take max-over-crops; `per_image_presence.csv` also carries the
-   mean, and the `.npz` cache keeps the full `(n_views, n_cls)` array. Tile 3487's numbers and
-   the 1669-tile distribution are therefore *not* measurements of the same object. Do not
-   present them as one series.
+3. ⛔ **CORRECTED 13 Sep — this item was wrong, and it is the opposite of what it said.**
+   It claimed `sam3_smoke_test.py` does a single whole-image forward while *"the eval path runs
+   sliding-window inference, so `_inference_single_view` is called once per crop"*, and concluded
+   the two were **not** measurements of the same object. **Both paths are single whole-image
+   forwards.** `slide_crop` defaults to `0` and no config raises it, so the sliding-window branch
+   has never executed; instrumentation reports **`views per tile: [1]`** on every dataset measured.
+   ⭐ **The two sets of numbers therefore ARE comparable**, and the caution here was unnecessary.
+   The `(n_views, n_cls)` array is real but has always had one row.
+   ⚠️ **What this does open is an untested configuration.** SAM 3 resizes input to 1008², so
+   crops smaller than that are *upsampled* — sliding-window inference would show the model more
+   effective resolution than any run in this project has. See `prereg/predict_sliding_window.md`.
 
 > ### ⚠️ The correlation is partly mechanical — do not over-claim it
 >
