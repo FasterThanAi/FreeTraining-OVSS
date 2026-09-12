@@ -172,6 +172,52 @@ shrink. ConInfer's reproduction gate **failed** — report LoveDA with both numb
 39.33, ours 36.99), drop their OEM row. Potsdam pre-registered at 4.29% catch-all.
 Target EarthVision 2027 (~March 2027, **unverified**); **content freeze 1 Jan 2027.**
 
+### ⭐⭐ THE RESIDUAL DOES COME BACK — and 6.6× more accurately than lowering τ. @DISCARD_AFTER_RESULTS.md, 12 Sep.
+
+⛔ **This had never been measured.** Every discard figure in the project is at the **published** τ,
+before either lever; the paper motivated itself with 323M discarded pixels and never said how many
+returned. `scripts/discard_after.py`, LoveDA full 1669 tiles, 5-fold held out, accounting identity
+`discard_A − discard_X == recovered − newly discarded` verified as exact integers.
+
+| rung | discarded | recovered | **correct** | newly discarded |
+|---|---|---|---|---|
+| A published τ | **29.25%** | — | — | — |
+| B per-class τ | 26.77% | 3.67% | 77.7% | 1.20% |
+| **C + scale** | **25.01%** | **4.65%** | ⭐ **79.2%** | 0.40% |
+
+⭐⭐ **The number the paper was missing:** τ→0.1 recovers at **1.73 wrong per right** (36.6% correct,
+§8.2); the per-class rule recovers at **0.26 wrong per right (79.2% correct)** — **6.6× better**, at
+**2.2×** the hit rate. **This is the bridge between the motivation and the method**, which nothing
+previously connected, and it is the most direct answer to *"why not just lower the threshold?"*
+
+⭐ **It splits exactly on which way τ moved.** Four classes whose τ moved DOWN recover heavily and
+accurately — `water` **31.9% → 18.6%** (−13.3) at **95.0%** correct, `building` −4.3 at 95.2%,
+`forest` −4.4 at 92.4%, `barren` −5.5 at 88.5%. ⛔ The two whose τ moved UP recover almost nothing
+and get it wrong: `road` **+0.1** (0.8% recovered, **0.0%** correct), `agricultural` −1.0 (0.0%).
+**The method is not a recovery method** — it is a decision rule that recovers where recovery is
+cheap and discards harder where it is not.
+
+⚠️ **My prediction was wrong** — I expected the total to barely move and only redistribute. It fell
+**4.24 points**; redistribution holds for two of six classes.
+⚠️ Rates from a 40k px/tile subsample (42.9M real px). ⚠️ LoveDA only; Potsdam is a CPU run away.
+⛔ **Never quote `recovered` without `newly discarded`** — §8.2's error; the script refuses to.
+
+### ⭐ WHY lever 3 is null — measured, and it is ONE class. @HEAD_FUSION_RESULTS.md §3b.
+
+`scripts/head_dominance.py`. **beyond lever 2 = flipped + min(untouched, rescaled)** — ⛔ *not*
+flipped alone, since `w_c` scales a whole class at once, so a class split between untouched and
+rescaled is getting a pixel-dependent change with no pixel changing head. (A first version used the
+flipped share and reported **0.0%** on the synthetic built so that no `w` can help — corrected, it
+reads 49.9% there and 0.0% on the null.)
+
+⭐ **For five of six real classes the instance head wins ≤ 3.3% of pixels**, so `max` is already the
+semantic head and ρ can only be a no-op or a uniform rescale — lever 2's family. Beyond-lever-2 is
+**≤ 3.4%** for all of them. ⭐⭐ **`road` is the exception: instance wins 41.8%, 58.0% of its won
+pixels flip head, 76.8% beyond lever 2, fitted ρ 3.83.** It had real room and used it — **and one
+class in seven cannot move an unweighted mean.** Overall **7.3%**.
+⚠️ **`water`'s 0.0% is not "no room"** — its heads are competitive (25.0%) but the fit chose ρ = 1,
+at which nothing changes by construction. Shares are measured **at the fitted ρ**.
+
 ### ⛔⭐ LEVER 4 IS A NULL TOO — and the four-lever family is CLOSED. @PRESENCE_POWER_RESULTS.md, 11 Sep.
 
 `s_c = P_fused_c · S_pres_c^γ_c`, γ = 1 the published rule. LoveDA, **full 1669 tiles**, no GPU.

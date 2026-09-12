@@ -180,6 +180,53 @@ folds while leaving `water` at exactly 1.00 in all five.
 
 ---
 
+## 3b. ⭐ WHY the null — measured, and it is one class
+
+`scripts/head_dominance.py`, LoveDA, at the fitted ρ. Identity gate **0.00000**.
+
+Every pixel of a class falls into one of three buckets under ρ: **untouched** (the winning head's
+arm carries multiplier 1), **rescaled** (it carries the scaled multiplier), **flipped** (the other
+head now supplies the score). ⭐ **Lever 2 can reproduce ρ only where every pixel gets the *same*
+multiplier**, since `w_c` scales the whole class at once. So
+
+> **beyond lever 2 = flipped + min(untouched, rescaled)**
+
+⛔ **Not "flipped" alone** — a class split between untouched and rescaled is getting a
+pixel-dependent change even with no pixel changing head. A first version of the script used the
+flipped share, and on the synthetic built so that *no* `w` can help it reported **0.0%** and would
+have concluded "a rescale in disguise" about the one construction where that is provably false.
+Corrected statistic reads **49.9%** there and **0.0%** on the null.
+
+| class | inst head wins | **beyond lever 2** *(won pixels)* | why |
+|---|---|---|---|
+| ⭐ **road** | **41.8%** | ⭐ **76.8%** | heads genuinely competitive, and the fit used it |
+| background | 0.2% | 3.4% | one head dominates |
+| building | 3.3% | 3.4% | one head dominates |
+| barren | 1.0% | 0.9% | one head dominates |
+| agricultural | 1.7% | 0.6% | one head dominates |
+| forest | 0.8% | 0.4% | one head dominates |
+| water | 25.0% | **0.0%** | ⚠️ heads competitive, but the fit chose ρ = 1 |
+
+**Overall: 7.3%** of the pixels a real class wins get a change a per-class constant could not make.
+
+> ⭐ **For five of six real classes the instance head wins ≤ 3.3% of pixels, so `max` is already
+> the semantic head and ρ can only be a no-op or a uniform rescale — which is lever 2's family.
+> The fusion choice is structurally empty for them.**
+
+⭐⭐ **`road` is the exception and it proves the rule.** Its two heads are genuinely competitive
+(instance wins 41.8%), **58.0%** of its won pixels flip head, and **76.8%** of the change is
+beyond anything lever 2 can express — the fit pinned it at ρ 3.83. It had real room and used it.
+**And one class out of seven cannot move an unweighted mean.** That is the whole null: the fusion
+choice matters for exactly one LoveDA class, and mIoU divides by 7.
+
+⚠️ **`water`'s 0.0% is not evidence of no room.** Its heads *are* competitive (25.0%), and the
+fit chose ρ = 1.00, at which nothing changes by construction. The shares are measured **at the
+fitted ρ**, so they describe the best available head assignment, not the available headroom.
+
+⚠️ This explains a null; it does not rescue one.
+
+---
+
 ## 4. What this changes
 
 | | |

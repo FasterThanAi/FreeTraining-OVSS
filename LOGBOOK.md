@@ -13,6 +13,29 @@ should answer it with a `grep` instead of an archaeology session.
 
 ---
 
+## 2026-09-12 (Fri) — the residual comes back, and lever 3's null is explained
+
+**@DISCARD_AFTER_RESULTS.md.** The discard rate after calibration had never been measured — every
+figure in the project is at the published τ. LoveDA, full 1669 tiles, 5-fold held out:
+**29.25% → 25.01%**, and ⭐⭐ **79.2% of what it recovers lands on the correct class — 0.26 wrong
+per right against τ→0.1's 1.73, a 6.6× better error rate.** That is the bridge between the
+motivation section and the method, and nothing previously connected them.
+
+⭐ It splits on which way τ moved: `water` 31.9% → 18.6% at 95.0% correct, `building` −4.3 at
+95.2%, `forest` −4.4 at 92.4%, `barren` −5.5 at 88.5%; while `road` (τ up to 0.675) nets **+0.1**
+with 0.0% of its recoveries correct. ⚠️ **My prediction was wrong** — I expected the total to
+barely move.
+
+**@HEAD_FUSION_RESULTS.md §3b.** `head_dominance.py` explains lever 3's null: for five of six real
+classes the instance head wins **≤ 3.3%** of pixels, so `max` is already the semantic head and ρ is
+structurally a no-op or a uniform rescale — lever 2's family. ⭐⭐ **`road` is the exception**
+(instance wins 41.8%, 58% of won pixels flip head, 76.8% beyond lever 2) — real room, used, **and
+one class in seven cannot move an unweighted mean.**
+
+⛔ A statistic bug the synthetic caught: the first version counted only *flipped* pixels and
+reported 0.0% on the construction built so that no `w` can help. Correct statistic is
+`flipped + min(untouched, rescaled)`.
+
 ## 2026-09-11 (Thu) — lever 4 is a null too, and the family is closed
 
 **@PRESENCE_POWER_RESULTS.md.** Per-class presence weight, LoveDA full 1669 tiles, no GPU.
