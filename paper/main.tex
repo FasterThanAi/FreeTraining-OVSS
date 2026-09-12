@@ -859,6 +859,74 @@ Table~\ref{tab:levers}'s substitution, and \best{we state it as a description of
 three points rather than a law} --- it was not pre-registered, and the totals are not
 constant across them.
 
+\subsection{Three further levers, and what their failure delimits}
+\label{sec:levers}
+
+Per-class thresholds are provably everything available \emph{after} the argmax,
+and the scale acts \emph{at} it. That leaves the score the argmax reads, and we
+fitted three further per-class corrections on the same tiles, the same protocol
+and the same acceptance gate --- mean less twice the fold standard deviation above
+zero, every fold positive --- each pre-registered before it was run.
+Table~\ref{tab:fivelevers} collects all five.
+
+\begin{table}[t]
+\centering
+\caption{Five per-class corrections, one protocol and one budget. The two that
+reshape the \emph{decision} work; the three that reshape the \emph{evidence} the
+decision reads do not. Gains are over the preceding rung, held out, five-fold.}
+\label{tab:fivelevers}
+\small
+\begin{tabular}{llr}
+\toprule
+correction & acts & $\Delta$ mIoU \\
+\midrule
+per-class $\tau$        & after the argmax  & \best{\methodGain{}} \\
+per-class scale         & at the argmax     & \best{\scLove{}} \\
+\midrule
+head fusion             & on the score      & \lvThreeLove{} \\
+presence weight         & on the score      & \lvFour{} \\
+per-class bias          & at the argmax     & \lvFive{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{What the three add.} SAM~3 fuses its semantic and instance heads with a
+hardcoded $\max$, applied identically to every class, although the duality that
+motivates having two heads is itself class-dependent. We fit that ratio per class.
+The presence score is a per-class, per-tile ceiling applied with the same
+uniformity, and classes sit \emph{forty times} apart on it; we fit an exponent per
+class. Finally, a per-class bias makes the reordering affine rather than
+multiplicative --- vector scaling, the step the calibration literature places
+immediately after the diagonal case~\cite{guo2017,kull2019} --- and it acts
+precisely where scores are small, which is where the residual lives and where a
+multiplier cannot reach.
+
+\paragraph{All three are null, and each diagnosed correctly before failing.}
+\best{The fitted parameters recover real structure; correcting it buys nothing.}
+The fusion ratio reproduces SAM~3's things/stuff duality with no supervision about
+which class is which (Potsdam \texttt{car} $\rho=\lvRhoCar{}$ toward the instance
+head, \texttt{building} $\rho=\lvRhoBuild{}$ toward the semantic one), and we
+measure why it cannot pay: for five of six real classes one head wins over
+$96\%$ of the pixels, so the ratio is a no-op or a uniform rescale, which the
+scale already fits. The presence exponent orders the classes by how heavily the
+gate touches them ($\rho=\lvGammaRho{}$, $p=\lvGammaP{}$, exact), placing
+\texttt{forest} --- the most-gated and worst-performing class --- lowest. The bias
+finds one thing consistently, a negative value for the catch-all alone, which
+reads as \emph{suppress the catch-all where scores are small}; but \mechB{} of
+catch-all assignments are argmax wins and the rest are the threshold rule, so it
+addresses a twentieth of the mechanism and the scale already reorders that.
+
+\paragraph{What this delimits.} Two corrections that change \emph{which label a
+score earns} succeed; three that change \emph{the score itself} do not.
+\best{On this evidence the miscalibration in a presence-gated open-vocabulary
+pipeline is in the decision rule rather than in the per-class evidence}, which is
+a claim about such pipelines in general and not about SAM~3. ⚠️ We state it as a
+description of five corrections on two datasets, not a law: it is post-hoc, and a
+post-hoc reading elsewhere in this paper did not survive its first committed test
+(Section~\ref{sec:limitations}). What it does establish is negative and firm ---
+the family of per-class corrections is bounded, and we bound it by testing rather
+than by asserting.
+
 \subsection{The label-free bound, and why it holds}
 \label{sec:bound}
 
@@ -890,12 +958,36 @@ precision better is not the missing ingredient.
 relation is not even monotone: \texttt{water} at 88.5\% precision
 takes $\tau=0.175$, \texttt{road} at 68.5\% takes $0.675$, and
 \texttt{barren} at 55.6\% takes $0.375$
-($\rho=\proxyTauRho{}$, $p=\proxyTauP{}$). \best{The optimal per-class threshold
-is the solution to a coupled multi-class objective}: raising one class's threshold
-moves its pixels into \bg{}, changing \bg{}'s IoU and therefore every other
-class's optimum. No per-class scalar can express that, measurable or not. This
-explains why an $N$-parameter fit works and every one-parameter rule fails, and
-it generalises to any training-free pipeline that thresholds a per-class score.
+($\rho=\proxyTauRho{}$, $p=\proxyTauP{}$).
+
+\paragraph{The objective separates, and that is why no scalar locates the
+threshold.} For a \emph{fixed} argmax, a pixel predicted class $c$ either clears
+$\tau_c$ or becomes the catch-all; it can never become another \emph{real} class,
+because lowering a threshold cannot change which class won. So $\mathrm{TP}_c$,
+$\mathrm{FP}_c$ and $\mathrm{FN}_c$ depend on $\tau_c$ alone, and the objective is a
+sum of single-variable terms. We verify this rather than assume it: sweeping each
+class's threshold across its full range while the others are held anywhere moves
+no other class's optimum by more than \sepExact{}, over \sepSweeps{} class-sweeps
+on three datasets. \best{Coordinate ascent is therefore exact rather than greedy}
+--- one pass per class reaches the joint optimum --- and the search costs
+\sepCostA{} evaluations instead of \sepCostB{}.
+
+\best{Separation is what makes the bound bite.} Each $\tau_c$ is the peak of that
+class's own IoU curve, and where that peak sits depends on the whole shape of the
+class's score distribution --- not on any summary of it. Precision is such a
+summary, which is why it is measurable and still useless, and why the fitted
+thresholds are not monotone in it. No per-class scalar locates a peak whose
+position is a property of a distribution. This explains why an $N$-parameter fit
+works and every one-parameter rule fails, and it generalises to any training-free
+pipeline that thresholds a per-class score.
+
+⛔ \emph{An earlier version of this argument attributed the bound to coupling
+between classes --- that raising one threshold changes every other class's
+optimum. Separation shows that is false for the real classes, and we report the
+correction because the conclusion survives on a stronger footing.} The coupling is
+real only through the catch-all: under an objective that scores it, the vector does
+not separate, and on Potsdam we measure a \sepAllMax{} disagreement there against
+\sepExact{} under the real-class objective.
 
 \paragraph{The same bound governs whether calibration is worth commissioning.} The same bound also governs \emph{whether} calibration will pay: stratifying by a label-free residual measure predicts neither the size nor the spread of the gain, on either dataset (\suppref{sup:when}). \best{The calibration cost buys the answer and the question together, and neither is available without labels.}
 
@@ -1046,11 +1138,46 @@ stratum of it. We regard this as the sharpest limitation of the work: the method
 is a calibration correction, and calibration is exactly the thing that does not
 transport.
 
-\paragraph{The substitution between the two levers is a description, not a law.}
-Table~\ref{tab:levers} orders three pipelines cleanly, but three points cannot
-establish a relationship, it was not pre-registered, and the mechanism we \emph{did}
-pre-register for it was falsified. We report the ordering and decline to explain it
-until a fourth pipeline tests it.
+\paragraph{We proposed that the two levers substitute, tested it, and they do
+not.} Table~\ref{tab:levers} appears to order three pipelines cleanly --- where the
+threshold collects a lot the scale collects little --- but three post-hoc points
+are not a relationship, and we committed a directional prediction before testing
+it. LoveDA's own domains span a $35\times$ range in threshold gain (\DOMr{} rural
+against \DOMu{} urban), so if the levers substituted their scale gains had to
+differ. They are $+1.22$ and $+1.25$: a difference of $+0.03$ against a standard
+error of $0.35$, where the effect the reading was drawn from spans five points.
+\best{This is a refutation from power, not a null from weakness}, and the ordering
+is withdrawn. What the same measurement shows instead is that the scale gain is
+\emph{invariant} to what the threshold collected, consistent with the two levers
+acting on disjoint error mass --- thresholds on the \mechA{} of the residual that
+falls below $\tau$, the scale on the \mechB{} the argmax loses plus the real-class
+confusion no threshold reaches. ⚠️ That is two strata of one dataset and inherits
+the same gate.
+
+\paragraph{The fit captures most of the oracle on two datasets and little on the
+third.} Against the per-class oracle bound, held out, our fitted thresholds
+capture \capLove{} on LoveDA and \capPots{} on Potsdam but only \capOEM{} on
+OpenEarthMap. ⛔ The shortfall is one class: OpenEarthMap's \texttt{water} is
+fitted at \capOemWaterFit{} against an oracle \capOemWaterOra{}, costing it
+\capOemWaterA{}~$\to$~\capOemWaterB{}~IoU. Correcting that class alone would take
+the dataset's gain from \mrOemFull{} to $+2.14$. It is not a sample-size problem
+--- OpenEarthMap calibrates on a \emph{larger} fraction of its tiles than LoveDA
+does. We state the figure because it is a measured bound on the method rather than
+on the benchmark, and a reader would otherwise compute it.
+
+\paragraph{A principled alternative to the fit is worse than the fit.} Because the
+calibration curves are flat near their optima, a one-standard-error rule --- take
+the most conservative threshold within one standard error of the best --- is the
+textbook response, and we named it as the principled choice before running it. It
+loses: \seLove{} on LoveDA against the deployed \methodGain{}, \sePots{} on
+Potsdam and \seOEM{} on OpenEarthMap, a mean of \seMean{} against what we ship. It
+cannot distinguish a curve that is flat because the class is uninformative from
+one that is flat near a genuinely displaced optimum, and on LoveDA it drags
+\texttt{water} --- the one class that needed moving --- back toward the published
+value. \best{Selecting \emph{which} classes to calibrate fails for the same reason,
+and there we can bound it exactly}: choosing on the evaluation fold, which no
+deployable rule may do, is worth only \frzOracle{}~mIoU, and an honest inner-CV
+selection gets \frzCv{}. There is nothing to select, so we fit every class.
 
 \paragraph{The scale's parameters are not uniquely identified.} Across folds the
 fitted multipliers vary by up to \scSpread{} on the real classes while the held-out

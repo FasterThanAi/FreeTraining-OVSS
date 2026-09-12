@@ -325,3 +325,49 @@
 \newcommand{\raWaterC}{18.6\%}
 \newcommand{\raWaterOk}{95.0\%}
 \newcommand{\raRoadDelta}{+0.1}      % road DISCARDS MORE, deliberately
+
+% ---- separability of the real objective ------------------------------------
+% @SEPARABILITY_RESULTS.md. For a FIXED argmax a pixel predicted c either clears
+% tau_c or becomes the catch-all -- never another real class -- so TP/FP/FN for
+% class c depend on tau_c alone and the `real' objective is a sum of
+% single-variable terms. Measured at exactly 0 on every class sweep.
+\newcommand{\sepExact}{0.000000}     % max |delta tau| over all sweeps
+\newcommand{\sepSweeps}{19}          % class-sweeps, LoveDA + Potsdam + OEM
+\newcommand{\sepCostA}{$N\times201$} % cost of exact coordinate ascent
+\newcommand{\sepCostB}{$201^{N}$}    % cost of the naive joint search
+\newcommand{\sepAllMax}{0.0050}      % Potsdam, --objective all: it does NOT hold
+
+% ---- how much of the oracle the fit captures -------------------------------
+% Held-out real-class mIoU. Put this in limitations: it is a measured bound on
+% the method, and naming it is stronger than letting a reader compute it.
+\newcommand{\capLove}{83\%}
+\newcommand{\capPots}{73\%}
+\newcommand{\capOEM}{11\%}
+\newcommand{\capOemWaterFit}{0.710}   % OEM water, fitted
+\newcommand{\capOemWaterOra}{0.240}   % OEM water, oracle
+\newcommand{\capOemWaterA}{69.18}     % its IoU at the oracle threshold
+\newcommand{\capOemWaterB}{55.02}     % ... and at the fitted one
+
+% ---- the one-standard-error rule: tested, and worse than what we deploy -----
+\newcommand{\seLove}{+0.76}          % vs deployed +1.23
+\newcommand{\sePots}{+0.55}          % vs deployed +0.90
+\newcommand{\seOEM}{+0.54}           % vs deployed +0.28
+\newcommand{\seMean}{-0.19}          % mean delta vs the deployed rule
+
+% ---- which classes to calibrate: closed by an UPPER BOUND ------------------
+% scripts/freeze_selection.py, LoveDA 1669 tiles, 5-fold held out.
+\newcommand{\frzOracle}{+0.08}       % choosing on the EVALUATION fold
+\newcommand{\frzCv}{-0.07}           % honest inner-CV selection
+
+% ---- the five levers, one protocol ----------------------------------------
+% Levers 1-2 reshape the DECISION and work; 3-5 are reported as bounded
+% negatives. Every one was pre-registered.
+\newcommand{\lvThreePots}{+0.04}     % head fusion, Potsdam
+\newcommand{\lvThreeLove}{+0.22}     % head fusion, LoveDA
+\newcommand{\lvFour}{+0.16}          % per-class presence weight, LoveDA
+\newcommand{\lvFive}{-0.07}          % per-class bias (vector scaling), LoveDA
+\newcommand{\lvFiveSD}{0.18}
+\newcommand{\lvRhoCar}{2.33}         % Potsdam car -> instance head
+\newcommand{\lvRhoBuild}{0.53}       % Potsdam building -> semantic head
+\newcommand{\lvGammaRho}{+0.886}     % Spearman(median S_pres, gamma), p=0.017
+\newcommand{\lvGammaP}{0.017}
