@@ -39,6 +39,19 @@ class SegEarthOV3Segmentation(BaseSegmentor):
                  bg_idx=0,
                  slide_stride=0,
                  slide_crop=0,
+                 # <<< GLOBAL PRESENCE. Sliding-window inference costs 3.85 mIoU
+                 # (@SLIDING_WINDOW_RESULTS.md) and the measured reason is that
+                 # S_pres is computed PER VIEW: a class absent from a crop is
+                 # vetoed there, and P_final = P_fused * S_pres crushes every one
+                 # of its pixels. `water` loses 14.28 IoU on -16.1 recall while
+                 # its precision RISES -- a tighter gate, not blurrier features.
+                 #   'per_view'  the published behaviour. DEFAULT, bit-identical.
+                 #   'max'       gate by the max presence over crops -- "present
+                 #               anywhere in the tile". Free: no extra forward.
+                 #   'global'    gate by presence from one whole-image forward.
+                 #               Literal reading of "compute S_pres once", and
+                 #               costs one extra pass per tile.
+                 presence_mode='per_view',
                  confidence_threshold=0.5,
                  use_sem_seg=True,
                  use_presence_score=True,
@@ -67,6 +80,13 @@ class SegEarthOV3Segmentation(BaseSegmentor):
         self.set_class_scale(class_scale)
         self.slide_stride = slide_stride
         self.slide_crop = slide_crop
+        if presence_mode not in ('per_view', 'max', 'global'):
+            raise ValueError(f'presence_mode must be per_view|max|global, '
+                             f'got {presence_mode!r}')
+        self.presence_mode = presence_mode          # <<< GLOBAL PRESENCE
+        if presence_mode != 'per_view':
+            print(f'  presence_mode: {presence_mode} '
+                  f'(gating decoupled from the crop grid)')
         self.confidence_threshold = confidence_threshold
         self.use_sem_seg = use_sem_seg
         self.use_presence_score = use_presence_score
@@ -248,6 +268,16 @@ class SegEarthOV3Segmentation(BaseSegmentor):
         sem = torch.zeros((self.num_queries, h_img, w_img), device=self.device)    # <<< CROSS-HEAD
         count_mat = torch.zeros((1, h_img, w_img), device=self.device)
         
+        # <<< GLOBAL PRESENCE, 'global' mode: one whole-image forward purely to
+        # read the presence head, then discard its scores. The crop loop below
+        # supplies the resolution; this supplies the tile-level gate.
+        global_presence = None
+        if self.presence_mode == 'global' and self.use_presence_score:
+            self._inference_single_view(image)
+            global_presence = (self.presence_log[-1].copy()
+                               if self.presence_log else None)
+            self.presence_log = []      # do not let it pollute the per-crop log
+
         h_grids = max(h_img - h_crop + h_stride - 1, 0) // h_stride + 1
         w_grids = max(w_img - w_crop + w_stride - 1, 0) // w_stride + 1
 
@@ -282,6 +312,26 @@ class SegEarthOV3Segmentation(BaseSegmentor):
         fused = fused / count_mat                                       # <<< INSTRUMENTATION
         inst = inst / count_mat                                         # <<< CROSS-HEAD
         sem = sem / count_mat                                           # <<< CROSS-HEAD
+
+        # <<< GLOBAL PRESENCE. `fused` is the dual-head score BEFORE gating, so
+        # re-gating it with a tile-level presence is exact rather than a repair:
+        # nothing has to be divided back out. `preds` above is the per-crop-gated
+        # accumulation and is simply replaced.
+        # ⛔ Untouched when presence_mode == 'per_view' -- the published path must
+        # stay bit-identical, and this branch is the only thing that changes it.
+        if self.presence_mode != 'per_view' and self.use_presence_score \
+                and self.presence_log:
+            with np.errstate(all='ignore'):
+                if self.presence_mode == 'max':
+                    gp = np.nanmax(np.stack(self.presence_log), axis=0)
+                else:                                    # 'global'
+                    gp = np.asarray(global_presence, dtype=np.float32)
+            # NaN = a query whose presence was never recorded; 1.0 leaves the
+            # fused score alone rather than silently zeroing the class.
+            gp = np.where(np.isfinite(gp), gp, 1.0)
+            preds = fused * torch.as_tensor(
+                gp, dtype=fused.dtype, device=fused.device).view(-1, 1, 1)
+
         return preds, fused, inst, sem                                  # <<< INSTRUMENTATION
 
     def predict(self, inputs, data_samples):
