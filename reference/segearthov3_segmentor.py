@@ -52,6 +52,21 @@ class SegEarthOV3Segmentation(BaseSegmentor):
                  #               Literal reading of "compute S_pres once", and
                  #               costs one extra pass per tile.
                  presence_mode='per_view',
+                 # <<< TTA. Sliding-window inference FAILED (-3.85) and the
+                 # measured reason was context: crops shrink the field of view,
+                 # every head degrades, and the per-crop presence gate was what
+                 # partly rescued it (@SLIDING_WINDOW_RESULTS.md 2a).
+                 # ⭐ Dihedral TTA is the version that does NOT do that. The whole
+                 # image is used every time, so the field of view, the scene
+                 # context and the presence semantics are all unchanged -- only
+                 # the orientation differs. And aerial imagery has no canonical
+                 # orientation, so a flip or a 90-degree rotation is genuinely
+                 # label-preserving here in a way it is not for natural images.
+                 #   'none'  published behaviour. DEFAULT, bit-identical.
+                 #   'h'     one horizontal flip (for CACHING a second view)
+                 #   'hflip' average of {identity, horizontal flip}   2x cost
+                 #   'd4'    average over all 8 dihedral transforms   8x cost
+                 tta='none',
                  confidence_threshold=0.5,
                  use_sem_seg=True,
                  use_presence_score=True,
@@ -84,6 +99,11 @@ class SegEarthOV3Segmentation(BaseSegmentor):
             raise ValueError(f'presence_mode must be per_view|max|global, '
                              f'got {presence_mode!r}')
         self.presence_mode = presence_mode          # <<< GLOBAL PRESENCE
+        if tta not in ('none', 'h', 'hflip', 'd4'):
+            raise ValueError(f'tta must be none|h|hflip|d4, got {tta!r}')
+        self.tta = tta                              # <<< TTA
+        if tta != 'none':
+            print(f'  tta: {tta}')
         if presence_mode != 'per_view':
             print(f'  presence_mode: {presence_mode} '
                   f'(gating decoupled from the crop grid)')
@@ -334,6 +354,39 @@ class SegEarthOV3Segmentation(BaseSegmentor):
 
         return preds, fused, inst, sem                                  # <<< INSTRUMENTATION
 
+    # <<< TTA. k = number of 90-degree rotations, f = horizontal flip after.
+    # The inverse un-rotates by (4 - k) and flips FIRST, because the forward
+    # order was rotate-then-flip. Getting that order wrong silently misaligns
+    # every averaged view with the ground truth, so it is unit-tested.
+    _D4 = [(0, False), (1, False), (2, False), (3, False),
+           (0, True), (1, True), (2, True), (3, True)]
+
+    @staticmethod
+    def _tta_fwd(img, k, f):
+        from PIL import Image as _I
+        if k:
+            img = img.rotate(90 * k, expand=True)
+        if f:
+            img = img.transpose(_I.FLIP_LEFT_RIGHT)
+        return img
+
+    @staticmethod
+    def _tta_inv(t, k, f):
+        if f:
+            t = torch.flip(t, dims=[-1])
+        if k:
+            t = torch.rot90(t, k=-k, dims=[-2, -1])
+        return t
+
+    def _tta_views(self):
+        if self.tta == 'none':
+            return [(0, False)]
+        if self.tta == 'h':
+            return [(0, True)]
+        if self.tta == 'hflip':
+            return [(0, False), (0, True)]
+        return self._D4
+
     def predict(self, inputs, data_samples):
         if data_samples is not None:
             batch_img_metas = [data_sample.metainfo for data_sample in data_samples]
@@ -356,12 +409,33 @@ class SegEarthOV3Segmentation(BaseSegmentor):
             self.presence_log = []       # <<< INSTRUMENTATION: reset per image
 
             # Determine inference mode
-            if self.slide_crop > 0 and (self.slide_crop < image.size[0] or self.slide_crop < image.size[1]):
-                seg_logits, fused_logits, inst_logits, sem_logits = self.slide_inference(
-                    image, self.slide_stride, self.slide_crop)
-            else:
-                seg_logits, fused_logits, inst_logits, sem_logits = \
-                    self._inference_single_view(image)
+            # <<< TTA: average the score stacks over dihedral views of the WHOLE
+            # image. Each view is a full forward pass at full field of view, so
+            # presence is computed over the same scene every time -- the property
+            # sliding-window crops destroyed.
+            # ⛔ A 90° turn of a NON-SQUARE image changes its dimensions
+            # (test_tta.py verifies 48x64 -> 64x48), so the rotated views cannot
+            # be averaged with the others. Refuse loudly rather than let a shape
+            # error surface from inside an accumulation. SAM 3 resizes to 1008²
+            # internally, but `image` here is the original tile.
+            if self.tta == 'd4' and image.size[0] != image.size[1]:
+                raise ValueError(
+                    f'tta=d4 needs square input; this image is '
+                    f'{image.size[0]}x{image.size[1]}. Use tta=hflip, which '
+                    f'involves no rotation.')
+            _acc = None
+            for _k, _f in self._tta_views():
+                _img = image if (_k, _f) == (0, False) else self._tta_fwd(image, _k, _f)
+                if self.slide_crop > 0 and (self.slide_crop < _img.size[0] or self.slide_crop < _img.size[1]):
+                    _out = self.slide_inference(_img, self.slide_stride, self.slide_crop)
+                else:
+                    _out = self._inference_single_view(_img)
+                if (_k, _f) != (0, False):
+                    _out = tuple(self._tta_inv(t, _k, _f) for t in _out)
+                _acc = list(_out) if _acc is None else [a + b for a, b in zip(_acc, _out)]
+            n_views = len(self._tta_views())
+            seg_logits, fused_logits, inst_logits, sem_logits = \
+                [t / n_views for t in _acc]
             self.last_fused = fused_logits                              # <<< INSTRUMENTATION
             self.last_inst = inst_logits                                # <<< CROSS-HEAD
             self.last_sem = sem_logits                                  # <<< CROSS-HEAD
