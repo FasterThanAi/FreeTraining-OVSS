@@ -172,6 +172,26 @@ shrink. ConInfer's reproduction gate **failed** — report LoveDA with both numb
 39.33, ours 36.99), drop their OEM row. Potsdam pre-registered at 4.29% catch-all.
 Target EarthVision 2027 (~March 2027, **unverified**); **content freeze 1 Jan 2027.**
 
+### ⛔ DROPPING THE CATCH-ALL FROM THE VOCABULARY — killed by its ceiling in 2 min. @DROP_CATCHALL_RESULTS.md, 13 Sep.
+
+`background` is undetectable (median `S_pres` **0.022**) yet competes in the argmax. Drop its
+channel and let τ alone produce it — free and exact, since dropping a class **is** dropping its
+channel. ⛔ **Ceiling: 0.20% of real-class pixels, all `water`, = +1.02 water IoU = a mIoU bound of
++0.146 with perfect luck.** Dead; the measured arm was not run.
+
+⭐⭐ **But the screen sharpened §7.7.** Background wins the argmax on **1,952,989** real-class
+pixels and only **84,276 (4.3%)** have a runner-up that clears τ. **So 95.7% of what the catch-all
+"steals" are pixels where nothing was confident — it is not out-competing a good answer, it is
+winning where there is none.** Those pixels reach the catch-all whichever route you close.
+⭐ Independently reproduces §7.7's oddest claim: every recoverable pixel is `water` (11.34% of its
+pixels taken, against ≤5.06% elsewhere). ⭐ And of the runners-up that clear τ, **100% are the
+correct class** — where a confident alternative exists at all, it is right.
+
+⭐⭐ **THE PROCESS RULE THIS ESTABLISHES: compute the peeking-oracle ceiling BEFORE building
+anything.** Levers 3, 4 and 5 each cost a GPU session to disprove; this idea had an equally good
+mechanism story and died in two minutes of CPU. `scripts/drop_class.py --oracle-only` is the
+template — count what perfect knowledge would be worth, then decide.
+
 ### ⛔⭐ SLIDING-WINDOW INFERENCE COSTS 3.85 mIoU — and it is the presence gate again. @SLIDING_WINDOW_RESULTS.md, 13 Sep.
 
 ⛔ **First, a documented error, now corrected in WEEK1_RESULTS (three places):** that file claimed
