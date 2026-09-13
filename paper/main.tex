@@ -314,6 +314,22 @@ cross-validation into a CPU operation on a saved array rather than a GPU run. We
 verify it against the deployed pipeline in Section~\ref{sec:results}.
 
 % =====================================================================
+\paragraph{We run the baseline's published configuration, and the obvious
+alternative costs.} SAM~3 resizes every input to $1008^2$, so a $1024^2$ tile is
+seen at roughly 1:1 while \swCrop{}$^2$ crops would be \emph{upsampled} --- the
+sliding-window inference the rest of this literature uses, and which
+SegEarth-OV3 does not. We tested it: mIoU falls \swDelta{}, to \swMIoU{}.
+\best{Mean precision \emph{rises} \swPrec{} while mean recall falls \swRec{},
+which is a tighter gate rather than sharper features.} $S_\mathrm{pres}$ is
+computed per view, so a class absent from a crop is vetoed there and, since
+$P_\mathrm{final}=P_\mathrm{fused}\cdot S_\mathrm{pres}$, every one of its pixels
+in that crop is crushed. Spatially concentrated classes pay most: \texttt{water},
+which occupies part of a tile rather than all of it, loses \swWater{}~IoU on
+\swWaterRec{} recall, and \bg{}'s recall rises \swBgRec{} as the catch-all absorbs
+the difference. \best{The baseline's whole-image choice is correct, and this is
+why.} We report it because the alternative is standard practice elsewhere and a
+reader is entitled to know it was measured rather than assumed.
+
 \section{Anatomy of the residual}
 \label{sec:anatomy}
 

@@ -13,6 +13,28 @@ should answer it with a `grep` instead of an archaeology session.
 
 ---
 
+## 2026-09-13 (Sat) — sliding window costs 3.85, and WEEK1 had it wrong for a month
+
+**@SLIDING_WINDOW_RESULTS.md.** WEEK1_RESULTS claimed in three places that the eval path runs
+sliding-window inference. It never has — `slide_crop` defaults to 0 and instrumentation reports
+`views per tile: [1]` across 2816 tiles. One of the three drew a conclusion from it that was the
+opposite of the truth. All three corrected.
+
+**Tested it: 47.38 → 43.53, −3.85.** W1 predicted a rise above +1.0. ⛔ Refuted.
+
+⭐⭐ **And the mechanism is the presence gate, a third time.** mPrecision **+1.1**, mRecall
+**−4.7** — tighter gate, not sharper features. `S_pres` is per view, so a class absent from a crop
+is vetoed there. `water` **−14.28 IoU on −16.1 recall while precision rises**; `background` recall
+**+12.9**, so the discard rate went UP (W2 refuted too). ⛔ W5 was backwards — I predicted per-crop
+presence would be more informative; it vetoes instead.
+
+⭐ The branch table named the mechanism before the run. Worth it for three reasons: it forecloses
+"why not multi-scale?" with a number, it is the most nearly causal of the three presence-gate
+demonstrations, and it shows the baseline's whole-image choice is correct and non-obvious.
+
+⛔ **Not running the obvious follow-up** (global S_pres on crop-level scores) — fourth attempt at
+the same family after three nulls, inference-time not methodological, and weeks from the freeze.
+
 ## 2026-09-12 (Fri) — lever 5 run and null; the experimental programme closes
 
 **@AFFINE_RESULTS.md.** I closed the decision-side family after lever 4 by asserting it was

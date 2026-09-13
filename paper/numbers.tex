@@ -371,3 +371,19 @@
 \newcommand{\lvRhoBuild}{0.53}       % Potsdam building -> semantic head
 \newcommand{\lvGammaRho}{+0.886}     % Spearman(median S_pres, gamma), p=0.017
 \newcommand{\lvGammaP}{0.017}
+
+% ---- sliding-window inference: tested, and it costs -------------------------
+% @SLIDING_WINDOW_RESULTS.md. slide_crop=512, stride=341, LoveDA val 1669 tiles.
+% SAM 3 resizes input to 1008^2, so 512^2 crops are UPSAMPLED ~2x -- the
+% configuration the rest of this literature uses and SegEarth-OV3 does not.
+% Precision RISES and recall COLLAPSES, which is a tighter gate rather than
+% sharper features: S_pres is computed per view, so a class absent from a crop
+% is vetoed there.
+\newcommand{\swMIoU}{43.53}          % vs the published single-view 47.38
+\newcommand{\swDelta}{-3.85}
+\newcommand{\swPrec}{+1.1}           % mPrecision, single-view -> sliding-window
+\newcommand{\swRec}{-4.7}            % mRecall
+\newcommand{\swWater}{-14.28}        % water IoU, over half the total loss
+\newcommand{\swWaterRec}{-16.1}      % water recall
+\newcommand{\swBgRec}{+12.9}         % background recall: the catch-all absorbs MORE
+\newcommand{\swCrop}{$512$}

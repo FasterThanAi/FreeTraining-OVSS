@@ -172,6 +172,40 @@ shrink. ConInfer's reproduction gate **failed** — report LoveDA with both numb
 39.33, ours 36.99), drop their OEM row. Potsdam pre-registered at 4.29% catch-all.
 Target EarthVision 2027 (~March 2027, **unverified**); **content freeze 1 Jan 2027.**
 
+### ⛔⭐ SLIDING-WINDOW INFERENCE COSTS 3.85 mIoU — and it is the presence gate again. @SLIDING_WINDOW_RESULTS.md, 13 Sep.
+
+⛔ **First, a documented error, now corrected in WEEK1_RESULTS (three places):** that file claimed
+the eval path runs sliding-window inference. **It never has.** `slide_crop` defaults to 0, no config
+sets it, and instrumentation reports **`views per tile: [1]`** on 800 LoveDA and 2016 Potsdam tiles.
+One of the three claims drew a conclusion from it — that the smoke test and the eval path were not
+measuring the same object — which was the **opposite** of the truth and is withdrawn.
+
+**Tested (`slide_crop=512`, `stride=341`, LoveDA val): 47.38 → 43.53, −3.85.** W1 predicted a rise
+above +1.0 and is refuted.
+
+⭐⭐ **Why, and it is the paper's own mechanism a third time.** mPrecision **+1.1**, mRecall
+**−4.7** — a *tighter gate*, not sharper features. `S_pres` is computed **per view**, so a class
+absent from a 512² crop is vetoed there and `P_final = P_fused·S_pres` crushes every one of its
+pixels. Spatially concentrated classes pay: ⭐ **`water` −14.28 IoU on −16.1 recall while its
+precision RISES 1.3**, and `background`'s recall jumps **+12.9** as the catch-all absorbs the
+difference — so the **discard rate rose**, refuting W2 as well.
+⛔ **W5 was backwards**: I predicted per-crop presence would be *more* informative since a class in
+one corner is no longer averaged against three empty ones. The mechanism is that it is **vetoed**
+in the other three.
+⭐ **The branch table named this in advance** — *"crops lose global context and `S_pres` is computed
+per view"* — so it is a pre-registered negative, not a post-hoc rationalisation.
+
+**What it is worth:** it forecloses *"why not multi-scale, as the rest of the literature does?"*
+with a number; it is the most nearly **causal** of the three presence-gate demonstrations (§9.2b
+turned the gate off, §9.2b measured background at 0.022, this shrinks the view); and it shows
+**SegEarth-OV3's whole-image choice is correct and non-obvious**.
+✅ **Nothing recorded is affected** — separate config, separate output, no cache touched. 47.38
+reproduces their *published* configuration; +2.32 is a within-configuration comparison.
+⚠️ One run, one crop size, one dataset. ⛔ **Do NOT run the obvious follow-up** (global `S_pres`
+applied to crop-level scores): a fourth attempt at the same family after three nulls, an
+inference-time change rather than a methodological one, and it would move every absolute number in
+the paper weeks from the content freeze. Record it as future work.
+
 ### ⛔ LEVER 5 (affine) IS A NULL — the decision side closes by measurement. @AFFINE_RESULTS.md, 12 Sep.
 
 `pred = argmax_c(w_c·s_c + b_c)`, threshold still reads the raw score. **LoveDA, full 1669 tiles:
