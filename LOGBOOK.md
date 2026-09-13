@@ -13,6 +13,27 @@ should answer it with a `grep` instead of an archaeology session.
 
 ---
 
+## 2026-09-13 (Sat) — I diagnosed the sliding-window loss wrongly, and the run caught it
+
+**@SLIDING_WINDOW_RESULTS.md §2a.** I concluded the per-crop presence gate *caused* sliding
+window's −3.85 and wrote it into the paper. That predicts loosening the gate recovers it.
+**Tested: `max` 39.86 (−3.67), `global` 39.05 (−4.48). It does the opposite.**
+
+⭐⭐ **Precision collapses as the gate loosens** — 68.1 → 58.2 → 56.7, `building` 77.0 → 49.4 —
+**while recall barely moves. The per-crop gate was suppressing FALSE predictions, not valid ones.**
+So the loss is not resolution-minus-gate: crops cost scene context, every head degrades, and the
+gate partly rescues it.
+
+⭐⭐ **A second job for presence gating, not previously identified:** beyond suppressing
+`background` (§9.2b), it suppresses classes **outside the current field of view** — worth 3.67–4.48
+mIoU. Fourth measurement showing loosening this gate costs more than it returns.
+⚠️ Half the diagnosis survives: `water` recovers 37.16 → 44.33 (50.2%) under the global gate and is
+the only class that improves.
+
+⛔ **I advised against this run and was overruled. Running it was correct** — it caught a wrong
+mechanism on its way into the paper. Record on "this should work": **0 for 5**. Paper,
+CLAUDE.md and the results file all corrected. **Stopping here; the next work is writing.**
+
 ## 2026-09-13 (Sat) — sliding window costs 3.85, and WEEK1 had it wrong for a month
 
 **@SLIDING_WINDOW_RESULTS.md.** WEEK1_RESULTS claimed in three places that the eval path runs

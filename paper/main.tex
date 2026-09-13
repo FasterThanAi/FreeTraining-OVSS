@@ -318,17 +318,31 @@ verify it against the deployed pipeline in Section~\ref{sec:results}.
 alternative costs.} SAM~3 resizes every input to $1008^2$, so a $1024^2$ tile is
 seen at roughly 1:1 while \swCrop{}$^2$ crops would be \emph{upsampled} --- the
 sliding-window inference the rest of this literature uses, and which
-SegEarth-OV3 does not. We tested it: mIoU falls \swDelta{}, to \swMIoU{}.
-\best{Mean precision \emph{rises} \swPrec{} while mean recall falls \swRec{},
-which is a tighter gate rather than sharper features.} $S_\mathrm{pres}$ is
-computed per view, so a class absent from a crop is vetoed there and, since
-$P_\mathrm{final}=P_\mathrm{fused}\cdot S_\mathrm{pres}$, every one of its pixels
-in that crop is crushed. Spatially concentrated classes pay most: \texttt{water},
-which occupies part of a tile rather than all of it, loses \swWater{}~IoU on
-\swWaterRec{} recall, and \bg{}'s recall rises \swBgRec{} as the catch-all absorbs
-the difference. \best{The baseline's whole-image choice is correct, and this is
-why.} We report it because the alternative is standard practice elsewhere and a
-reader is entitled to know it was measured rather than assumed.
+SegEarth-OV3 does not. We tested it: mIoU falls \swDelta{}, to \swMIoU{}. Mean precision \emph{rises}
+\swPrec{} while mean recall falls \swRec{}, and \texttt{water} --- which occupies
+part of a tile rather than all of it --- loses \swWater{}~IoU on \swWaterRec{}
+recall.
+
+Because $S_\mathrm{pres}$ is computed per view, the natural reading is that the
+gate is at fault: a class absent from one crop is vetoed there, and
+$P_\mathrm{final}=P_\mathrm{fused}\cdot S_\mathrm{pres}$ then crushes every one of
+its pixels. \best{We tested that reading directly and it is wrong.} Gating instead
+by the maximum presence over crops gives \swMax{}, and by a single whole-image
+forward \swGlobal{} --- a further \swMaxDelta{} and worse. Precision collapses as
+the gate loosens ($\swPrecDrop{}$; \texttt{building} alone $\swBuildPrec{}$) while
+recall barely moves. \best{The per-crop gate was not destroying valid predictions
+but suppressing false ones}: a class genuinely absent from a crop should be vetoed
+there, and telling the model it is present somewhere in the tile lets it fire
+across the whole grid.
+
+The loss is therefore not resolution offset by gating. \best{Crops cost scene
+context, that degrades every head, and the per-crop gate partly rescues it} ---
+which identifies a second role for presence gating beyond the suppression of
+\bg{} reported in the supplementary: it suppresses classes outside the current
+field of view, worth \swMaxDelta{}~mIoU here. \best{The baseline's whole-image
+choice is correct, and this is why.} We report the whole sequence because the
+alternative is standard practice elsewhere, and because the first explanation we
+reached for was the wrong one.
 
 \section{Anatomy of the residual}
 \label{sec:anatomy}

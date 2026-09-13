@@ -183,17 +183,32 @@ measuring the same object — which was the **opposite** of the truth and is wit
 **Tested (`slide_crop=512`, `stride=341`, LoveDA val): 47.38 → 43.53, −3.85.** W1 predicted a rise
 above +1.0 and is refuted.
 
-⭐⭐ **Why, and it is the paper's own mechanism a third time.** mPrecision **+1.1**, mRecall
-**−4.7** — a *tighter gate*, not sharper features. `S_pres` is computed **per view**, so a class
-absent from a 512² crop is vetoed there and `P_final = P_fused·S_pres` crushes every one of its
-pixels. Spatially concentrated classes pay: ⭐ **`water` −14.28 IoU on −16.1 recall while its
-precision RISES 1.3**, and `background`'s recall jumps **+12.9** as the catch-all absorbs the
-difference — so the **discard rate rose**, refuting W2 as well.
-⛔ **W5 was backwards**: I predicted per-crop presence would be *more* informative since a class in
-one corner is no longer averaged against three empty ones. The mechanism is that it is **vetoed**
-in the other three.
-⭐ **The branch table named this in advance** — *"crops lose global context and `S_pres` is computed
-per view"* — so it is a pre-registered negative, not a post-hoc rationalisation.
+**Symptoms:** mPrecision **+1.1**, mRecall **−4.7**; ⭐ `water` **−14.28 IoU on −16.1 recall while
+its precision RISES**; `background` recall **+12.9**, so the discard rate rose (W2 refuted too).
+
+⛔⛔ **MY FIRST DIAGNOSIS WAS WRONG, AND IT WAS ABOUT TO ENTER THE PAPER AS FACT.** I concluded the
+per-crop presence gate *caused* the loss — a class in one corner is vetoed in the other three. That
+predicts loosening the gate recovers it. **Tested (`presence_mode`, 13 Sep): it does the opposite.**
+
+| gate, under sliding window | mIoU | vs per-crop | mPrec |
+|---|---|---|---|
+| **per crop** (published) | **43.53** | — | **68.1** |
+| max over crops | 39.86 | ⛔ **−3.67** | 58.2 |
+| one whole-image forward | 39.05 | ⛔ **−4.48** | 56.7 |
+
+⭐⭐ **Precision collapses as the gate loosens while recall barely moves** (`building` 77.0 → 49.4,
+`road` 69.7 → 52.3). **The per-crop gate was suppressing FALSE predictions, not valid ones.** A
+class genuinely absent from a crop should be vetoed there.
+⭐ **So the −3.85 is not resolution-minus-gate: crops cost scene context, that degrades every head,
+and the gate partly RESCUES it.** ⭐⭐ **That is a SECOND job for presence gating the project had
+not identified** — beyond suppressing `background` (§9.2b, median 0.022), it suppresses classes
+**outside the current field of view**, worth 3.67–4.48 mIoU here. Fourth independent measurement
+that loosening this gate costs more than it returns (τ→0.1 −5.54; `--no-presence` −11.97; these).
+⚠️ **Half of the first diagnosis survives:** `water` *is* hurt by per-crop gating and recovers
+37.16 → **44.33** (50.2%) under the global gate — the only class that improves. Right mechanism for
+that class, wrong about the net.
+⛔ **I advised against running this follow-up and was overruled. Running it was correct** — it
+caught an error heading for the paper. My record on "this should work" is now **0 for 5**.
 
 **What it is worth:** it forecloses *"why not multi-scale, as the rest of the literature does?"*
 with a number; it is the most nearly **causal** of the three presence-gate demonstrations (§9.2b

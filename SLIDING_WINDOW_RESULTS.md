@@ -54,6 +54,53 @@ opposite is the mechanism: a class in one corner is now **vetoed** in the other 
 
 ---
 
+## 2a. ⛔ AND §2's DIAGNOSIS IS WRONG — tested 13 Sep, corrected here
+
+§2 above concluded that the per-crop presence gate **caused** the loss: *"a class present in one
+corner is vetoed in the other three."* That implies loosening the gate should recover the loss.
+**It was tested directly and it does the opposite.**
+
+| gate under sliding window | mIoU | vs per-crop | mPrecision | mRecall |
+|---|---|---|---|---|
+| **per crop** *(the published behaviour)* | **43.53** | — | **68.1** | 57.3 |
+| max over crops — *"present anywhere in the tile"* | **39.86** | ⛔ **−3.67** | 58.2 | 59.0 |
+| one whole-image forward | **39.05** | ⛔ **−4.48** | 56.7 | 57.8 |
+
+> ⭐⭐ **Precision collapses as the gate loosens — 68.1 → 58.2 → 56.7 — while recall barely moves.
+> The per-crop gate was not destroying valid predictions. It was suppressing false ones.**
+
+`building`'s precision goes **77.0 → 49.4**, `road`'s **69.7 → 52.3**. A class that is genuinely
+absent from a crop *should* be vetoed there, and telling the model it is "present somewhere in the
+tile" lets it fire across the whole crop grid.
+
+### ⭐ What the loss actually is
+
+If the gate were the cause, removing it would help. It hurts. So sliding-window's **−3.85** is not
+*resolution minus gate*: **crops lose scene context, that degrades every head, and the per-crop
+gate is what partly rescues it.** The resolution benefit this run was meant to isolate is at best
+small and is swamped; it cannot be separated with this design, because every crop configuration
+changes context for the semantic and instance heads too, not only for presence.
+
+⭐⭐ **And that is a second job for presence gating that the project had not identified.**
+WEEK1 §9.2b established one — it suppresses `background`, whose median `S_pres` is 0.022. This
+establishes another: **it suppresses classes that are outside the current field of view**, and
+under sliding window that job is worth **3.67–4.48 mIoU**. It is the fourth independent measurement
+showing that loosening this gate costs more than it returns (τ→0.1 −5.54; `--no-presence` −11.97;
+these two).
+
+### ⚠️ The half of §2 that survives
+
+`water` *is* hurt by per-crop gating, exactly as §2 argued — it is spatially concentrated, so it
+loses its presence score in most crops. Under the whole-image gate it recovers **37.16 → 44.33**,
+**50.2%** of its loss, and it is the only class that improves. **The mechanism was right for that
+class and wrong about the net**: repairing water costs more in `background`, `road` and `building`
+than it returns.
+
+⛔ **§2's closing sentence — "shrinking the view shrinks what the gate lets through" — is true and
+misleading.** It lets less through because less *should* be let through.
+
+---
+
 ## 3. Predictions scored
 
 | | prediction | measured | |
@@ -62,7 +109,11 @@ opposite is the mechanism: a class in one corner is now **vetoed** in the other 
 | **W2** | discard rate falls | rose (bg recall +12.9) | ⛔ **refuted** |
 | W3 | levers still clear the gate, gain < +2.32 | not run — pointless on a worse baseline | — |
 | **W4** | `water`'s advantage shrinks but survives | **−14.28 IoU**, the worst class | ⛔ |
-| **W5** | presence becomes more informative | ⭐ **exactly backwards** | ⛔ **and that is the finding** |
+| **W5** | presence becomes more informative | ⭐ **exactly backwards** | ⛔ |
+
+⚠️ **W5's scoring is itself corrected by §2a.** Per-crop presence is *less* informative about what
+is in the tile and *more* informative about what is in the **crop** — which is the quantity the
+decision actually needs. Calling it "backwards" was right; calling the veto a fault was not.
 
 ⭐ **The branch table named the mechanism in advance.** Written before the run:
 
@@ -94,13 +145,17 @@ and might land differently; we do not claim a curve.
 
 ---
 
-## 5. ⚠️ The obvious follow-up, and why I am not recommending it
+## 5. ⚠️ The follow-up: advised against, run anyway, and it refuted my diagnosis
 
 The diagnosis suggests a fix: compute `S_pres` **once over the whole image** and apply it to
 **crop-level** fused scores — global presence, local resolution. It is one more `eval.py` run.
 
-⛔ **I am not recommending it, for three reasons.** It would be a fourth attempt at the same
-family after three nulls and my record on "this should work" is now **0 for 4**. It is an
-inference-time change, not a methodological one, so it strengthens the baseline rather than the
-contribution. And it would move every absolute number in the paper five weeks from a content
-freeze. **Record it as the natural next question and leave it to the reviewer or to future work.**
+⛔ I advised against it: a fourth attempt at the same family after three nulls, an inference-time
+change rather than a methodological one, and weeks from a content freeze. **It was run anyway, and
+that was the right call** — see §2a. My objections were about cost and novelty and they stand, but
+the run did something I had not argued for: it **refuted my own explanation of §2**, which was
+about to go into the paper as fact. ⭐ **A wrong mechanism caught by a two-hour run is worth far
+more than the run cost.**
+
+⭐ **Scored honestly: my record on "this should work" is now 0 for 5**, and the one time I argued
+*against* running something, running it was what caught my error.
