@@ -1,0 +1,7 @@
+background,other,unlabeled
+building,house,rooftop
+road,street,highway
+water,river,lake
+barren,bareland,bare soil
+forest,tree,woodland
+agricultural,farmland,cropland
