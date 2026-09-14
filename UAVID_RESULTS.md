@@ -742,3 +742,66 @@ pre-registration predicted and what no threshold can do.
 Our own reproduction is 2.16 above their number for reasons we cannot explain, so **the
 honest claim is +6.69 over our own reproduced baseline**, exactly as the ConInfer row is
 handled in the other direction.
+
+
+---
+
+## 19. ⭐⭐⭐ ONE WORD IS WORTH +3.53 mIoU — V1 and V2 confirmed
+
+`prereg/predict_uavid_vocabulary.md` (`b20eaf8`), committed before any cache existed.
+**One line of `cls_uavid.txt` changed: `vegetation` → `low vegetation`.** ✅ Same line count,
+so still one prompt per class — no arity confound (`WEEK3 §7b`).
+
+| | `vegetation` | **`low vegetation`** | Δ |
+|---|---|---|---|
+| **mIoU** | 56.86 | ⭐ **60.39** | ⭐ **+3.53** |
+| aAcc | 79.24 | 82.96 | +3.72 |
+
+### ⭐⭐ And it moves ONLY the two classes lever 2 was repairing
+
+| class | `vegetation` | `low vegetation` | Δ |
+|---|---|---|---|
+| ⭐ **tree** | 53.15 | **67.81** | ⭐ **+14.66** |
+| ⭐ **vegetation** | 50.19 | **61.33** | ⭐ **+11.14** |
+| `background` | 55.23 | 54.16 | −1.07 |
+| building | 90.79 | 90.75 | −0.04 |
+| road | 67.79 | 67.77 | −0.02 |
+| human | 17.62 | 17.64 | +0.02 |
+| car | 63.28 | 63.29 | +0.01 |
+
+**Every class except `tree`, `vegetation` and the catch-all moves by at most 0.04.** A
+two-word prompt cannot be confused with a general improvement: it is surgical.
+
+### V2 — the diagnostic, predicted in advance and both directions right
+
+| | before | after | predicted |
+|---|---|---|---|
+| `vegetation` **precision** | 53.62 | ⭐ **71.51** | rises ✅ |
+| `tree` **recall** | 55.90 | ⭐ **72.76** | rises ✅ |
+
+⭐ The bare word `vegetation` was matching trees, so the class over-fired (precision 53.6)
+and stole `tree`'s pixels (recall 55.9). Naming the class *low vegetation* separates them.
+**That is the same confusion lever 2 repaired with a 6.4× scale ratio — reached instead by
+typing two words.**
+
+### ⚠️ What this already changes, before V3 is known
+
+⭐ **This is a second dataset confirming `PROMPT_ENSEMBLE_RESULTS`' finding that the
+vocabulary is the largest single lever in this pipeline.** LoveDA: `barren` 35.73 → 1.17 on
+two words, **+4.94 mIoU**. UAVid: **+3.53 on one word**, larger than the entire calibration
+method delivers on LoveDA (+2.32). The vocabulary is inherited, hand-written and unreported
+by the baseline, and it is worth more than anything else measured in this project.
+
+⛔ **Reporting discipline, decided in the pre-registration rather than now:**
+- **The reproduction row keeps THEIR vocabulary** — 56.86 against their published 54.7 — or
+  it is no longer a reproduction of their configuration.
+- **Our method's reported configuration uses the corrected prompt**, because keeping a number
+  obtained with a prompt we know to be wrong, on the grounds that it flatters the method,
+  is precisely what the pre-registration exists to prevent.
+- **The +3.53 is reported as its own result**, not folded into the method's gain.
+
+⏳ **V3 — the actual test — is still running.** Lever 2 was **+5.64** with the bad prompt.
+The new baseline already reaches `tree` 67.81 and `vegetation` 61.33, where lever 2 with the
+old prompt reached 74.04 and 63.00 — so some headroom remains, but much of the mass lever 2
+was collecting has now been collected by the word. **V3 asks whether lever 2's gain falls
+below +2.8.**
