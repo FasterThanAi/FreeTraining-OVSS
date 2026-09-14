@@ -188,6 +188,7 @@
 % delta is robust to a constant offset, but the text must say so.
 \newcommand{\cnPub}{39.33}         % ConInfer's published LoveDA mIoU
 \newcommand{\cnRepro}{36.99}       % our reproduction -- gap -2.34, full split
+\newcommand{\cnGap}{2.34}          % CONINFER_RESULTS: repro below published
 \newcommand{\cnTau}{0.8}           % THEIR published LoveDA threshold
 \newcommand{\cnBase}{37.00}        % held-out baseline at their tau
 \newcommand{\cnFit}{39.52}         % held out, per-class tau
@@ -419,3 +420,81 @@
 \newcommand{\ttaAtC}{+0.06}
 \newcommand{\ttaScaleWith}{+0.74}    % lever 2's own gain WITH tta
 \newcommand{\ttaScaleWithout}{+1.26} % ... and without
+
+% =====================================================================
+%  UAVid — the fourth dataset.  @UAVID_RESULTS.md
+% =====================================================================
+\newcommand{\uavPub}{54.7}           % SegEarth-OV3 Table 2, UAVid^img
+\newcommand{\uavBase}{56.86}         % UAVID §1   our reproduction, their vocabulary
+\newcommand{\uavGap}{+2.16}          % UAVID §1   unexplained
+\newcommand{\uavTiles}{70}           % official val frames
+\newcommand{\uavTrainTiles}{200}     % official train frames (real, excl. augmented)
+\newcommand{\uavScenes}{20}          % flights in the train split
+\newcommand{\uavValScenes}{7}        % flights in the val split
+\newcommand{\uavOracle}{59.7}        % their supervised SegFormer-b0 row
+\newcommand{\uavCatchShare}{16.16\%} % UAVID §4   catch-all share of GT
+\newcommand{\uavDiscard}{6.81\%}     % UAVID §1   real-class pixels to catch-all
+
+% ---- levers on UAVid, group-disjoint folds --------------------------
+\newcommand{\uavTauCV}{+1.34}        % UAVID §12  5-fold, 20 flights
+\newcommand{\uavTauSD}{0.39}
+\newcommand{\uavTauWorst}{+0.75}
+\newcommand{\uavScaleCV}{+5.89}      % UAVID §16  5-fold, on top of lever 1
+\newcommand{\uavScaleSD}{1.51}
+\newcommand{\uavOracleBound}{+1.40}  % UAVID §16  per-class tau oracle, 200 frames
+
+% ---- transfer: fitted on train, applied unchanged to val ------------
+\newcommand{\uavTauTrans}{+1.03}     % UAVID §14  lever 1 across the split
+\newcommand{\uavTauTransPerm}{0.0\%} % shuffles matching it
+\newcommand{\uavScaleTrans}{+5.64}   % UAVID §17  lever 2 across the split
+\newcommand{\uavScalePerm}{1.0\%}
+\newcommand{\uavScaleShuffle}{-2.82} % UAVID §20  shuffled assignment, corrected prompt
+\newcommand{\uavCalibScenes}{3}      % UAVID §14  scenes for +0.81
+\newcommand{\uavCalibGain}{+0.81}
+
+% ---- verified end-to-end --------------------------------------------
+\newcommand{\uavEEone}{57.92}        % UAVID §15  eval.py, lever 1
+\newcommand{\uavEEtwo}{63.55}        % UAVID §18  eval.py, lever 1 + lever 2
+\newcommand{\uavEEpred}{63.55}       % cached prediction -- agrees exactly
+\newcommand{\uavEEmax}{0.20}         % largest per-class disagreement
+\newcommand{\uavaAccA}{79.24}        % UAVID §18  pixel accuracy, baseline
+\newcommand{\uavaAccC}{84.81}
+\newcommand{\uavPrecD}{+0.60}        % mPrecision, lever 1+2 vs baseline
+\newcommand{\uavRecD}{+4.92}         % mRecall
+
+% ---- the corrected configuration -------------------------------------
+\newcommand{\uavCorrBase}{60.40}     % UAVID §19  with `low vegetation'
+\newcommand{\uavCorrOne}{+1.19}      % lever 1 on the corrected prompt
+\newcommand{\uavCorrTwo}{+2.03}      % lever 2 on the corrected prompt
+\newcommand{\uavCorrMethod}{+3.22}   % UAVID §20  the honest method contribution
+\newcommand{\uavCorrFinal}{63.62}
+\newcommand{\uavScaleLost}{64\%}     % share of lever 2's gain the prompt took
+
+% =====================================================================
+%  The vocabulary.  @VOCABULARY_RESULTS.md  -- pre-registered, two arms
+% =====================================================================
+\newcommand{\vocUavGain}{+3.53}      % VOCAB §1   vegetation -> low vegetation
+\newcommand{\vocUavTree}{+14.66}     % tree IoU
+\newcommand{\vocUavVeg}{+11.14}      % low-vegetation IoU
+\newcommand{\vocUavElse}{0.04}       % largest move among the other real classes
+\newcommand{\vocUavVegPrecA}{53.62}
+\newcommand{\vocUavVegPrecB}{71.51}
+\newcommand{\vocUavTreeRecA}{55.90}
+\newcommand{\vocUavTreeRecB}{72.76}
+\newcommand{\vocPotsBase}{57.83}     % VOCAB §2   recorded Potsdam baseline
+\newcommand{\vocPotsNew}{55.12}      % with `low vegetation'
+\newcommand{\vocPotsGain}{-2.71}
+\newcommand{\vocPotsTreeRec}{38.63}  % IDENTICAL before and after
+\newcommand{\vocPotsTreePrecA}{93.34}
+\newcommand{\vocPotsTreePrecB}{92.17}
+\newcommand{\vocLoveBarren}{+4.94}   % PROMPT_ENSEMBLE, LoveDA `barren'
+\newcommand{\vocRouteA}{63.55}       % UAVID §20  bad prompt + both levers
+\newcommand{\vocRouteB}{63.62}       % one word + both levers
+\newcommand{\vocRouteDelta}{0.07}
+
+% ---- the data traps, reported in setup -------------------------------
+\newcommand{\uavLeak}{+0.54}         % UAVID §8   frame-level folds inflate lever 1
+\newcommand{\uavLeakA}{+1.05}        % leaking
+\newcommand{\uavLeakB}{+0.51}        % group-disjoint
+\newcommand{\uavAug}{400}            % augmented copies shipped among 600 `train' frames
+\newcommand{\uavFrames}{10}          % consecutive frames per flight

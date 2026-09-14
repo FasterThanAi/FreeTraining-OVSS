@@ -99,6 +99,23 @@ gains \treeScale{}~IoU. The two levers turn out to be \best{substitutes} --- the
 scale adds \scPots{}~mIoU where thresholds add \subPotstau{}, and \scCI{} where they
 add \subCItau{} --- so which one pays depends on the pipeline's operating point
 rather than on its backbone.
+On a fourth dataset --- low-altitude drone video, a different sensor from the other
+three --- both levers hold under folds grouped by flight, and applied unchanged
+across a split boundary they raise \uavBase{} to \uavEEtwo{}, verified in the
+unmodified evaluation pipeline against a cached prediction that agrees exactly.
+\best{We then found that most of the second lever's gain there was repairing a word.}
+The vocabulary shipped with the baseline names that dataset's \emph{low vegetation}
+class \texttt{vegetation}, which also describes trees; correcting the single word is
+worth \vocUavGain{}~mIoU and removes \uavScaleLost{} of the lever's gain, so we
+report that dataset's contribution as \uavCorrMethod{}. \best{The vocabulary is the
+largest lever we measure and it has no rule.} The same correction applied to
+Potsdam's equivalent class \emph{costs} \vocPotsGain{}~mIoU, because the prompt
+shipped there is already better than the annotation guide's own term; on that dataset
+\texttt{tree}'s recall is unchanged to a hundredth of a point by the rename, so its
+deficit is visual confusion rather than a naming error and the scale reaches
+something a word cannot. A one-word change is worth \vocUavGain{} on one dataset and
+\vocLoveBarren{} on another, against \loveTotal{} for our complete method on LoveDA.
+Every training-free method inherits such a list; none report it.
 Finally, we show the oracle bound is not reachable without labels, and identify
 why: \nAttempts{} label-free rules fail, four of which provably estimate per-class
 precision, because the optimal threshold solves a \emph{coupled} multi-class
@@ -186,10 +203,20 @@ at
   \item \textbf{A second lever, and the bound that motivated it.} Because the
         completeness result above holds only \emph{given} the argmax, we fit a
         per-class scale \emph{before} it (Sec.~\ref{sec:scale}). It adds
-        \scPots{}~$\pm$~\scPotsSD{}~mIoU on Potsdam and \scLove{}~$\pm$~\scLoveSD{}
-        on LoveDA over thresholds alone, both verified end to end, and \scCI{} on
-        the CLIP pipeline. \best{We pre-registered a positive result there and were
+        \scPots{}~$\pm$~\scPotsSD{}~mIoU on Potsdam, \scLove{}~$\pm$~\scLoveSD{}
+        on LoveDA and \uavScaleCV{}~$\pm$~\uavScaleSD{} on UAVid over thresholds
+        alone, all verified end to end, and \scCI{} on the CLIP pipeline. \best{We pre-registered a positive result there and were
         wrong}; the mechanism we proposed is withdrawn in Sec.~\ref{sec:scaleresults}.
+  \item \textbf{\best{A larger lever than the method, and a correction to our own
+        result.}} Every training-free method inherits a hand-written prompt list and
+        none report it. Replacing one word with the dataset's own class name is worth
+        \vocUavGain{}~mIoU on UAVid --- more than our complete method earns on
+        LoveDA (\loveTotal{}) --- and it removes \uavScaleLost{} of the second
+        lever's gain there, so we restate that dataset's contribution as
+        \uavCorrMethod{} (Sec.~\ref{sec:vocab}). \best{The same rule applied to
+        Potsdam \emph{costs} \vocPotsGain{}~mIoU}, so the annotation guide's term is
+        not automatically the better prompt and no lookup rule exists. Both arms were
+        registered before running; one prediction of each pair failed and is reported.
   \item \textbf{A reporting recommendation.} We observe the catch-all moving the
         headline mIoU in both directions, supplying \oemBgGain{}~IoU of an
         apparent gain in one experiment and cancelling a real one in another, and
@@ -903,6 +930,134 @@ Table~\ref{tab:levers}'s substitution, and \best{we state it as a description of
 three points rather than a law} --- it was not pre-registered, and the totals are not
 constant across them.
 
+\subsection{A fourth dataset, and a correction to our own headline}
+\label{sec:uavid}
+
+The three datasets above are satellite and airborne imagery. UAVid is low-altitude
+drone video, a different sensor and a different viewpoint, and its official
+training split is \uavTrainTiles{} labelled frames --- the same order as the
+calibration budget the method needs. We reproduce the baseline at \uavBase{}
+against a published \uavPub{}, and report both: the \uavGap{} discrepancy survives
+identical code, configuration, vocabulary and thresholds, and their released
+configuration points at a split whose labels are not public, so it is not
+resolvable from the release.
+
+\paragraph{Two properties of the data change the protocol, and both were initially
+got wrong.} UAVid's validation split is \uavValScenes{} drone flights of
+\uavFrames{} \emph{consecutive} video frames. A frame-level cross-validation
+therefore places near-duplicates of every evaluation frame in the calibration set,
+and it reports \uavLeakA{} where the group-disjoint answer is \uavLeakB{} ---
+\best{the leak is worth \uavLeak{}~mIoU and flips two of five folds}. Its
+distributed training split further ships \uavAug{} flipped and shifted copies among
+$600$ frames, so an image and its own mirror can land on opposite sides of a fold.
+Both are corrected by grouping folds by flight and excluding the augmented copies;
+all UAVid numbers here use that protocol. We record them because neither is visible
+in the directory structure, and both produce a clean, plausible, wrong result.
+
+\paragraph{Both levers work, and the second transfers better than the first.}
+Group-disjoint five-fold over \uavScenes{} flights gives \uavTauCV{}~$\pm$~\uavTauSD{}
+for thresholds, worst fold \uavTauWorst{}, and \best{\uavScaleCV{}~$\pm$~\uavScaleSD{}}
+for the scale on top --- the largest scale gain we measure. Fitting both on the
+training split and applying them \emph{unchanged} to validation gives \uavTauTrans{}
+and \uavScaleTrans{}, so the scale retains $96\%$ of its within-split value across a
+split boundary where thresholds retain $77\%$. \best{\uavCalibScenes{} flights are
+enough}: \uavCalibGain{} at that budget, with the worst of five draws positive.
+Shuffling which class receives which multiplier costs \uavScaleShuffle{}~mIoU and
+\uavScalePerm{} of $200$ draws match the fitted assignment, so what transfers is the
+assignment and not the fact that some classes were scaled.
+
+\paragraph{Verified end to end.} Deploying both vectors in the unmodified evaluation
+pipeline gives \uavEEone{} for thresholds and \best{\uavEEtwo{}} for both, against a
+cached prediction of \uavEEpred{} --- exact on the headline, every class within
+\uavEEmax{}. Pixel accuracy rises \uavaAccA{}~$\to$~\uavaAccC{}, and mean precision
+and recall \emph{both} rise (\uavPrecD{}, \uavRecD{}), which distinguishes a better
+decision from a redistributed one.
+
+\paragraph{\best{And then we found that most of the second lever's gain there was a
+prompt.}} UAVid's class is \emph{low vegetation}; the vocabulary shipped with the
+baseline names it \texttt{vegetation}, a word that also describes trees. Correcting
+that single word (Sec.~\ref{sec:vocab}) removes \uavScaleLost{} of the scale's gain:
+\uavScaleTrans{}~$\to$~\uavCorrTwo{}. \best{We therefore report UAVid's method
+contribution as \uavCorrMethod{}, not the \uavEEtwo{}~$-$~\uavBase{} the uncorrected
+chain suggests} --- \uavCorrOne{} from thresholds and \uavCorrTwo{} from the scale,
+on a corrected baseline of \uavCorrBase{}, reaching \uavCorrFinal{}. That is in line
+with the other datasets (\loveTotal{} on LoveDA, \potsTotal{} on Potsdam) and it is
+the figure that survives the check. We report the uncorrected chain too, because the
+comparison between the two is the finding of the next section.
+
+\subsection{A larger lever than either, and no rule for setting it}
+\label{sec:vocab}
+
+Every training-free open-vocabulary method inherits a hand-written list of class
+prompts. None of the work we compare against reports how that list was chosen, and
+our own results above are stated at a vocabulary we did not write. We therefore
+tested it, on two datasets, with the prediction committed to version control before
+each run.
+
+\paragraph{The rule tested is the obvious one, applied uniformly:} replace the
+shipped prompt with the name the dataset's own annotation guide uses. One word
+changes; the prompt count per class is unchanged, which matters because prompt
+\emph{arity} moves scores regardless of meaning (Sec.~\ref{sec:intervention}).
+
+\begin{table}[t]\centering\small
+\caption{The same rule, applied to the same class, on two datasets. One word.}
+\label{tab:vocab}
+\begin{tabular}{llll}
+\toprule
+ & shipped prompt & annotation guide & $\Delta$ mIoU \\
+\midrule
+UAVid   & \texttt{vegetation} & \emph{low vegetation} & \best{\vocUavGain{}} \\
+Potsdam & \texttt{grass}      & \emph{low vegetation} & \best{\vocPotsGain{}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{On UAVid it is worth \vocUavGain{}~mIoU, and it is surgical.}
+\texttt{tree} gains \vocUavTree{} and the low-vegetation class \vocUavVeg{}, while
+\emph{every other real class moves by at most \vocUavElse{}}. The mechanism is
+visible in the two numbers we pre-registered: the low-vegetation class was firing on
+anything green, and its precision rises \vocUavVegPrecA{}~$\to$~\vocUavVegPrecB{};
+\texttt{tree} was losing those pixels, and its recall rises
+\vocUavTreeRecA{}~$\to$~\vocUavTreeRecB{}.
+
+\paragraph{On Potsdam the same rule \best{costs} \vocPotsGain{}~mIoU, and we
+predicted the magnitude wrongly.} We pre-registered that the change would move the
+score by less than one point; it moved \vocPotsGain{}. The shipped \texttt{grass} is
+\emph{better} than the official name --- specific, visual, and crucially it does not
+name the neighbouring class. \best{So the annotation guide's own term is not
+automatically the better prompt, and there is no lookup rule here.}
+
+\paragraph{The prediction that did hold is the one that identifies the mechanism.}
+Potsdam's \texttt{tree} recall is \vocPotsTreeRec{} before the change and
+\vocPotsTreeRec{} after --- unchanged to a hundredth of a point --- while its
+precision falls \vocPotsTreePrecA{}~$\to$~\vocPotsTreePrecB{} as the weaker prompt
+leaks pixels into it. \best{Renaming a competing class changes nothing about
+\texttt{tree} there.} Potsdam's tree deficit is visual confusion at 5\,cm
+ground sampling distance, not a naming error, which is why the scale reaches it and
+a better word does not. \best{The two datasets look identical in the results table
+--- a scale gain carried by \texttt{tree} --- and have different causes.}
+
+\paragraph{\best{The word and the multiplier are substitutes.}} On UAVid the two
+routes end in the same place: keeping the flawed prompt and letting both levers
+repair it reaches \vocRouteA{}, while correcting the word first and then applying
+both levers reaches \vocRouteB{} --- \vocRouteDelta{}~mIoU apart, and within about
+one point per class. \best{Typing two words and fitting a multiplicative reweighting
+on \uavTrainTiles{} labelled frames address the same pixels.} One class does not
+substitute: \texttt{human} gains the same amount either way, because it is not
+losing an argmax to a mis-named neighbour, it is simply too conservative. This is
+the second substitution we measure between an intervention that adds or corrects
+evidence and one that fixes the decision.
+
+\paragraph{What we take from this.} A one-word change is worth \vocUavGain{} on
+UAVid and \vocLoveBarren{} on LoveDA, against \loveTotal{} for our complete
+method on LoveDA. \best{The vocabulary is the largest single lever we have measured
+in this pipeline, it is unreported, and the direction of a change to it is not
+predictable from the class name.} We do not offer a method for choosing prompts ---
+our two arms disagree, which is the point. We offer the measurement, and the
+recommendation that the prompt list be reported and ablated alongside the
+architecture, because on these benchmarks it is worth more than the methods being
+compared.
+
 \subsection{Three further levers, and what their failure delimits}
 \label{sec:levers}
 
@@ -1174,7 +1329,9 @@ the same source --- which answers both questions at once.
 \section{Limitations}
 \label{sec:limitations}
 
-\paragraph{Two datasets.} The mechanism is established by intervention
+\paragraph{Two datasets for the mechanism.} The method is evaluated on four
+datasets and a second pipeline; the \emph{mechanism} of Section~\ref{sec:mechanism}
+rests on two. It is established by intervention
 (Section~\ref{sec:intervention}) on one of them, and the stratified evidence
 supporting it comes from the other. A third dataset whose catch-all is common but
 visually distinct would strengthen both, and we did not have one: the obvious
@@ -1185,6 +1342,39 @@ classes upward rather than at random, and the arity-matched control is not
 perfectly inert, since dropping a prompt disturbs the scores wherever that class's
 pixels lie. We therefore report the dose-to-control \emph{ratio} rather than the
 difference alone.
+
+\paragraph{\best{Our remaining results are stated at vocabularies we have not
+audited.}} Section~\ref{sec:vocab} shows a single word is worth \vocUavGain{} on one
+dataset --- more than our complete method earns on LoveDA --- and that the direction
+of such a change is not predictable. We tested two prompts on two datasets. LoveDA's
+and OpenEarthMap's lists are untested by the same rule, and we cannot exclude that
+part of the gains reported for them would also be available by rewording. Two things
+bound this rather than excuse it. Potsdam was tested precisely because its scale gain
+has the same signature as UAVid's and it came back clean, with the shipped prompt
+beating the annotation guide's own term. And LoveDA's list already carries hand-tuned
+synonyms whose removal costs \vocLoveBarren{}~mIoU, which is evidence that it was
+written with more care than UAVid's. \best{Neither is a substitute for auditing it,
+and we recommend the field report prompt lists as part of a method rather than as
+part of a configuration file.}
+
+\paragraph{One reproduction does not reproduce.} Our UAVid baseline is \uavGap{}
+above the published figure under identical code, configuration, vocabulary and
+thresholds, and we cannot account for it: the released configuration points at a
+split whose labels are not public, and no preparation procedure is documented. We
+report both numbers and quote gains against our own reproduction throughout, as we do
+in the opposite direction for the CLIP-based competitor, whose LoveDA figure we
+reproduce \cnGap{} \emph{below} its published value. A gain measured as a difference
+on one pipeline is robust to a constant offset in that pipeline; an absolute
+comparison across the two is not, and we do not make one.
+
+\paragraph{UAVid's validation split is seven scenes.} Seventy frames sounds
+comparable to the other datasets and is not: they are \uavFrames{} consecutive video
+frames from each of \uavValScenes{} flights, so the effective sample size is the
+flight count. Five-fold cross-validation inside it scores on one or two flights per
+fold and its baseline swings eighteen mIoU points across folds, which is why we fit
+on the training split and evaluate on validation whole rather than reporting folds
+within it. The same caution applies to any video-derived benchmark evaluated with
+frame-level splits.
 
 \paragraph{Calibration must match the evaluation distribution, and the gain is
 not uniform.} Fitting on LoveDA's \emph{train} split and evaluating on val gives
