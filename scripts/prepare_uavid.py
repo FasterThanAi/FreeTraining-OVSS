@@ -89,9 +89,19 @@ def main():
     src = Path(args.src).expanduser() / f'uavid_{args.split}'
     if not src.is_dir():
         raise SystemExit(f'{src} does not exist')
-    seqs = sorted(d for d in src.iterdir() if d.is_dir())
-    print(f'\n  {len(seqs)} sequences under {src}: '
-          f'{", ".join(d.name for d in seqs)}')
+    # ⛔ DO NOT assume `split/seq*/Images`. This mirror nests one level deeper
+    # -- `ls uavid_val` shows a single `seq16` while `find` turns up all 70
+    # official val frames -- which is the same doubled-nesting trap WEEK1 3
+    # records for LoveDA's `Val/Val/`. An earlier version read one sequence,
+    # reported an incomplete download, and the download was complete.
+    # Find every directory named `Images` at ANY depth and pair it with its
+    # sibling `Labels`; that is true whatever the nesting.
+    seqs = sorted({d.parent for d in src.rglob('Images') if d.is_dir()})
+    print(f'\n  {len(seqs)} sequence dir(s) under {src}:')
+    for d in seqs[:8]:
+        print(f'    {d.relative_to(src)}')
+    if len(seqs) > 8:
+        print(f'    ... and {len(seqs) - 8} more')
     # ⚠️ How many sequences the official val split contains is NOT hardcoded
     # here, because an earlier version asserted "five, seq16-seq20" on no
     # evidence and that was a guess dressed as a fact. What matters is that the
@@ -124,18 +134,23 @@ def main():
     for s in seqs:
         imgs = sorted((s / 'Images').glob('*.png'))
         if not imgs:
-            print(f'  ⚠️ {s.name}: no Images, skipped')
+            print(f'  ⚠️ {s}: no Images, skipped')
             continue
         labs = sorted((s / 'Labels').glob('*.png'))
         if len(labs) != len(imgs):
             raise SystemExit(
-                f'{s.name}: {len(imgs)} images but {len(labs)} labels. '
+                f'{s}: {len(imgs)} images but {len(labs)} labels. '
                 f'A split that does not pair up produces a plausible table from '
                 f'mismatched data.')
+        # ⛔ The prefix must be unique across the WHOLE tree. With nesting,
+        # two different parents can share a basename, and a basename-only
+        # prefix would silently overwrite -- the very collision the rename
+        # exists to prevent.
+        tag = '_'.join(s.relative_to(src).parts) or s.name
         for im, la in zip(imgs, labs):
             if im.name != la.name:
-                raise SystemExit(f'{s.name}: {im.name} pairs with {la.name}')
-            pairs.append((s.name, im, la))
+                raise SystemExit(f'{tag}: {im.name} pairs with {la.name}')
+            pairs.append((tag, im, la))
     print(f'  {len(pairs)} image/label pairs')
     if args.dry_run:
         for n, im, _ in pairs[:3]:
