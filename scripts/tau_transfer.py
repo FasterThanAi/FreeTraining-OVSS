@@ -203,11 +203,31 @@ def main():
     # Does the class ASSIGNMENT transfer, or only the spread of values? Shuffle
     # C's thresholds among the real classes and re-evaluate.
     real = [c for c in range(nc) if c != bg]
-    perm_d = []
+    # ⛔ A permutation draw can BE the identity, and then the "shuffle" is the
+    # real assignment scored against itself. With 6 real classes that is 1 draw
+    # in 720 and it never bit; with 2 it is half of them, and the control
+    # reported 75%% of shuffles matching when the only genuine shuffle scored
+    # -0.03 against +45.24. It also matters with MANY classes when two of them
+    # are fitted to the same value -- UAVid gives two classes the same threshold, so swapping those two is a no-op dressed as a draw. Compare the
+    # resulting VECTOR, not the index permutation.
+    perm_d, degen = [], 0
+    _real = np.array(real)
     for _ in range(args.perms):
-        t = taus_src.copy()
-        t[real] = taus_src[np.array(real)[rng.permutation(len(real))]]
+        t = None
+        for _try in range(64):
+            cand = taus_src.copy()
+            cand[_real] = taus_src[_real[rng.permutation(len(_real))]]
+            if not np.allclose(cand, taus_src):
+                t = cand
+                break
+        if t is None:
+            degen += 1
+            continue
         perm_d.append(miou(ev(t)) - m_pub)
+    if not perm_d:
+        raise SystemExit('every permutation of the thresholds was a no-op')
+    if degen:
+        print(f'  note: {degen} draws discarded as no-ops (equal thresholds)')
     perm_d = np.array(perm_d)
     real_d = miou(C_tr) - m_pub
     beat = float((perm_d >= real_d).mean())
