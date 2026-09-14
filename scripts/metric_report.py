@@ -33,6 +33,7 @@ import argparse
 import sys
 from pathlib import Path
 
+import re
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -56,12 +57,29 @@ def main():
     ap.add_argument('--objective', choices=['all', 'real'], default='real')
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--limit', type=int, default=0)
+    ap.add_argument('--exclude-re', default=None,
+                    help='drop cache files whose stem matches this REGEX. The '
+                         'UAVid Kaggle repack ships 200 real train frames plus '
+                         '400 augmented copies (flipped*/shifted*); an original '
+                         'and its own mirror landing in different folds is the '
+                         'same pixels on both sides, a worse leak than '
+                         'correlated video frames. Example: '
+                         '--exclude-re "_(flipped|shifted)"')
     ap.add_argument('--md', default=None)
     args = ap.parse_args()
 
     LB = labels.from_cache(args.cache)
     nc, bg = LB.n, LB.bg - 1
     files = sorted(Path(args.cache).expanduser().glob('*.npz'))
+    if args.exclude_re:
+        _ex = re.compile(args.exclude_re)
+        _before = len(files)
+        files = [f for f in files if not _ex.search(f.stem)]
+        if not files:
+            raise SystemExit(f'--exclude-re {args.exclude_re!r} removed every '
+                             f'one of the {_before} cache files')
+        print(f'  --exclude-re {args.exclude_re!r}: dropped '
+              f'{_before - len(files)} of {_before} tiles')
     if args.limit:
         files = files[:args.limit]
     if not files:

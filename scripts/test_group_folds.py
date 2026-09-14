@@ -93,6 +93,43 @@ def main():
     check('is fewer than {args.folds} ' in src or 'fewer than' in src,
           'script refuses folds > groups')
 
+    # --- the regex must cover EVERY real name form in both UAVid splits ---
+    # val : 000000..000900 (seq16) + fileNN-k          -> 7 sequences
+    # train: 000000..000900 (seq1) + fileNN-k + file-k -> 20 sequences
+    RE = r'([a-z]+[0-9]*)(?=[-_][0-9]+$)'
+    want = {'seq16_000000': 'seq16', 'seq16_file20-1': 'file20',
+            'seq16_file29-10': 'file29', 'seq1_000900': 'seq1',
+            'seq1_file5-4': 'file5', 'seq1_file18-10': 'file18',
+            'seq1_file-1': 'file'}
+    for stem, exp in want.items():
+        m = re.compile(RE).search(stem)
+        got = (m.group(1) if m else None)
+        check(got == exp, f'{stem:<18} -> {got} (want {exp})')
+
+    # the augmented copies must NOT silently become their own scenes
+    for stem in ['seq1_flipped18', 'seq1_shifted144', 'seq1_shifted9']:
+        m = re.compile(RE).search(stem)
+        check(m is None, f'{stem:<18} does not match -- it must be EXCLUDED, '
+                         f'not grouped')
+
+    # --- exclude-re exists in all three readers and drops exactly the 400 ---
+    import pathlib
+    for f in ['tau_cv.py', 'tau_oracle.py', 'metric_report.py']:
+        t = (pathlib.Path(__file__).resolve().parent / f).read_text()
+        check("ap.add_argument('--exclude-re', default=None," in t,
+              f'{f} accepts --exclude-re')
+        check('removed every ' in t, f'{f} refuses an exclusion that drops everything')
+    names = ([f'seq1_{i:06d}' for i in range(0, 1000, 100)] +
+             [f'seq1_file{s}-{k}' for s in range(2, 20) for k in range(1, 11)] +
+             [f'seq1_file-{k}' for k in range(1, 11)] +
+             [f'seq1_flipped{i}' for i in range(200)] +
+             [f'seq1_shifted{i}' for i in range(200)])
+    check(len(names) == 600, f'600 synthetic train stems ({len(names)})')
+    kept = [n for n in names if not re.search(r'_(flipped|shifted)', n)]
+    check(len(kept) == 200, f'exclusion leaves 200 real frames ({len(kept)})')
+    groups = {re.compile(RE).search(n).group(1) for n in kept}
+    check(len(groups) == 20, f'200 real frames carry 20 sequences ({len(groups)})')
+
     print()
     print('ALL PASS' if not fail else f'{fail} FAILURE(S)')
     return 1 if fail else 0
