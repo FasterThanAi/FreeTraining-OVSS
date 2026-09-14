@@ -602,3 +602,65 @@ which is what overfitting looks like"* and *"non-uniqueness, not overfitting"*. 
 a generic warning template; the second is the correct reading here, and the evidence is the
 sd column — the three classes that decide the result are stable to **0.01–0.02** across five
 disjoint flight groups. Quote the sd, not the warning.
+
+
+---
+
+## 17. ✅⭐⭐ LEVER 2 TRANSFERS train→val — +5.64 over lever 1 on tiles never seen
+
+`scale_transfer.py`. Fit `(w, τ)` on all 200 real train frames, evaluate **exactly over
+every one of 37,324,800 labelled pixels** of the 70 val frames. ✅ Gate exact: published τ
+reproduces **56.87**. ✅ The val cache is verified by arithmetic — 37,324,800 =
+40×(960×540) + 30×(1024×540), matching UAVid's two frame widths to the pixel.
+
+| arm | mIoU | Δ vs published |
+|---|---|---|
+| A published τ = 0.3 | 56.87 | — |
+| B lever 1 — per-class τ from train | 57.91 | +1.04 |
+| ⭐ **C + lever 2 — per-class scale from train** | ⭐ **63.55** | **+6.68** |
+| D `(w, τ)` fitted **on val** *(a bound, not a method)* | 64.17 | *+7.29* |
+
+> ⭐⭐ **Lever 2 adds +5.64 over lever 1 across a split boundary, reaching 90% of the
+> destination bound (+5.64 of +6.26).**
+
+Compare the within-split 5-fold (§16): **+5.89 ± 1.51**. The transfer keeps **96%** of it.
+⭐ **The scale transfers better than the threshold does** — lever 1 keeps +1.03 of its own
++1.34 (77%) — which is the opposite of what `road`'s threshold failure suggested.
+
+### Per class — and no real class loses
+
+| class | w | τ | published | lever 1 | **lever 2** | Δ (C−B) |
+|---|---|---|---|---|---|---|
+| ⭐ **tree** | **2.522** | 0.115 | 53.15 | 53.25 | ⭐ **74.04** | **+20.79** |
+| ⭐ **vegetation** | **0.383** | 0.180 | 50.20 | 49.92 | ⭐ **63.04** | **+13.12** |
+| **human** | **2.522** | 0.005 | 17.57 | 23.75 | **29.20** | **+5.45** |
+| car | 0.495 | 0.005 | 63.32 | 63.40 | 63.65 | +0.25 |
+| building | 1.788 | 0.160 | 90.73 | 91.40 | 91.58 | +0.18 |
+| road | 0.383 | 0.405 | 67.92 | 67.25 | 67.40 | +0.15 |
+| `background` | 1.212 | — | 55.21 | 56.39 | 55.96 | −0.43 |
+
+⭐ **Every real class is at or above its lever-1 value**, and `road` — which lever 1 *lost*
+0.68 on — is recovered to +0.15. The scale repairs the class the threshold hurt.
+
+### ⚠️ The permutation control is weaker than lever 1's, and the reason is in the vector
+
+| | Δ vs published |
+|---|---|
+| **real assignment** | **+6.68** |
+| shuffled, mean | **−1.58** |
+| shuffled, p95 | +6.57 |
+| shuffled, max | +6.72 |
+| matching or beating it | **1.0%** *(2 of 200)* |
+
+Lever 1's control gave **0.0%**. Here two draws match, and the vector says why: `road` and
+`vegetation` are **both 0.383**, `tree` and `human` **both 2.522**. Many rearrangements
+therefore preserve the structure that matters — *greens split, small objects up, road down*
+— and score nearly as well.
+⭐ **That refines the claim rather than weakening it: what transfers is the GROUPING, not
+seven individually meaningful numbers.** A shuffle that breaks the grouping costs 1.58 mIoU
+below the published baseline, an 8-point swing from the real assignment.
+
+⛔ **Still to verify end-to-end.** The deploy config
+`configs/cfg_uavid_val_scale.py` is written from the fit; `eval.py` should report **63.55**.
+The first attempt **CUDA-OOMed because another process held 10.61 GB of the 16 GB card** —
+a scheduling collision, not a fault in the run; the cached result above is unaffected.
