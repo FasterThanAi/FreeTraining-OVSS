@@ -1,165 +1,47 @@
-# `paper/` — the LaTeX skeleton
+# The paper — two documents, one set of numbers
 
-Started at Week 3 rather than ROADMAP's Week 9, because writing is what reveals a
-missing experiment while there is still time to run it.
+| file | length target | for |
+|---|---|---|
+| `main.tex` | **none** | the full version — journal (TGRS) or arXiv |
+| `main_cvpr.tex` | **8 pages excl. references** | a conference submission (CVPR / EarthVision) |
+| `supplementary.tex` | — | shared overflow, cited by both |
+| `numbers.tex` | — | ⭐ **every load-bearing number, defined once** |
+| `refs.bib` | — | shared bibliography |
 
-## Build
+## ⛔ Why two documents are safe here
 
-No LaTeX is installed on the Mac. Use Overleaf, or any TeX Live:
+`CLAUDE.md` recorded a decision **against** a second paper: *"one source of truth, and
+`numbers.tex` is it."* The risk that decision guarded against is real — a number right in
+one document and stale in the other.
 
-```bash
-cd paper && pdflatex main && bibtex main && pdflatex main && pdflatex main
-```
+**That risk is removed by construction, not by discipline.** Both papers `\input{numbers}`,
+so a value changes in both or in neither. What they may differ in is *prose and emphasis*,
+which is the point of having two.
 
-Figures are pulled from `../docs/` via `\graphicspath`, which works in place but
-not on Overleaf — there is no parent directory there. Do not flatten it by hand:
+`scripts/check_paper_consistency.py` enforces the rest:
 
-```bash
-bash scripts/make_overleaf_bundle.sh      # -> ~/Desktop/overleaf_paper.zip
-```
+1. every `\macro{}` used is defined,
+2. **no result is typed inline** — a ratchet, so the known backlog in `main.tex` and
+   `supplementary.tex` may fall but never rise, and `main_cvpr.tex` is held at zero,
+3. environments and braces balance,
+4. neither paper redefines a shared macro locally, which would silently break (1).
 
-That copies **only the figures `main.tex` actually includes**, strips the
-`\graphicspath` line, and fails loudly if a figure is missing rather than letting
-Overleaf discover it. Then: *New Project → Upload Project → that zip*.
+⚠️ **Run it before every bundle.** It has already caught two value collisions that a
+careless edit would have turned into a wrong citation: `54.7` is both UAVid's published
+mIoU and LoveDA `water`'s recall, and `+0.16` is both OpenEarthMap's threshold gain and
+lever four's null. **Never match a macro by its value.**
 
-## Where the figures come from
+## What differs between the two
 
-All are generated, none hand-drawn, and all are tracked in `docs/`:
+`main_cvpr.tex` keeps the method, the four datasets, the CLIP transfer, the vocabulary
+finding, the label-free bound and the limitations. It compresses the mechanism section
+and drops to the supplementary: the co-occurrence prior, the three null levers, the
+dose–response detail and the domain-transfer decomposition.
 
-| figure | script |
-|---|---|
-| `fig2_mechanism.pdf` | `scripts/fig_mechanism.py` |
-| `fig3_oem_per_class.pdf`, `fig4_detection_auc.pdf` | `scripts/fig_results.py` |
-| `fig7_method.pdf` | `scripts/fig_method.py` |
+## Building
 
-Each prints every plotted number against its `WEEK3_RESULTS.md` section on
-render. **A figure that has drifted from its source table is worse than no
-figure**, and that check is why. `fig5_atom_purity.pdf` is still generated but no
-longer used — it supported the component that did not earn its place.
+No LaTeX on the Mac side. Use `scripts/make_overleaf_bundle.sh`, which flattens
+`\input{../paper/numbers}` and refuses any surviving `../`.
 
-## ⚠️ `numbers.tex` is the only place a number may be typed
-
-Every load-bearing figure is a macro carrying the results section it came from.
-A number that is right in Table 1 and stale in the abstract is the cheapest
-remaining class of error in this project, and macros make it impossible.
-
-**If a number has no macro, it has no citation, and it does not go in the paper.**
-To add one: put it in `numbers.tex` with its `WEEK*_RESULTS.md` section in a
-comment, then use the macro.
-
-## Section map
-
-Follows `PAPER_OUTLINE.md` §3. Deviating from it means updating that file too —
-it is the document that decides what each experiment is *for*.
-
-## What `\todo{}` means
-
-Unwritten prose, deliberately loud in red. The tables, figures and contribution
-list are already real; the connecting text is not. Nothing marked `\todo` should
-survive to submission.
-
-## Template
-
-Written against plain `article` so it compiles anywhere. Two lines marked
-`% TEMPLATE` at the top switch it to CVPR (workshop, the primary target) or
-IEEEtran (GRSL, the backup). Nothing else assumes a document class.
-
-## ⚠️ Before submission — three things that are NOT done
-
-### 1. Complete the recent references
-
-`refs.bib` opens with a block marked **RECENT / VERIFY**. Those are 2025–2026
-works whose full author lists were not available offline, so they carry the first
-author, `and others`, and the arXiv identifier taken from `ANALYSIS.md`. Open each
-PDF and complete them:
-
-| key | what to fill in |
-|---|---|
-| `segearthov3` | full author list, arXiv:2512.08730 — **our baseline, get this right** |
-| `coninfer` | full author list, arXiv:2603.29271 |
-| `sam3` | full author list and the arXiv number |
-| `segearthov` | full author list, CVPR 2025 |
-| `ovrsisbench` | authors and title, arXiv:2604.15652 |
-
-**Do not guess an author list.** A wrong one is the error a reviewer who works in
-the area spots immediately, and it costs more credibility than a missing citation.
-
-### 2. Move to the venue template
-
-`main.tex` compiles as-is against plain `article`, deliberately — it builds
-anywhere, with no class file to chase. Two lines are marked `% TEMPLATE`:
-
-```latex
-\documentclass[10pt,a4paper]{article}         % TEMPLATE
-\usepackage[margin=2.2cm]{geometry}           % TEMPLATE
-```
-
-For a CVPR workshop, replace both with the CVPR class (Overleaf carries the
-template; start from it and paste the body in). For IEEE GRSL, use `IEEEtran`
-with `journal` options. **Nothing else in the file assumes a document class** —
-no hard-coded column widths, no `\linewidth` gymnastics — except that the two
-wide figures use `figure*`, which is correct in two-column and harmless in one.
-
-### 3. Length — the spine cut is done; judge the rest in the real template
-
-⭐ **The paper now has a stated spine: mechanism → method → transfer → bound.**
-*One global threshold is the wrong design; here is what it costs and what fixes it.*
-Everything off that line moved to `supplementary.tex` — **moved, not deleted**:
-
-| moved | why it is not spine |
-|---|---|
-| the co-occurrence prior, in full | a refuted idea; one paragraph in the main text discharges the honesty duty |
-| domain transfer + the composition decomposition | scope detail; the finding survives in three sentences |
-
-`main.tex` is now ~6,850 words with 5 tables and 4 figures; `supplementary.tex`
-holds ~1,000 words and one table. **Judge whether more must go after the first
-build in the real two-column class**, not before — page count in `article` at
-2.2\,cm margins says very little about page count in CVPR's class.
-
-If more is needed, cut in this order, and keep the principle: **cut a table, not a
-caveat.**
-
-### The old cut list, retained --- and the principle
-
-~7,100 words, 5 tables, 4 figures. That is roughly 10--11 two-column pages; a
-CVPR workshop paper is **8 pages excluding references**, or about 5,000--5,500
-words once floats are placed.
-
-⚠️ **Word-level editing will not close this.** A full tightening pass over the
-introduction and related work bought **69 words**. The prose is already dense, and
-squeezing further starts costing clarity rather than length. Two blocks are marked
-in `main.tex` instead:
-
-```
-% ==== SUPPLEMENTARY CANDIDATE 1: the refuted co-occurrence prior (~200 words)
-% ==== SUPPLEMENTARY CANDIDATE 2: domain transfer, Table 4 + prose (~520 words)
-```
-
-The test applied to both: **is anything here load-bearing for a claim made in the
-abstract?** Neither is. Moving both, plus their table, is roughly 2 pages.
-
-If that is still not enough, the next candidates in order are the composition
-decomposition (Section~\ref{sec:results}), then Figure~4, then the anatomy
-section. Supplementary material is normal at CVPR workshops and costs nothing.
-
-### The old cut list, retained --- and the principle
-
-Currently ~7,200 words, 6 tables, 5 figures. A CVPR workshop paper is **8 pages
-two-column excluding references**, which is roughly 5,000–5,500 words once
-figures are placed. So **about 1,500–2,000 words have to go.**
-
-Cut in this order, and note the principle: **cut a table, not a caveat.** The
-caveats are what make the causal claim credible; the tables can move.
-
-1. **Table 3 (co-occurrence ablation)** → one sentence. It is a refuted idea we
-   keep for honesty, and one sentence discharges that duty.
-2. **Table 5 (threshold rules)** → merge into the bound section as prose.
-3. **Section 6 (what we built)** → compress. The atomisation ceiling is a
-   two-sentence result; the prior's construction details belong in supplementary.
-4. **Figure 5 (atom purity)** → supplementary. It supports a component that did
-   not earn its place.
-
-**Do not cut:** the intervention control arms, the saturation bound, the P8
-failure, the units note, or the per-class decomposition of OpenEarthMap. Every
-one of them exists because a reviewer would otherwise construct it themselves,
-and the paper's credibility rests on getting there first.
+⚠️ **Neither document has been compiled since the UAVid and vocabulary sections were
+added.** Word counts are exact; page counts are estimates until one builds.

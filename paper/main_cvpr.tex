@@ -1,0 +1,543 @@
+% =====================================================================
+%  CONFERENCE VERSION -- 8 pages excluding references (CVPR / EarthVision).
+%
+%  ⚠️ THIS IS NOT A SECOND SOURCE OF TRUTH. It shares `numbers.tex` and
+%  `refs.bib` with main.tex, so NO NUMBER CAN DIVERGE between the two:
+%  change a value once and both papers change, or neither does.
+%  `scripts/check_paper_consistency.py` enforces that and fails if either
+%  file types a figure inline.
+%
+%  main.tex          -- the full version, no length target (journal/arXiv)
+%  main_cvpr.tex     -- this file, cut to a conference limit
+%  supplementary.tex -- shared overflow, cited by both
+%
+%  To submit: replace the two TEMPLATE lines with the venue class
+%  (\usepackage{cvpr} or IEEEtran). Nothing else assumes a class.
+% =====================================================================
+\documentclass[10pt,twocolumn,letterpaper]{article}          % TEMPLATE
+\usepackage[margin=1.9cm]{geometry}                          % TEMPLATE
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{../docs/}}
+\input{numbers}
+
+\newcommand{\best}[1]{\textbf{#1}}
+\newcommand{\bg}{\texttt{background}}
+\newcommand{\suppref}[1]{the supplementary material}
+
+\title{Calibrating the Decision, Not the Model:\\
+       Per-Class Thresholds for Training-Free Open-Vocabulary
+       Remote-Sensing Segmentation}
+
+\author{%
+  Priyanshu Kumar, \quad Raj Gautam, \quad Shounak Chakraborty, \quad K.~Sathya Babu\\[2pt]
+  Indian Institute of Information Technology Design and Manufacturing, Kurnool\\
+  \texttt{\{123cs0045, 123ad0059, shounak, ksb\}@iiitk.ac.in}%
+}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Training-free open-vocabulary segmentation pipelines built on SAM~3 gate their
+predictions with a single confidence threshold and assign everything below it to a
+\bg{} class. On LoveDA this discards \discardPct{} of all real-class pixels
+(\discardPx{}), with silence outnumbering misclassification \discardRatio{}. We show
+the single threshold is the wrong \emph{shape} for the problem, and that two
+corrections recover a substantial part of what it costs --- one threshold per class,
+and one multiplier per class applied before the argmax --- both fitted on
+\calibTiles{} labelled tiles with no weights trained, the same supervision the
+baseline already spends tuning its one threshold. Per-class thresholds give
+\methodGain{}~$\pm$~\methodSD{}~mIoU on LoveDA, \uavTauCV{}~$\pm$~\uavTauSD{} on
+UAVid, and \cnCV{}~$\pm$~\cnCVsd{} on a CLIP-based competitor at its own operating
+point, so the correction composes with prior work rather than competing with it. The
+multiplier reaches errors no threshold can, because it changes which class wins:
+Potsdam's \texttt{tree} gains \treeScale{}~IoU where thresholds move it \treeTau{}.
+All results are verified in the unmodified evaluation pipeline. We then report a
+finding that limits our own: \best{the hand-written prompt list every training-free
+method inherits is a larger lever than the method.} Replacing one word with a
+dataset's own class name is worth \vocUavGain{}~mIoU on UAVid --- more than our
+complete method earns on LoveDA --- and removes \uavScaleLost{} of the multiplier's
+gain there, so we restate that dataset's contribution as \uavCorrMethod{}. The same
+rule applied to Potsdam \emph{costs} \vocPotsGain{}~mIoU. No lookup rule exists, and
+no compared method reports its prompts. Finally, \nAttempts{} label-free rules fail
+to reach the oracle bound, four of which provably estimate per-class precision: the
+optimal threshold solves a \emph{coupled} multi-class objective that no per-class
+statistic can express, so the labelled calibration set is irreducible.
+\end{abstract}
+
+% =====================================================================
+\section{Introduction}
+\label{sec:intro}
+
+A training-free open-vocabulary segmenter is handed a list of class names and asked
+to label every pixel without seeing an annotation. The dominant recipe for remote
+sensing scores each class independently, takes an argmax, and then applies one global
+confidence threshold: pixels below it become \bg{}. The threshold is not incidental.
+It is tuned per dataset by its authors, on labelled data, and published as part of the
+configuration --- $\tauLove{}$ on LoveDA, $\tauOEM{}$ on OpenEarthMap, $\tauUav{}$ on UAVid.
+
+We begin from what that one number costs. Reproducing the strongest published SAM~3
+pipeline at \loveBase{}~mIoU on LoveDA against its reported \lovePub{}, we measure
+that \discardPct{} of every pixel carrying a real land-cover label is assigned to
+\bg{} --- \discardPx{} pixels --- and that this silence outnumbers outright
+misclassification \discardRatio{}. The obvious remedy fails: sweeping the threshold
+down to $\tauOEM{}$ recovers two thirds of that mass at a cost of \tauRatio{} wrong pixels
+for every right one, and \best{loses} mIoU.
+
+\paragraph{The claim.} A single confidence threshold is the wrong shape for a
+multi-class decision, because different classes are wrong in different directions.
+\texttt{water} on LoveDA is right $\waterPrec{}\%$ of the times it fires and finds only
+$\waterRec{}\%$ of what is there; \texttt{road} is the reverse. One number cannot serve
+both, and the fitted values span $\eeSpread{}$ to $\eeSpreadHi{}$ where the published one is $\tauLove{}$
+for all of them. Fitting one threshold per class on \calibTiles{} labelled tiles ---
+\best{no weights trained, and the same protocol the baseline already uses for its
+single threshold} --- recovers \methodGain{}~$\pm$~\methodSD{}~mIoU.
+
+Per-class thresholds are provably the \emph{complete} family of corrections available
+after the argmax (Sec.~\ref{sec:method}). That result is what motivates the second
+lever: if nothing more can be done after the argmax, the remaining freedom is
+\emph{at} it. We fit one multiplier per class applied to the scores before the argmax,
+with the threshold still reading the raw score, and it reaches an error mass no
+threshold can touch --- a pixel whose correct class lost the argmax cannot be
+recovered by lowering that class's bar.
+
+\paragraph{And a finding that limits our own.} Every method in this literature
+inherits a hand-written list of class prompts, and none report how it was chosen.
+We tested two, each with the prediction registered before the run. Replacing UAVid's
+\texttt{vegetation} --- a word that also names trees --- with the dataset's own term
+\emph{low vegetation} is worth \vocUavGain{}~mIoU and removes \uavScaleLost{} of our
+second lever's gain there. The identical rule applied to Potsdam \best{costs}
+\vocPotsGain{}. \best{The vocabulary is the largest single lever we measure, its
+direction is not predictable, and it is unreported.}
+
+\paragraph{Contributions.}
+\begin{enumerate}\itemsep2pt
+  \item \textbf{A method, and a completeness result that bounds it.} Per-class
+        thresholds give \methodGain{}~$\pm$~\methodSD{} on LoveDA, \uavTauCV{} on
+        UAVid and \cnCV{} on a CLIP pipeline, all verified end to end. Any per-class
+        monotone recalibration composed with a global threshold reduces to this rule
+        exactly (Sec.~\ref{sec:method}).
+  \item \textbf{A second lever, motivated by that bound.} A per-class scale before
+        the argmax adds \scPots{}~$\pm$~\scPotsSD{} on Potsdam, \scLove{} on LoveDA
+        and \uavScaleCV{} on UAVid over thresholds alone. It reaches Potsdam's
+        \texttt{tree}, which has the largest precision--recall gap we measure
+        (\treeGap{}) and which thresholds move \treeTau{}.
+  \item \textbf{\best{A larger lever than either, and a correction to our own
+        result.}} One word is worth \vocUavGain{} on UAVid and \vocLoveBarren{} on
+        LoveDA against \loveTotal{} for our complete method; the same rule costs
+        \vocPotsGain{} on Potsdam (Sec.~\ref{sec:vocab}).
+  \item \textbf{A reporting recommendation.} We observe a catch-all class moving the
+        headline mIoU in both directions and recommend reporting mIoU over the real
+        classes beside it.
+  \item \textbf{A bound with its reason.} \nAttempts{} label-free rules fail; four
+        provably estimate per-class precision, which we had supposed was the missing
+        quantity. It is not.
+\end{enumerate}
+
+% =====================================================================
+\section{Related work}
+\label{sec:related}
+
+Dense open-vocabulary segmentation from CLIP begins with MaskCLIP~\cite{maskclip} and
+continues through SCLIP~\cite{sclip}, ClearCLIP~\cite{clearclip} and
+ProxyCLIP~\cite{proxyclip}, each removing an obstacle between CLIP's image-level
+training and pixel-level use. SegEarth-OV~\cite{segearthov} adapts that line to
+remote sensing with a feature upsampler, and SegEarth-OV3~\cite{segearthov3} replaces
+the stack with SAM~3~\cite{sam3}, fusing a semantic and an instance head and gating by
+a presence score. That pipeline is our baseline and we reproduce it.
+
+ConInfer~\cite{coninfer} is the nearest competitor: it fits a per-scene visual prior
+over DINOv3 features and fuses it with a VLM posterior, and reports gains over
+SegEarth-OV on the same benchmarks. It is orthogonal to us --- it changes the
+\emph{scores}, we change the \emph{decision rule} applied to them --- and we show the
+two compose.
+
+Our corrections are recalibration in the sense of Guo~\etal~\cite{guo2017} and
+Kull~\etal~\cite{kull2019}, but applied to a decision rather than to a probability:
+we never ask the scores to be calibrated, only that the rule reading them be
+class-aware. What we add to that literature is a completeness argument for the
+post-argmax family and a measured demonstration that the remaining freedom lies at
+the argmax itself.
+
+% =====================================================================
+\section{Setup}
+\label{sec:setup}
+
+We evaluate on four segmentation benchmarks and one competing pipeline. LoveDA
+(\loveTiles{} validation tiles) and OpenEarthMap (\oemTiles{} of the official 500)
+are land-cover benchmarks; Potsdam is ISPRS aerial imagery at \best{5\,cm} ground
+sampling distance; UAVid is low-altitude drone video, a different sensor and
+viewpoint from the other three. We reproduce the published baseline on each:
+\loveBase{} against \lovePub{} on LoveDA, \potsBase{} against \potsPub{} on Potsdam,
+\oemBase{} against \oemPub{} on OpenEarthMap, and \uavBase{} against \uavPub{} on
+UAVid. The last differs by \uavGap{} under identical code, configuration, vocabulary
+and thresholds, and we report both figures rather than explain it away
+(Sec.~\ref{sec:limitations}).
+
+\paragraph{Two properties of UAVid change the protocol.} Its validation split is
+\uavValScenes{} drone flights of \uavFrames{} \emph{consecutive} frames, so a
+frame-level cross-validation places near-duplicates of every evaluation frame in the
+calibration set: it reports \uavLeakA{} where the flight-grouped answer is
+\uavLeakB{}, \best{a leak worth \uavLeak{}~mIoU that flips two of five folds}. Its
+distributed training split further ships \uavAug{} flipped and shifted copies among
+$600$ frames. All UAVid results here group folds by flight and exclude the augmented
+copies. We report both because neither is visible in the directory structure and both
+produce a clean, plausible, wrong number.
+
+\paragraph{Protocol.} Thresholds and scales are fitted by coordinate ascent on a
+calibration subset and evaluated on disjoint tiles, with the published-threshold
+baseline recomputed on the same held-out pixels. The fit maximises mIoU over the real
+classes only; full mIoU is still what we report. Every headline is verified by running
+the fitted parameters through the unmodified evaluation pipeline, not only through the
+cached statistic used to search.
+
+% =====================================================================
+\section{What the baseline discards, and what governs it}
+\label{sec:mechanism}
+
+\begin{figure*}[t]\centering
+\includegraphics[width=\textwidth]{fig2_mechanism.pdf}
+\caption{The residual's size, its detectability, and the presence-score correlation
+all move with the catch-all class's share of ground truth. The mechanism is
+established by intervention, not correlation: because that share is set by the
+vocabulary, we manipulate it directly with class count controlled.}
+\label{fig:mechanism}
+\end{figure*}
+
+\begin{table}[t]\centering\small
+\caption{The residual is ordered by the catch-all's share of ground truth, across
+four datasets. The Potsdam row was predicted from ground-truth masks alone and
+registered before the pipeline was run.}
+\label{tab:cmech}
+\begin{tabular}{lrr}
+\toprule
+ & catch-all share & real-class pixels discarded \\
+\midrule
+OpenEarthMap & \bgShareOEM{} & \discardOEM{} \\
+Potsdam      & \potsShare{} & \potsDiscard{} \\
+UAVid        & \uavCatchShare{} & \uavDiscard{} \\
+LoveDA       & \bgShareLove{} & \discardPct{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+How much real land cover a presence-gated pipeline discards is not a property of the
+model. It is ordered by how much of the scene the dataset's catch-all class covers
+(Table~\ref{tab:cmech}). A catch-all gives the model a plausible answer everywhere, so
+a strong runner-up carries no information: on LoveDA nine tested signals reach a best
+AUC of \aucLove{} against a \aucFloor{} floor, while on OpenEarthMap the runner-up
+score separates the residual at \aucOEM{}.
+
+Because the catch-all's share is set by the \emph{vocabulary}, we can intervene on it
+rather than stratify. Merging real classes into the catch-all at increasing doses,
+against a control that merges the same classes into \emph{each other} so class count
+moves identically, drives detectability \ivAtwo{}~$\to$~\ivBtwo{} while the control
+moves only to \ivDtwo{} (\suppref{sec:dose}). A second arm localises the effect to the
+label space rather than the prompt list.
+
+\paragraph{Recovery is not the answer.} Having measured the residual, we tried to
+recover it and report the failure: a region-level labeller reaches \recoverLove{}~mIoU
+on LoveDA, and its apparent \recoverOEM{} on OpenEarthMap is entirely the catch-all
+ceasing to be over-predicted (\oemBgGain{}~IoU) while the real classes lose
+\oemRealLoss{}. \best{The residual is real and recovering it after the fact does not
+work.} What does work is not making the decision wrongly in the first place.
+
+% =====================================================================
+\section{Two levers}
+\label{sec:method}
+
+\paragraph{Lever one: a threshold per class.} The baseline predicts
+$\hat{c} = \arg\max_c s_c$ and emits \bg{} when $s_{\hat c} < \tau$. We replace the
+scalar with a vector: emit \bg{} when $s_{\hat c} < \tau_{\hat c}$. Nothing else
+changes, and with a constant vector the rule is bit-identical to the baseline.
+
+\best{This is the complete family of corrections available after the argmax.} Let
+$g_c$ be any per-class strictly monotone map applied to the scores, followed by a
+global threshold $t$. Because $g_c$ is monotone, $g_c(s) \geq t$ holds exactly when
+$s \geq g_c^{-1}(t)$, so the composition is the per-class rule with
+$\tau_c = g_c^{-1}(t)$. Any post-argmax recalibration --- temperature, vector scaling,
+isotonic --- therefore reduces to choosing $\tau_c$, and cannot beat choosing it
+directly.
+
+\paragraph{The objective separates, so the fit is exact.} For a fixed argmax, a pixel
+predicted $c$ either clears $\tau_c$ or becomes the catch-all; it can never become a
+different real class. So $\mathrm{TP}_c$, $\mathrm{FP}_c$ and $\mathrm{FN}_c$ depend
+on $\tau_c$ alone and the real-class objective is a sum of single-variable terms.
+Coordinate ascent is therefore \best{exact rather than greedy} --- one sweep per class
+is the global optimum --- and costs $N \times 201$ evaluations rather than $201^N$. We
+verify this at exactly $\sepExact{}$ over \sepSweeps{} class sweeps on three datasets.
+
+\paragraph{Lever two: a multiplier before the argmax.} The completeness result holds
+only \emph{given} the argmax, which points at the remaining freedom. We predict
+$\hat{c} = \arg\max_c w_c s_c$ and keep the pixel when $s_{\hat c} \geq \tau_{\hat c}$
+--- \best{the argmax reads the scaled score, the threshold reads the raw one}. That
+asymmetry is what confines $w$ to the decision: a scale applied after the argmax would
+be monotone and merely reparameterise $\tau$. Only ratios of $w$ matter, so we
+renormalise to geometric mean one after each pass. $(w, \tau)$ are fitted jointly on
+the same tiles, and nothing is trained.
+
+This reaches a mass no threshold can. A pixel whose correct class \emph{lost} the
+argmax is not below that class's bar --- it is behind another class --- and lowering
+its threshold returns it wearing the wrong label.
+
+% =====================================================================
+\section{Results}
+\label{sec:results}
+
+\begin{figure*}[t]\centering
+\includegraphics[width=\textwidth]{fig7_method.pdf}
+\caption{Left: fitted thresholds against the single published value. Centre:
+per-class IoU change. Right: the calibration curve --- the gain is reliably positive
+from roughly \calibTiles{} tiles on LoveDA, and from \uavCalibScenes{} flights on
+UAVid.}
+\label{fig:method}
+\end{figure*}
+
+\begin{table}[t]\centering\small
+\caption{Both levers, across four datasets and a second pipeline. $\Delta$ is over
+the published threshold on identical held-out pixels. Catch-all-excluded mIoU is
+reported beside the headline throughout, for the reason in
+Sec.~\ref{sec:results}.}
+\label{tab:cmain}
+\begin{tabular}{lrrr}
+\toprule
+ & lever 1 & lever 2 & excl.\ catch-all \\
+\midrule
+LoveDA        & \best{\methodGain{}} & \best{\scLove{}} & \methodLandMean{} / \scLoveExcl{} \\
+Potsdam       & \potsFull{} & \best{\scPots{}} & \potsReal{} \\
+UAVid         & \best{\uavTauCV{}} & \best{\uavScaleCV{}} & --- \\
+OpenEarthMap  & \oemTauCV{} & --- & \best{\mrOemReal{}} \\
+\midrule
+ConInfer (CLIP) & \best{\cnCV{}} & \scCI{} & \cnReal{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Thresholds.} Five-fold cross-validation gives
+\methodGain{}~$\pm$~\methodSD{}~mIoU on LoveDA with every fold positive and a worst
+fold of \methodWorst{}, capturing \oracleShare{} of an oracle bound of
+\oracleBound{}. The gain is entirely land cover: the catch-all moves \methodBg{}~IoU.
+It is driven by \texttt{water}, which gains \methodWater{}~IoU alone at a fitted
+threshold of \methodWaterTau{} against a global $\tauLove{}$. \best{The headroom is smaller
+than it looks, which makes the gain larger than it looks}: a fully supervised
+SegFormer-b0 trained on the whole LoveDA training set reaches \oracleSup{}, so
+\best{\gapClosed{} of the gap between training-free and fully supervised is closed by
+\calibTiles{} labelled tiles and no trained weights}.
+
+\paragraph{It is not backbone-specific, but it is dataset-specific.} Applied unchanged
+to ConInfer at \emph{its} published operating point, the same rule adds
+\cnCV{}~$\pm$~\cnCVsd{} on LoveDA with every fold positive and every class improving
+--- \best{so our method composes with the nearest published competitor rather than
+beating it}, taking its reproduction from \cnRepro{} to \cnFit{}. On OpenEarthMap it
+helps neither pipeline's headline, for the same reason in both: the fit must sacrifice
+a catch-all sitting at \mrOemBgIoU{}~IoU that owns a ninth of the metric.
+
+\paragraph{The scale reaches what thresholds cannot.} It adds \scPots{} on Potsdam,
+\scLove{} on LoveDA and \uavScaleCV{} on UAVid over thresholds alone. Potsdam's
+\texttt{tree} is the clean case: the largest precision--recall gap we measure
+(\treeGap{}), which per-class thresholds move \treeTau{} and the scale moves
+\best{\treeScale{}}. The reason is measurable --- \texttt{tree}'s residual is
+\emph{below} the threshold but with a \emph{different class} winning the argmax, so
+lowering its own threshold returns those pixels mislabelled.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\columnwidth]{fig3_oem_per_class.pdf}
+\caption{A headline mIoU gain that is not a segmentation improvement: the catch-all
+supplies \oemBgGain{}~IoU while the real classes lose \oemRealLoss{}. We observe the
+same artefact with the opposite sign elsewhere, which is why we treat it as a property
+of the metric.}
+\label{fig:oemperclass}
+\end{figure}
+
+\paragraph{Report both metrics.} mIoU is an \emph{unweighted} mean over $N$ classes,
+so \best{a catch-all owns exactly $1/N$ of the score however meaningful it is} ---
+\mrOemLever{} on OpenEarthMap for a class covering \bgShareOEM{} of the pixels. We
+observe that class moving the headline in both directions: supplying
+\oemBgGain{}~IoU of an apparent gain in one experiment (Fig.~\ref{fig:oemperclass})
+and cancelling a real one in another. The distortion exists before any method is
+applied --- OpenEarthMap's published headline is depressed \mrOemDistort{} points by
+that single class --- so we report mIoU over the real classes beside the headline, and
+suggest the field does.
+
+\paragraph{The correction reaches the residual the paper opened with.} Held out, it
+lowers the discard rate \raDiscA{}~$\to$~\raDiscC{}, and \best{\raCorrect{} of the
+pixels it recovers land on the correct class --- \raWPR{} wrong per right, against
+\tauRatio{} for the global threshold sweep that reaches the same mass.}
+
+\paragraph{UAVid, and a correction to our own headline.} On drone video both levers
+hold under flight-grouped folds and transfer across the split boundary: fitted on the
+training split and applied unchanged, they take \uavBase{} to \uavEEone{} and then to
+\best{\uavEEtwo{}}, verified in the unmodified pipeline against a cached prediction of
+\uavEEpred{} --- exact on the headline, every class within \uavEEmax{}. Pixel accuracy
+rises \uavaAccA{}~$\to$~\uavaAccC{} and mean precision and recall \emph{both} rise
+(\uavPrecD{}, \uavRecD{}). \best{We then found that most of the scale's gain there was
+repairing a word}, and restate the contribution accordingly in the next section.
+
+% =====================================================================
+\section{A larger lever than either, and no rule for setting it}
+\label{sec:vocab}
+
+\begin{table}[t]\centering\small
+\caption{The same rule --- use the dataset's own class name --- applied to the same
+class, on two datasets. One word changes; prompt count per class does not.}
+\label{tab:cvocab}
+\begin{tabular}{llll}
+\toprule
+ & shipped & annotation guide & $\Delta$ mIoU \\
+\midrule
+UAVid   & \texttt{vegetation} & \emph{low vegetation} & \best{\vocUavGain{}} \\
+Potsdam & \texttt{grass}      & \emph{low vegetation} & \best{\vocPotsGain{}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Every training-free open-vocabulary method inherits a hand-written list of class
+prompts, and none of the work we compare against reports how that list was chosen.
+Our own results above are stated at a vocabulary we did not write. We therefore
+tested it on two datasets, with the prediction committed to version control before
+each run.
+
+\paragraph{On UAVid one word is worth \vocUavGain{}~mIoU, and it is surgical.}
+\texttt{tree} gains \vocUavTree{} and the low-vegetation class \vocUavVeg{}, while
+\best{every other real class moves by at most \vocUavElse{}}. The mechanism appears in
+the two quantities we registered in advance: the shipped \texttt{vegetation} was
+firing on anything green, and its precision rises
+\vocUavVegPrecA{}~$\to$~\vocUavVegPrecB{}; \texttt{tree} was losing those pixels, and
+its recall rises \vocUavTreeRecA{}~$\to$~\vocUavTreeRecB{}.
+
+\paragraph{On Potsdam the identical rule \best{costs} \vocPotsGain{}~mIoU.} We
+registered that the change would move the score by less than a point and were wrong
+about the magnitude. The shipped \texttt{grass} is \emph{better} than the official
+term: specific, visual, and crucially it does not name the neighbouring class. \best{So
+the annotation guide's own wording is not automatically the better prompt.}
+
+\paragraph{The prediction that did hold identifies the mechanism.} Potsdam's
+\texttt{tree} recall is \vocPotsTreeRec{} before the change and \vocPotsTreeRec{}
+after --- unchanged to a hundredth --- while its precision falls
+\vocPotsTreePrecA{}~$\to$~\vocPotsTreePrecB{} as the weaker prompt leaks pixels into
+it. \best{Renaming a competing class changes nothing about \texttt{tree} there.} Its
+deficit is visual confusion at 5\,cm ground sampling distance, not a naming error,
+which is why the scale reaches it and a better word does not. \best{The two datasets
+present identically in the results table --- a scale gain carried by \texttt{tree} ---
+and have different causes.}
+
+\paragraph{The word and the multiplier are substitutes.} On UAVid the two routes end
+in the same place: keeping the flawed prompt and letting both levers repair it reaches
+\vocRouteA{}, while correcting the word first and then applying both levers reaches
+\vocRouteB{} --- \vocRouteDelta{}~mIoU apart, and within about a point per class.
+\best{Typing two words and fitting a multiplicative reweighting on \uavTrainTiles{}
+labelled frames address the same pixels.} One class does not substitute:
+\texttt{human} gains the same either way, because it is not losing an argmax to a
+mis-named neighbour, it is simply too conservative.
+
+\paragraph{We therefore restate our own result.} Correcting the word removes
+\uavScaleLost{} of the scale's gain on UAVid (\uavScaleTrans{}~$\to$~\uavCorrTwo{}),
+so that dataset's method contribution is \best{\uavCorrMethod{}} --- \uavCorrOne{}
+from thresholds and \uavCorrTwo{} from the scale on a corrected baseline of
+\uavCorrBase{}, reaching \uavCorrFinal{}. That is in line with \loveTotal{} on LoveDA
+and \potsTotal{} on Potsdam.
+
+\paragraph{What we take from this.} A one-word change is worth \vocUavGain{} on UAVid
+and \vocLoveBarren{} on LoveDA, against \loveTotal{} for our complete method on
+LoveDA. \best{The vocabulary is the largest single lever we measure, it is unreported,
+and the direction of a change to it is not predictable from the class name.} We do not
+offer a method for choosing prompts --- our two arms disagree, which is the point. We
+offer the measurement, and the recommendation that prompt lists be reported and
+ablated alongside the architecture, because on these benchmarks they are worth more
+than the methods being compared.
+
+% =====================================================================
+\section{Why the calibration set is irreducible}
+\label{sec:bound}
+
+The method costs \calibTiles{} labelled tiles. It is natural to ask whether a
+label-free rule could choose the thresholds instead, and we tried \nAttempts{} ---
+Otsu splits, confidence percentiles, presence-scaled thresholds, cross-head agreement,
+and others. None reaches the oracle bound; on LoveDA every one scores \emph{below} the
+published threshold.
+
+\best{The instructive part is why.} We had supposed the missing quantity was per-class
+precision, which is label-derived by definition. It is not: four of the label-free
+statistics predict per-class precision at Spearman $\rho \geq \proxyRho{}$ with exact
+$p \leq \proxyP{}$, and they still buy nothing. Precision does not determine the
+threshold, and the relation is not even monotone --- \texttt{water} at $\bndWaterPrec{}\%$
+precision takes the \emph{lowest} threshold while \texttt{road} at $\bndRoadPrec{}\%$ takes the
+\emph{highest}.
+
+The real bound is structural. The optimal threshold vector solves a \emph{coupled}
+multi-class objective: raising one class's threshold pushes pixels into the catch-all,
+changing every other class's optimum. No per-class scalar can express that, measurable
+or not. \best{That is why a six-parameter fit works and every one-parameter rule
+fails}, and it generalises to any training-free pipeline that thresholds a per-class
+score.
+
+% =====================================================================
+\section{Limitations}
+\label{sec:limitations}
+
+\paragraph{\best{Our remaining results are stated at vocabularies we have not
+audited.}} Sec.~\ref{sec:vocab} shows one word is worth more than our complete method
+on LoveDA and that the direction of such a change is unpredictable. We tested two
+prompts on two datasets. LoveDA's and OpenEarthMap's lists are untested by the same
+rule and we cannot exclude that part of their reported gains is available by
+rewording. Two things bound this rather than excuse it: Potsdam was tested
+\emph{because} its scale gain has UAVid's signature and came back clean, and LoveDA's
+list already carries hand-tuned synonyms whose removal costs \vocLoveBarren{}~mIoU.
+Neither substitutes for auditing it.
+
+\paragraph{One reproduction does not reproduce.} Our UAVid baseline is \uavGap{} above
+the published figure under identical code, configuration, vocabulary and thresholds,
+and their released configuration points at a split whose labels are not public. We
+quote gains against our own reproduction throughout, as we do in the opposite
+direction for ConInfer, whose LoveDA figure we reproduce \cnGap{} \emph{below} its
+published value. A difference measured on one pipeline is robust to a constant offset
+in it; an absolute comparison across two is not, and we do not make one.
+
+\paragraph{Thresholds do not transfer across a domain shift.} Fitted on LoveDA's rural
+tiles and applied to urban ones they land \emph{below} the published threshold. The
+calibration set must match the evaluation distribution, and pooling across two
+distributions reproduces the failure of the global threshold one level up. We find one
+label-free predictor of when transfer will work --- agreement in discard rate between
+source and target, which orders four split pairs --- but four points across two
+datasets is an ordering, not a law.
+
+\paragraph{Seventy frames from seven flights is a sample of seven.} UAVid's validation
+split is video, so its effective sample size is the flight count; a five-fold inside it
+has a baseline that swings eighteen mIoU points across folds. We fit on the training
+split and evaluate on validation whole for that reason. The same caution applies to any
+video-derived benchmark evaluated with frame-level splits.
+
+\paragraph{The negative results are ours too.} Three further per-class corrections ---
+fusing the two SAM~3 heads, weighting the presence score, and affine rather than
+diagonal scaling --- were fitted under the same protocol and gate, and all three are
+null (\suppref{sec:levers}). Each was pre-registered as a small positive.
+
+% =====================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+A single confidence threshold is the wrong shape for a multi-class open-vocabulary
+decision. Fitting one per class, and one multiplier per class before the argmax,
+recovers a consistent gain across four datasets and two backbones on the supervision
+the baseline already spends --- and the first of those two rules is provably
+everything available after the argmax. But the largest lever we found is not ours: the
+hand-written prompt list that every method in this literature inherits and none
+reports is worth more, on these benchmarks, than the methods being compared. We
+recommend it be reported.
+
+{\small
+\bibliographystyle{plain}
+\bibliography{refs}
+}
+
+\end{document}

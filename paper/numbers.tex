@@ -498,3 +498,24 @@
 \newcommand{\uavLeakB}{+0.51}        % group-disjoint
 \newcommand{\uavAug}{400}            % augmented copies shipped among 600 `train' frames
 \newcommand{\uavFrames}{10}          % consecutive frames per flight
+
+% ---- values that were typed inline until the consistency check caught them ----
+% ⚠️ \waterRec is 54.7 and \uavPub is ALSO 54.7 -- water's recall and UAVid's
+% published mIoU are unrelated. Never reuse a macro because the value matches.
+\newcommand{\tauLove}{0.5}           % published thresholds, per dataset
+\newcommand{\tauOEM}{0.1}
+\newcommand{\tauPots}{0.1}
+\newcommand{\tauUav}{0.3}
+\newcommand{\waterPrec}{89.5}        % WEEK1 §5  LoveDA water, the motivating asymmetry
+\newcommand{\waterRec}{54.7}
+\newcommand{\eeSpreadHi}{0.675}      % WEEK3 §9c fitted span, high end (\eeSpread = low)
+\newcommand{\proxyRho}{0.886}        % WEEK3 §9d best label-free precision proxy
+\newcommand{\proxyP}{0.033}
+\newcommand{\bndWaterPrec}{88.5}     % WEEK3 §9d precision vs oracle tau, non-monotone
+\newcommand{\bndRoadPrec}{68.5}
+\newcommand{\sepSweeps}{19}          % SEPARABILITY class sweeps
+% ⚠️ \oemTauCV is +0.16 and \lvFour is ALSO +0.16 -- OpenEarthMap's threshold gain
+% and lever four's null. The second value collision this check caught; matching on
+% a value rather than a meaning would have put the wrong citation in the paper.
+\newcommand{\oemTauCV}{+0.16}        % WEEK3 §9b OpenEarthMap, 5-fold, full mIoU
+\newcommand{\oemTauSD}{0.93}
