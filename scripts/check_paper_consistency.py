@@ -104,6 +104,25 @@ def main():
             print('      That breaks the one-source-of-truth guarantee.')
             fail += 1
 
+    # -- 5. informational: values shared by more than one macro ---------------
+    # ⭐ NOT an error. Distinct quantities legitimately share a value. This is
+    # printed because it is the evidence for the one rule that keeps this file
+    # honest: NEVER choose a macro by grepping for its value. Three real near
+    # misses while writing the conference version -- 54.7 is both UAVid's
+    # published mIoU and LoveDA water's recall; +0.16 is both OpenEarthMap's
+    # threshold gain and lever four's null; +0.886 is both a label-free proxy's
+    # correlation and lever four's presence ordering.
+    import collections
+    by_val = collections.defaultdict(list)
+    for name, val in re.findall(r'\\newcommand\{\\([a-zA-Z]+)\}\{([^}]*)\}', nums):
+        by_val[val].append(name)
+    shared = {v: n for v, n in by_val.items() if len(n) > 1}
+    worst = sorted(shared.items(), key=lambda kv: -len(kv[1]))[:5]
+    print(f'\n{len(shared)} values are used by more than one macro '
+          f'(not an error -- the reason never to match a macro by its value):')
+    for v, names in worst:
+        print(f'   {v:>10}  ->  {", ".join(names)}')
+
     print('\n' + ('ALL PASS' if not fail else f'{fail} FAILURE(S)'))
     return 1 if fail else 0
 
