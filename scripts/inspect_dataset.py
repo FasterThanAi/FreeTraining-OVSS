@@ -74,6 +74,15 @@ def probe_image(p, n_colours=64):
         a = np.array(im)
     info = {'mode': mode, 'size': size, 'shape': a.shape,
             'dtype': str(a.dtype), 'has_palette': pal is not None}
+    if pal:
+        # A mode-P PNG already stores class INDICES; np.array gives the index
+        # plane, not RGB. The palette is still worth dumping, because the
+        # colours are how a dataset's published legend names each index -- and
+        # WEEK3 11 records a near miss where a hardcoded ladder would have
+        # labelled `grass` as `building` and printed a clean table with wrong
+        # row names. Verify index -> name against the legend, never assume it.
+        rgb = [tuple(pal[i * 3:i * 3 + 3]) for i in range(len(pal) // 3)]
+        info['palette'] = rgb
     if a.ndim == 2:
         vals, cnt = np.unique(a, return_counts=True)
         info['kind'] = 'index'
@@ -119,6 +128,10 @@ def main():
                          'The value union is over THIS SAMPLE, so a rare class '
                          'can be missed -- raise it before trusting a class list.')
     ap.add_argument('--colours', type=int, default=64)
+    ap.add_argument('--palette', action='store_true',
+                    help='dump the PNG palette of mode-P labels, so index -> '
+                         'colour can be checked against the published legend '
+                         'instead of assumed')
     ap.add_argument('--md', default=None)
     args = ap.parse_args()
 
@@ -183,6 +196,22 @@ def main():
                          f'discard rate and per-class behaviour as unmeasured here.')
 
         L.append(f'- distinct values over the sample: **{len(union)}**')
+        if args.palette:
+            try:
+                pinfo = probe_image(files[0], args.colours)
+            except Exception:                            # noqa: BLE001
+                pinfo = {}
+            if pinfo.get('palette'):
+                rgb = pinfo['palette']
+                used = sorted(union) if kind == 'index' else []
+                nz = max(used) + 1 if used else len(rgb)
+                L += ['', f'#### Palette of `{files[0].name}` '
+                          f'(first {nz} of {len(rgb)} entries)', '',
+                      '| index | RGB | in this sample |', '|---|---|---|']
+                for i, c in enumerate(rgb[:nz]):
+                    L.append(f'| {i} | `{c}` | '
+                             f'{"yes" if i in union else "—"} |')
+                L.append('')
         if kind == 'rgb' and len(union) <= args.colours:
             L += ['', '| colour | pixels | share |', '|---|---|---|']
             tot = sum(union.values())
@@ -198,10 +227,32 @@ def main():
             tot = sum(union.values())
             for v, c in sorted(union.items()):
                 L.append(f'| {v} | {c:,} | {100 * c / tot:.2f}% |')
-            L += ['', '⚠️ Check whether `0` is **no-data/ignore** (LoveDA, '
-                  '`reduce_zero_label=True`) or a **real class** (OpenEarthMap, '
-                  '`reduce_zero_label=False`). Getting this backwards deletes a class '
-                  'or shifts every label by one, and neither crashes.\n']
+            L.append('')
+            if 0 in union:
+                L.append('⚠️ Value `0` IS present. Decide whether it is '
+                         '**no-data/ignore** (LoveDA, `reduce_zero_label=True`) or a '
+                         '**real class** (OpenEarthMap, `reduce_zero_label=False`). '
+                         'Getting this backwards deletes a class or shifts every '
+                         'label by one, and neither crashes.\n')
+            else:
+                nprobe = 'ALL files' if not args.sample else f'{nprobed} sampled files'
+                L.append(f'- ⭐ **Value `0` never appears** across {nprobe}, and the '
+                         f'values run 1..{max(union)} with no gap' +
+                         ('' if sorted(union) == list(range(1, max(union) + 1))
+                          else ' ⚠️ **(there ARE gaps — check)**') +
+                         f'. That matches this repo\'s own convention '
+                         f'(`labels.py`: mask value 0 = no-data, i+1 = classes[i]), '
+                         f'so `reduce_zero_label=True` is the likely setting — but '
+                         f'confirm it, because here 0 means *no pixel is unlabelled* '
+                         f'rather than *some are*.')
+                L.append(f'- ⛔⭐ **Every pixel carries a real class, so this dataset '
+                         f'may have NO CATCH-ALL.** Check the legend: if none of the '
+                         f'{max(union)} names is background/clutter/unlabelled, then '
+                         f'(a) `labels.py` will not find a catch-all and will guess '
+                         f'mask value 1 — pass `bg_name=` or fix it explicitly; and '
+                         f'(b) full mIoU equals catch-all-excluded mIoU by '
+                         f'construction, so no result here can be a repaired '
+                         f'catch-all (WEEK3 9h).\n')
         else:
             L.append(f'- ⚠️ more than {args.colours} distinct values; raise `--colours`\n')
 
