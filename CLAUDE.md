@@ -17,6 +17,13 @@ Do **not** call this "unsupervised" — the vocabulary is given. See @ANALYSIS.m
 
 ## Baseline
 
+⭐ **@BASELINE_NUMBERS.md holds SegEarth-OV3's full published table.** Check it BEFORE proposing a
+dataset — not having it cost four exchanges of guessing whether a number existed. Headlines:
+LoveDA **47.4**, Potsdam **57.8**, ⭐ **Vaihingen 60.8**, UAVid **54.7**, UDD5 **71.7**, VDD **64.5**,
+OEM 42.9, iSAID 27.6. ⛔ **`cfg_gid.py`, `cfg_gf7-building.py` and `cfg_gf-road.py` ship no
+vocabulary file** (404 upstream) and are unusable.
+
+
 SegEarth-OV3 (arXiv:2512.08730), our named baseline and closest competitor. Reproduced at
 **47.38 mIoU** on LoveDA val vs their reported 47.4. This number is a gate — if any change
 moves it, the change is wrong.
