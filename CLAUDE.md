@@ -300,6 +300,31 @@ lever 2 +2.03) · final **63.62**, still above the Oracle's 59.7.
 ⛔ **The method's UAVid contribution is +3.22, NOT +6.69** — the earlier figure bundled a
 prompt defect into the method. Consistent with LoveDA +2.32 and Potsdam +5.67.
 
+### ⭐⭐⭐ THE VOCABULARY IS THE BIGGEST LEVER, AND THERE IS NO RULE FOR IT. @VOCABULARY_RESULTS.md, 14 Sep.
+
+Two pre-registered single-word arms, same rule (*use the dataset's own class name*), opposite
+results:
+
+| dataset | shipped | official name | Δ mIoU |
+|---|---|---|---|
+| **UAVid** | ⛔ `vegetation` | *low vegetation* | ⭐ **+3.53** |
+| **Potsdam** | ⭐ `grass` | *low vegetation* | ⛔ **−2.71** |
+
+⭐⭐ **The same rule helps one dataset by 3.5 and hurts another by 2.7.** The official class
+name is **not** automatically the better prompt. Every training-free OVSS paper inherits a
+hand-written vocabulary, none report it, and the correction is worth more than any published
+method's contribution (UAVid +3.53, LoveDA `barren` +4.94, against our whole method's +2.32
+on LoveDA).
+⭐ **This settles the Potsdam question: its +4.86 lever-2 gain is NOT prompt repair.** `grass`
+already beats the principled alternative, so there is no mass for a better prompt to take —
+unlike UAVid, where the fix removed 64% of lever 2. ⭐ **UAVid was a one-off careless prompt,
+not a systemic flaw in our results.**
+⭐⭐ **P2 held exactly and is the mechanism**: Potsdam `tree`'s recall is **38.63 → 38.63,
+unchanged to a hundredth**, while its precision falls 1.17. **Renaming the competitor changes
+nothing about `tree`** — its deficit is visual confusion at 5 cm GSD, not a naming error.
+⛔ **P1 failed** (predicted |Δ| < 1.0, measured −2.71) and is reported as a miss.
+⛔ **CLOSED — no third word**, per the pre-registration and `configs/README_vocabularies.md`.
+
 ### ⭐⭐ TTA WORKS — AND IT IS A SUBSTITUTE FOR LEVER 2, NOT A COMPLEMENT. @TTA_RESULTS.md, 13-14 Sep.
 
 Dihedral test-time augmentation: average the score stacks over flipped/rotated views of the
