@@ -344,6 +344,20 @@ choice is correct, and this is why.} We report the whole sequence because the
 alternative is standard practice elsewhere, and because the first explanation we
 reached for was the wrong one.
 
+\paragraph{The multi-view inference that \emph{does} help changes orientation,
+not field of view.} If crops fail because they shrink the scene, the remedy is a
+transform that does not. Averaging the score stacks over dihedral views of the
+\emph{whole} image leaves field of view, scene context and presence semantics
+identical between views, and only the orientation differs --- and aerial imagery
+has no canonical orientation, so a mirrored tile is an ordinary image rather than
+an unnatural one. A single horizontal flip gives \ttaHflip{}~mIoU
+(\ttaHflipD{}); all eight dihedral transforms give \ttaDfour{} (\ttaDfourD{}, at
+\ttaCost{}~s per image against $0.85$). \best{Mean precision and mean recall both
+rise (\ttaPrec{}, \ttaRec{}) --- the only intervention we measure for which they
+do} --- and the discard rate does not move, so this keeps the same \emph{quantity}
+of pixels and a better \emph{selection} of them. Section~\ref{sec:levers} reports
+what it does and does not compose with.
+
 \section{Anatomy of the residual}
 \label{sec:anatomy}
 
@@ -956,6 +970,25 @@ post-hoc reading elsewhere in this paper did not survive its first committed tes
 (Section~\ref{sec:limitations}). What it does establish is negative and firm ---
 the family of per-class corrections is bounded, and we bound it by testing rather
 than by asserting.
+
+\paragraph{Adding evidence substitutes for fixing the decision rather than
+compounding with it.} The three corrections above \emph{reallocate} the evidence
+a pixel already carries. Test-time augmentation instead \emph{adds} evidence ---
+a genuine second measurement --- and unlike them it works
+(Section~\ref{sec:setup}), which makes it the sharpest available test of whether
+our correction is orthogonal to a better pipeline or compensating for a worse
+one. Paired fold by fold on identical tiles and identical partitions,
+augmentation is worth \ttaAtA{}~mIoU on the baseline, \ttaAtB{} once per-class
+thresholds are applied, and \best{\ttaAtC{} once the per-class scale is}; from
+the other side, the scale's own gain falls from \ttaScaleWithout{} to
+\ttaScaleWith{} when augmentation precedes it. \best{The two are substitutes, and
+mechanically so: both change which class wins the argmax, while the threshold
+acts after it and does not compete.} We report this because it bounds our own
+claim --- part of what per-class scaling corrects is score noise that a better
+measurement would also remove. It removes it far more cheaply, since the scale is
+fitted once on \calibTiles{} tiles and costs nothing at inference where
+augmentation doubles it for the life of the deployment, but a reader is entitled
+to know the two are not additive.
 
 \subsection{The label-free bound, and why it holds}
 \label{sec:bound}

@@ -397,3 +397,25 @@
 \newcommand{\swMaxDelta}{-3.67}      % vs the per-crop gate
 \newcommand{\swPrecDrop}{68.1 \rightarrow 58.2 \rightarrow 56.7}
 \newcommand{\swBuildPrec}{77.0 \rightarrow 49.4}
+
+% ---- dihedral test-time augmentation --------------------------------------
+% @TTA_RESULTS.md. Average the score stacks over flipped/rotated views of the
+% WHOLE image -- unlike crops, the field of view and therefore the presence
+% semantics are identical across views, which is why this works where sliding
+% window did not. Aerial imagery has no canonical orientation, so the argument
+% is specific to remote sensing.
+\newcommand{\ttaHflip}{47.67}        % 2 views, LoveDA val 1669 tiles
+\newcommand{\ttaHflipD}{+0.29}
+\newcommand{\ttaDfour}{47.84}        % 8 views (all dihedral transforms)
+\newcommand{\ttaDfourD}{+0.47}
+\newcommand{\ttaPrec}{+0.4}          % mPrecision, hflip -- BOTH rise, uniquely
+\newcommand{\ttaRec}{+0.1}           % mRecall
+\newcommand{\ttaCost}{6.59}          % s/image at 8 views vs 0.85 baseline
+% ⭐ Paired fold-by-fold, same 800 tiles / seed / fold partition. TTA's gain at
+% each rung: it survives per-class tau and is ABSORBED by the per-class scale,
+% because both change which class wins the argmax.
+\newcommand{\ttaAtA}{+0.42}
+\newcommand{\ttaAtB}{+0.58}
+\newcommand{\ttaAtC}{+0.06}
+\newcommand{\ttaScaleWith}{+0.74}    % lever 2's own gain WITH tta
+\newcommand{\ttaScaleWithout}{+1.26} % ... and without
