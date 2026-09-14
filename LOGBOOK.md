@@ -13,6 +13,144 @@ should answer it with a `grep` instead of an archaeology session.
 
 ---
 
+## 2026-09-14 (Sun) — UAVid added as a fourth dataset. Three traps, each of which produced a good-looking WRONG number first.
+
+**Plain-language summary, because the results files are dense.** Today we added a fourth dataset
+(UAVid — drone video of city streets) and got the method working on it end to end. The final
+number is **56.86 → 57.92 mIoU (+1.06)**, verified by the real evaluation pipeline. Getting
+there needed three bugs found and fixed, and **every one of them produced a plausible, quotable,
+wrong answer before it was caught**. That is the story of the day.
+
+### What we were trying to do
+
+The method is: instead of one confidence threshold for all classes, fit **one threshold per
+class** on a small set of labelled images. It already works on LoveDA, Potsdam and ConInfer.
+UAVid is a fourth test — and a different kind of imagery (low-altitude drone video, not
+satellite), so it is a real test rather than a repetition.
+
+### Trap 1 — the program ran out of GPU memory, and my first fix did nothing at all
+
+UAVid pictures are **3840×2160**, about **8× bigger** than the satellite tiles we had been using.
+The program crashed with "out of memory".
+
+My first fix was to tell the data loader to shrink the images. **It changed nothing** — the
+failure came back byte-for-byte identical, asking for exactly the same 2.63 GB. That identical
+number was the clue: *if shrinking the input eight times doesn't move the memory, the input isn't
+being used.*
+
+And it wasn't. Deep in the model code (`segearthov3_segmentor.py:404`), the program **throws away
+the picture the data loader hands it and re-opens the original file from disk**. So no amount of
+shrinking in the loader could ever matter.
+
+⭐ **The real fix costs nothing**, and that is the interesting part: the model resizes every input
+to **1008×1008** internally anyway, and its main output layer is **288×288**. Feeding it a 4K
+picture was paying for detail the model throws away in its first step. Shrinking to 1008 first
+(`max_side`) made it fit, and later measurement showed it costs about **half a point** — going
+*up* to 1344 gained +0.43, so if anything we are being slightly conservative.
+
+### The baseline, and an honest unknown
+
+**56.86**, where the paper we compare against reports **54.7**. We are **2.16 higher**, and
+**I cannot explain why.** Same code, same config file, same word list, same thresholds. Their
+config points at a folder with no published labels, and their release contains no document saying
+how they prepared the data. **We report both numbers and move on** — the same thing we do for
+ConInfer, where our reproduction is 2.34 *below* theirs.
+
+**The labels were checked and are perfect**: every one of 597,196,800 pixels maps to a real class,
+none discarded. The pixel count even decomposes exactly as 40 pictures at 3840×2160 plus 30 at
+4096×2160 — UAVid ships two widths, and the arithmetic closing to the pixel is much stronger
+evidence than "it looks right".
+
+### Trap 2 — the first good result was measuring the model against copies of its own study material
+
+The standard test is: fit the thresholds on part of the data, score on the rest. That gave
+**+1.05, positive in all 5 of 5 splits** — a clean-looking win.
+
+**It was wrong.** UAVid's 70 validation pictures are **7 drone flights of 10 consecutive video
+frames**. Frame 3 and frame 4 of the same flight are nearly the same picture. Splitting at the
+picture level put near-duplicates of the test pictures into the study set.
+
+Fixed by splitting at the **flight** level, so a whole flight is either studied or tested, never
+both. **The honest number is +0.51, and it is no longer significant.**
+⭐ **The leak was worth +0.54 mIoU and flipped two of the five splits.** The giveaway had been
+visible: the contaminated version claimed the method needed only **10 labelled pictures**, where
+every other dataset needs 25–200. That "too good" number was the leak talking. Clean, 10 pictures
+gives **−0.19**.
+
+### Trap 3 — 400 of the 600 "training" pictures were flipped and shifted copies
+
+We then needed more data, so we prepared UAVid's training split: **600 pictures**. But UAVid
+officially has only 200 labelled training pictures. Reading the filenames explained it:
+
+    200 shifted…   ← augmented copies
+    200 flipped…   ← augmented copies
+    180 file##-#   ← 18 flights × 10
+     10 file-#     ←  1 flight  × 10
+     10 ######     ←  1 flight  × 10   = 200 real pictures, 20 flights
+
+An image and its own **mirror** sitting on opposite sides of a test is not "similar data" — it is
+**literally the same pixels**. Excluded them (`--exclude-re`), leaving the 200 real pictures from
+20 flights.
+
+### A storage problem, and the insight that solved it
+
+Saving the model's per-pixel output for 200 of these 4K pictures needed **35 GB**; we had 13 GB.
+⭐ But the model only ever saw a 1008-wide picture — the program then *blows its output back up*
+to 4K before saving. **We were spending gigabytes storing an enlargement of something smaller.**
+Saving every 4th pixel (`--cache-stride 4`) is **16× less disk** and was measured to cost
+**0.01 mIoU** (55.49 against 55.48). Reported numbers are still computed at full resolution, so
+the safety check is unaffected.
+
+### The results
+
+- **Lever 1 (per-class thresholds), properly split: +1.34 ± 0.39, positive in 5 of 5.**
+  This is *better* than LoveDA's +1.18 ± 0.45, the dataset the method was built on. And it is the
+  only dataset so far where **no class gets worse**.
+- **The gain is one class.** `human` — people seen from a drone — improves **+6.47**. The model is
+  right **79%** of the time it says "person" but only finds **18%** of them, so it is being far
+  too cautious; its best threshold turns out to be **zero**. `human` is **0.19% of the pixels**
+  but a seventh of the score, so fixing it moves the headline a lot.
+- **The thresholds TRANSFER.** Fitted on the 200 training pictures and applied unchanged to the
+  70 validation pictures: **+1.03**, which is **71%** of what a cheating oracle could get.
+  - A single *global* threshold fitted the same way gives only **+0.12**, so the per-class part
+    is **89%** of the gain.
+  - Shuffling *which class gets which threshold* makes it **−3.08**, and **0 of 200 shuffles**
+    matched the real assignment. So what carries across is the specific per-class pattern.
+  - **25 pictures from 3 flights already give +0.81.**
+- ⭐ **This gives the project a rule it did not have.** The standing advice was "calibrate on the
+  distribution you will evaluate on" with no way to check in advance. The **discard rate** — the
+  share of pixels the model refuses to label — needs **no ground truth at all**, and across four
+  split pairs it orders the outcome: UAVid train/val differ by 1.01× → **+1.03**; LoveDA's differ
+  by 2.04× → −0.12; LoveDA's city/countryside differ by 2.1× → −0.40 and −1.11.
+  ⚠️ Four points, two datasets, mixed protocols — a consistent **ordering, not a law**.
+- ✅ **Verified by the real pipeline**, not just by arithmetic: `eval.py` reports **57.92** where
+  the cached calculation predicted **57.90**. Fourth dataset to validate that shortcut.
+
+### What I got wrong today, on the record
+
+1. **Told the user to add a `Resize`** that could not work, costing one wasted GPU run.
+2. **Forgot to `git push`** after committing, so the workstation pulled nothing.
+3. **Printed a group count of `438`** from a one-liner I wrote against the wrong filename pattern.
+   It was meaningless and I said so rather than letting it stand.
+4. **Wrote "41% of the ceiling" where the arithmetic is 59%** — typed instead of computed. Fixed
+   in its own commit.
+5. **Predicted `car` would be the class that fails to transfer** (it is the only class whose
+   discard rate moves between the splits, 28.92% vs 22.73%). It came back at **+0.07**, neutral.
+   ⛔ **The per-class discard gap did not predict which class fails.** The loser is `road`
+   (−0.68), which is fragile in *every* protocol tried.
+6. **Prescribed a 24-minute LoveDA re-run** to re-check a change that a six-line diff already
+   proved was dead code. Withdrawn — GPU time is the scarce resource here.
+
+### Files
+
+`UAVID_RESULTS.md` §1–§15 · `CLAUDE.md` (UAVid section) · `scripts/tau_transfer.py` +
+`test_tau_transfer.py` · `max_side` in `reference/segearthov3_segmentor.py` +
+`test_max_side.py` · `--cache-stride` in `measure_discard_rate.py` + `test_cache_stride.py` ·
+`--group-re` / `--exclude-re` in `tau_cv.py` / `tau_oracle.py` / `metric_report.py` +
+`test_group_folds.py`. 13 commits.
+
+---
+
 ## 2026-09-13 (Sat) — I diagnosed the sliding-window loss wrongly, and the run caught it
 
 **@SLIDING_WINDOW_RESULTS.md §2a.** I concluded the per-crop presence gate *caused* sliding

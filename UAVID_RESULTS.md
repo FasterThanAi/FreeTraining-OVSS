@@ -368,8 +368,7 @@ fences), not LoveDA's "everything else".
 - ⛔ **Lever 2 (per-class scale)** — needs `--cache-full`. Now feasible: at stride 4 that is
   ~14 MB/tile, so 200 train + 70 val is under 4 GB. **Not run.**
 - ✅ **train→val transfer — DONE, §14. +1.03, prediction confirmed.**
-- ⛔ **End-to-end `eval.py` verification.** Everything above is cached-histogram arithmetic.
-  WEEK3 §9c's rule: verify in the segmentor before it is written up.
+- ✅ **End-to-end `eval.py` verification — DONE, §15. 57.92 measured against 57.90 predicted.**
 
 
 ---
@@ -465,3 +464,49 @@ fails.**
 7-scene CV, +0.72 on train's 20-scene CV, −0.68 under transfer. Train fits it at
 **0.405** where val's oracle wants **0.700**. Its optimum genuinely differs between the
 splits, and it is the one class the transfer costs.
+
+
+---
+
+## 15. ✅✅ VERIFIED END-TO-END BY THE PIPELINE — 57.92 against a predicted 57.90
+
+Everything in §12–§14 is arithmetic on a cached `(gt, pred, conf-bin)` histogram. WEEK3 §9c's
+rule is to run it through the actual segmentor before it is written up. LoveDA and Potsdam both
+did; UAVid now has too.
+
+`configs/cfg_uavid_val_perclass.py` was written **by `tau_transfer.py --deploy-cfg`, straight
+from the fit** — not transcribed. The log shows the segmentor accepting it:
+`per-class prob_thd: 0.300, 0.150, 0.405, 0.000, 0.180, 0.185, 0.015`.
+
+| | predicted from the cache | **measured by `eval.py`** | Δ |
+|---|---|---|---|
+| published τ = 0.3 | 56.87 | **56.86** | 0.01 |
+| **per-class τ (transferred from train)** | **57.90** | ⭐ **57.92** | **0.02** |
+| **gain** | +1.03 | ⭐ **+1.06** | 0.03 |
+
+### Per class, cached prediction against the pipeline
+
+| class | predicted | measured | Δ |
+|---|---|---|---|
+| background | 56.39 | 56.53 | 0.14 |
+| building | 91.41 | 91.53 | 0.12 |
+| human | 23.78 | 23.69 | 0.09 |
+| car | 63.40 | 63.32 | 0.08 |
+| tree | 53.21 | 53.26 | 0.05 |
+| road | 67.21 | 67.24 | 0.03 |
+| vegetation | 49.88 | 49.90 | 0.02 |
+
+⚠️ **Max disagreement 0.14, against LoveDA's ≤0.04.** Larger, and the reason is known rather than
+guessed: `conf` is cached as **float16** and binned into 200 buckets, so a pixel sitting on a bin
+edge can be scored on either side of a threshold. Two of UAVid's fitted thresholds (`car` 0.000,
+`human` 0.015) sit at the very bottom of the range where float16 spacing is finest and the
+quantisation is relatively coarsest. **Immaterial at 0.02 on the headline, but quote the
+measured column, not the predicted one.**
+
+⭐ **This validates the histogram as an instrument on a FOURTH dataset** (LoveDA, Potsdam,
+ConInfer, UAVid), so every cached result above inherits it.
+
+### The deployable claim, in one line
+
+> **56.86 → 57.92 (+1.06) on UAVid val, with thresholds fitted on a different split, never
+> touching a validation label, and verified by the unmodified evaluation pipeline.**

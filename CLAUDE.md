@@ -240,8 +240,12 @@ ratio → **+1.03**; LoveDA train→val 2.04× → −0.12; LoveDA urban↔rural
 ⚠️ Four points, two datasets, mixed protocols — a consistent **ordering, not a law**. ⚠️ It
 does not overturn §9f, which asked whether calibration pays *at all*, not whether a
 calibration set transfers.
-⛔ **Not done: lever 2 (needs `--cache-full`, now feasible at stride 4) and end-to-end
-`eval.py` verification.**
+✅✅ **VERIFIED END-TO-END: `eval.py` 56.86 → 57.92 (+1.06)** against the cache's predicted
+57.90, every class within **0.14** (larger than LoveDA's 0.04 because two fitted thresholds sit
+at 0.000/0.015 where float16 binning is coarsest). Config written by `tau_transfer.py
+--deploy-cfg` straight from the fit, never transcribed. ⭐ **Fourth dataset validating the
+histogram instrument.**
+⛔ **Not done: lever 2** (needs `--cache-full`, now feasible at stride 4).
 
 ### ⭐⭐ TTA WORKS — AND IT IS A SUBSTITUTE FOR LEVER 2, NOT A COMPLEMENT. @TTA_RESULTS.md, 13-14 Sep.
 
