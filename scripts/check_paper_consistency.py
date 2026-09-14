@@ -36,7 +36,45 @@ def main():
     fail = 0
     nums = (PAPER / 'numbers.tex').read_text()
     defined = dict(re.findall(r'\\newcommand\{\\([a-zA-Z]+)\}\{([^}]*)\}', nums))
-    print(f'numbers.tex defines {len(defined)} macros\n')
+    print(f'numbers.tex defines {len(defined)} macros')
+
+    # -- 0. a macro defined TWICE is a LaTeX error, not a style problem --------
+    # ⛔ `\newcommand` refuses to redefine, so a duplicate name halts the build.
+    # This happened twice in one session: a macro was added without checking the
+    # name existed. A compiler catches it in seconds -- but only if a compiler is
+    # available, and on the authoring machine there is none.
+    names = re.findall(r'\\newcommand\{\\([a-zA-Z]+)\}', nums)
+    dup = sorted({x for x in names if names.count(x) > 1})
+    if dup:
+        print(f'  FAIL  defined more than once (LaTeX will halt): {dup}')
+        fail += 1
+    else:
+        print('  ok    no macro defined twice')
+
+    # -- 0b. non-ASCII in body text is a LaTeX error under inputenc ------------
+    # ⛔ This project writes its notes with ⚠/⛔/⭐ markers and they leaked into
+    # main.tex on 8 and 13 Sep, breaking every build since. They were invisible
+    # because the build check grepped for undefined REFERENCES, not for errors.
+    # Comments are safe; anything before an unescaped % is not.
+    SAFE = set('\u2010\u2011\u2013\u2014\u2018\u2019\u201c\u201d\u2026')
+    for doc in DOCS + ['numbers.tex']:
+        f = PAPER / doc
+        if not f.exists():
+            continue
+        hits = []
+        for i, line in enumerate(f.read_text().splitlines(), 1):
+            code = line.split('%')[0]
+            bad = [c for c in code if ord(c) > 0x2000 and c not in SAFE]
+            if bad:
+                hits.append((i, ''.join(bad), code.strip()[:60]))
+        if hits:
+            print(f'  FAIL  {doc}: {len(hits)} line(s) with non-ASCII in body text:')
+            for i, b, ctx in hits[:6]:
+                print(f'       line {i:>5}  {b!r}  {ctx}')
+            fail += 1
+    if not fail:
+        print('  ok    no non-ASCII outside comments')
+    print()
 
     for name in DOCS:
         f = PAPER / name

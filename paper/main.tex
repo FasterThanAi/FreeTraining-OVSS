@@ -7,7 +7,7 @@
 %  \documentclass[10pt,twocolumn,letterpaper]{article} + \usepackage{cvpr}
 %  (or IEEEtran for GRSL). Nothing else here assumes a class.
 %
-%  ⚠️ EVERY NUMBER COMES FROM numbers.tex. Do not type a figure inline --
+%  EVERY NUMBER COMES FROM numbers.tex. Do not type a figure inline --
 %  if it is not a macro there, it has no citation and does not belong.
 % =====================================================================
 \documentclass[10pt,a4paper]{article}                        % TEMPLATE
@@ -28,7 +28,7 @@
 \newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
 \newcommand{\best}[1]{\textbf{#1}}
 \newcommand{\bg}{\texttt{background}}
-% ⚠️ The supplementary is a SEPARATE document, so \ref to a label defined there
+% The supplementary is a SEPARATE document, so \ref to a label defined there
 % renders as ??. This macro keeps the prose correct either way. If the venue
 % merges the two into one PDF, add
 %     \usepackage{xr}\externaldocument{supplementary}
@@ -1125,7 +1125,7 @@ addresses a twentieth of the mechanism and the scale already reorders that.
 score earns} succeed; three that change \emph{the score itself} do not.
 \best{On this evidence the miscalibration in a presence-gated open-vocabulary
 pipeline is in the decision rule rather than in the per-class evidence}, which is
-a claim about such pipelines in general and not about SAM~3. ⚠️ We state it as a
+a claim about such pipelines in general and not about SAM~3. We state it as a
 description of five corrections on two datasets, not a law: it is post-hoc, and a
 post-hoc reading elsewhere in this paper did not survive its first committed test
 (Section~\ref{sec:limitations}). What it does establish is negative and firm ---
@@ -1205,7 +1205,7 @@ position is a property of a distribution. This explains why an $N$-parameter fit
 works and every one-parameter rule fails, and it generalises to any training-free
 pipeline that thresholds a per-class score.
 
-⛔ \emph{An earlier version of this argument attributed the bound to coupling
+\emph{An earlier version of this argument attributed the bound to coupling
 between classes --- that raising one threshold changes every other class's
 optimum. Separation shows that is false for the real classes, and we report the
 correction because the conclusion survives on a stronger footing.} The coupling is
@@ -1293,7 +1293,7 @@ obvious next step and we have not tested one.
   naming follows the words given. \textbf{Top:} a photovoltaic array. The
   settlement vocabulary, which has no word for it, assigns \indVegA{}\% of the
   tile to \texttt{vegetation}; adding \texttt{solar panel} recovers
-  \indSolarB{}\%, \best{well below the panels' visible extent}. ⛔ No ground
+  \indSolarB{}\%, \best{well below the panels' visible extent}. No ground
   truth exists for this imagery, so these are pixel shares, not accuracy.}
   \label{fig:vocab}
 \end{figure*}
@@ -1318,7 +1318,7 @@ which is the low-recall regime per-class thresholds exist to correct (the
 \texttt{tree} case of Section~\ref{sec:scaleresults} at \treeP{}\% precision and
 \treeR{}\% recall is the same shape). Here we cannot correct it: the imagery is
 unlabelled, and Section~\ref{sec:limitations} shows thresholds fitted elsewhere
-would not transfer. ⛔ We therefore claim nothing about accuracy on these
+would not transfer. We therefore claim nothing about accuracy on these
 scenes, only that the class list is an input and the model responds to it. The
 \calibTiles{} labelled tiles our correction needs are exactly what such a
 deployment must budget for, and this is what not having them looks like.
@@ -1410,13 +1410,13 @@ is withdrawn. What the same measurement shows instead is that the scale gain is
 \emph{invariant} to what the threshold collected, consistent with the two levers
 acting on disjoint error mass --- thresholds on the \mechA{} of the residual that
 falls below $\tau$, the scale on the \mechB{} the argmax loses plus the real-class
-confusion no threshold reaches. ⚠️ That is two strata of one dataset and inherits
+confusion no threshold reaches. That is two strata of one dataset and inherits
 the same gate.
 
 \paragraph{The fit captures most of the oracle on two datasets and little on the
 third.} Against the per-class oracle bound, held out, our fitted thresholds
 capture \capLove{} on LoveDA and \capPots{} on Potsdam but only \capOEM{} on
-OpenEarthMap. ⛔ The shortfall is one class: OpenEarthMap's \texttt{water} is
+OpenEarthMap. The shortfall is one class: OpenEarthMap's \texttt{water} is
 fitted at \capOemWaterFit{} against an oracle \capOemWaterOra{}, costing it
 \capOemWaterA{}~$\to$~\capOemWaterB{}~IoU. Correcting that class alone would take
 the dataset's gain from \mrOemFull{} to $+2.14$. It is not a sample-size problem
