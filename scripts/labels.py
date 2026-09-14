@@ -40,6 +40,9 @@ class Labels:
         comparison instead of an assumption -- see the note below."""
         self.names = [str(n) for n in names]
         self.n = len(self.names)
+        # True when the discard target sits outside the class list, so it is
+        # never scored. Consumers size their confusion matrix with `n_pred`.
+        self.sink = False
         self.nc = self.n + 1                      # mask-space width incl. no-data
         low = [n.lower() for n in self.names]
 
@@ -48,12 +51,34 @@ class Labels:
             if cand in low:
                 self.bg = low.index(cand) + 1
                 break
-        if self.bg is None:
+        # ⭐ A dataset can legitimately have NO catch-all. DLRSD is the first:
+        # 17 classes, all of them real things, every one of its 137,625,600
+        # pixels labelled, index 0 absent from all 2100 files. There the
+        # segmentor still needs somewhere to send sub-tau pixels, and
+        # cfg_dlrsd.py points `bg_idx` at an index OUTSIDE the class list -- an
+        # unscored sink. A discarded pixel then becomes a false negative for
+        # its true class and a false positive for nothing.
+        #
+        # ⛔ Without this branch the fallback below fires and silently nominates
+        # the FIRST class as the catch-all (`airplane` on DLRSD), which is the
+        # `g > BACKGROUND` mistake from Potsdam wearing a different hat.
+        if self.bg is None and discard_idx is not None and discard_idx >= self.n:
+            self.bg = discard_idx + 1              # mask value, outside 1..n
+            self.sink = True
+            print(f'  ⭐ no catch-all class, and the segmentor sends sub-τ pixels '
+                  f'to bg_idx={discard_idx}, outside the {self.n} classes. '
+                  f'Treating it as an UNSCORED SINK: a discarded pixel is a '
+                  f'false negative for its true class and a false positive for '
+                  f'nothing. Full mIoU == catch-all-excluded mIoU here.')
+        elif self.bg is None:
             self.bg = 1
             print(f'  !! no catch-all class found among {CATCH_ALL_ALIASES} in '
                   f'{self.names}; assuming mask value 1 ({self.names[0]}). '
                   f'Pass bg_name= explicitly if that is wrong — getting this '
-                  f'backwards invalidates every number silently.')
+                  f'backwards invalidates every number silently.'
+                  + ('' if discard_idx is None else
+                     f' The segmentor\'s bg_idx={discard_idx} is INSIDE the '
+                     f'class range, so it cannot be an unscored sink either.'))
         elif self.bg != 1:
             # The segmentor's `bg_idx` decides where sub-tau pixels go. Its
             # DEFAULT is 0, so on a dataset whose catch-all is not first the
@@ -79,12 +104,26 @@ class Labels:
                       f'below is measuring the wrong class.')
         self.real = [c for c in range(1, self.nc) if c != self.bg]
 
+    @property
+    def n_pred(self):
+        """Width of a confusion matrix's PREDICTED axis.
+
+        Equal to `n` normally. With an unscored sink the segmentor can emit one
+        index past the class list, so the matrix needs an extra column -- and
+        that column is deliberately NOT a class: nothing iterates over it, so
+        the sink contributes to no IoU. ⛔ Sizing the matrix `n x n` instead
+        raises `IndexError: index 17 is out of bounds` at best, and at worst a
+        `np.clip` upstream folds every discarded pixel onto the last class.
+        """
+        return max(self.n, self.bg)
+
     def name(self, mask_value):
         return self.names[mask_value - 1]
 
     def __repr__(self):
-        return (f'Labels({self.n} classes, background=mask value {self.bg}, '
-                f'{", ".join(self.names)})')
+        where = ('unscored sink' if self.sink
+                 else f'background=mask value {self.bg}')
+        return f'Labels({self.n} classes, {where}, {", ".join(self.names)})'
 
 
 def from_cache(cache_dir, bg_name=None, discard_idx=None):

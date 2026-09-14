@@ -92,6 +92,7 @@ import labels  # noqa: E402
 CLASSES = None
 N = None
 BACKGROUND = None
+NPRED = None      # predicted-axis width; > N only with an unscored sink
 
 
 def main():
@@ -324,11 +325,19 @@ def main():
                 f'--seed 0   would fit, or --cache-stride {max(2, int(np.ceil(np.sqrt(need_gb * 1.5 / max(free_gb, 1e-9)))) * args.cache_stride)}   (same tiles, '
                 f'coarser grid), or --cache-dir on a bigger volume, or --no-cache.')
 
-    global CLASSES, N, BACKGROUND
+    global CLASSES, N, BACKGROUND, NPRED
     _lab = labels.from_model(model, cfg.get('model', cfg))
     CLASSES, N, BACKGROUND = _lab.names, _lab.n, _lab.bg
+    # ⭐ With an unscored sink (DLRSD) the segmentor emits one index past the
+    # class list, so the PREDICTED axis is one wider than the TRUE axis. Equal
+    # to N on every other dataset, so this is a no-op there.
+    NPRED = _lab.n_pred
     print(f'  classes: {N} -- {", ".join(CLASSES)}')
-    print(f'  background is mask value {BACKGROUND} ({CLASSES[BACKGROUND - 1]})')
+    if _lab.sink:
+        print(f'  discard target is an UNSCORED SINK at mask value {BACKGROUND} '
+              f'(no such class) — confusion matrix is {N}x{NPRED}')
+    else:
+        print(f'  background is mask value {BACKGROUND} ({CLASSES[BACKGROUND - 1]})')
 
     # query -> class map, collapsing synonym queries onto classes
     qidx = model.query_idx.cpu().numpy() if hasattr(model, 'query_idx') else None
@@ -338,7 +347,13 @@ def main():
               '     Copy reference/segearthov3_segmentor.py over\n'
               '     ~/SegEarth-OV-3/segearthov3_segmentor.py and re-run.')
 
-    conf = np.zeros((N, N), dtype=np.int64)      # conf[true, pred], 0-indexed
+    # conf[true, pred], 0-indexed. ⛔ NOT (N, N): with an unscored sink `pred`
+    # reaches N, and `np.add.at(conf, (g-1, p-1), 1)` then raises
+    # `IndexError: index 17 is out of bounds for axis 1 with size 17`. Widening
+    # the predicted axis is the whole fix; every downstream line already reads
+    # the catch-all by its mask value rather than assuming a position, because
+    # of the Potsdam correction.
+    conf = np.zeros((N, NPRED), dtype=np.int64)
     per_image = []
     pres_rows = []
 
@@ -541,15 +556,23 @@ def main():
     rows.sort(key=lambda r: -r['pct_lost'])
 
     # mIoU from the confusion matrix — sanity check against the known 47.38
-    inter = np.diag(conf).astype(float)
-    union = conf.sum(1) + conf.sum(0) - np.diag(conf)
+    # ⚠️ `conf.sum(0)` runs over the PREDICTED axis, which is one wider than the
+    # true axis when there is a sink -- it would not broadcast against
+    # `conf.sum(1)`. Restrict the predicted axis to the real classes: a pixel
+    # sent to the sink still counts in its true class's row (a false negative)
+    # and in nobody's column (a false positive for nothing), which is exactly
+    # the semantics cfg_dlrsd.py claims and test_dlrsd_sink.py verifies.
+    sq = conf[:, :N]
+    inter = np.diag(sq).astype(float)
+    union = conf.sum(1) + sq.sum(0) - inter
     iou = np.where(union > 0, inter / np.maximum(union, 1), np.nan)
     miou = float(np.nanmean(iou) * 100)
 
     # ---- write ------------------------------------------------------------
     np.save(out / 'confusion_matrix.npy', conf)
     with open(out / 'confusion_matrix.csv', 'w') as f:
-        f.write('true\\pred,' + ','.join(CLASSES) + '\n')
+        _cols = list(CLASSES) + (['<discarded>'] if NPRED > N else [])
+        f.write('true\\pred,' + ','.join(_cols) + '\n')
         for c in range(N):
             f.write(CLASSES[c] + ',' + ','.join(map(str, conf[c])) + '\n')
     with open(out / 'discard_per_class.csv', 'w') as f:
@@ -654,12 +677,13 @@ def main():
         cm = conf / np.maximum(conf.sum(1, keepdims=True), 1)
         fig, ax = plt.subplots(figsize=(8, 7))
         im = ax.imshow(cm, cmap='Blues', vmin=0, vmax=1)
-        ax.set_xticks(range(N)); ax.set_xticklabels(CLASSES, rotation=45, ha='right')
+        _xl = list(CLASSES) + (['<discarded>'] if NPRED > N else [])
+        ax.set_xticks(range(NPRED)); ax.set_xticklabels(_xl, rotation=45, ha='right')
         ax.set_yticks(range(N)); ax.set_yticklabels(CLASSES)
         ax.set_xlabel('predicted'); ax.set_ylabel('true')
         ax.set_title('Row-normalised confusion matrix')
         for a in range(N):
-            for b in range(N):
+            for b in range(NPRED):
                 if cm[a, b] > 0.01:
                     ax.text(b, a, f'{cm[a,b]*100:.0f}', ha='center', va='center',
                             fontsize=8, color='white' if cm[a, b] > 0.5 else 'black')
