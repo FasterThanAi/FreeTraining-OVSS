@@ -37,28 +37,36 @@ import numpy as np
 from PIL import Image
 
 
-def dataset_meta(repo):
-    """Read UAVidDataset's classes and palette out of custom_datasets.py.
+# ⭐ UAVidDataset's own map, copied verbatim from custom_datasets.py, plus the
+# merge its docstring names. Hardcoded rather than parsed: METAINFO is written
+# as dict(...) with parentheses and a parser looking for a closing brace finds
+# nothing. verify_meta() below re-checks it against the file on every run, so it
+# cannot drift silently.
+CLASSES = ('background', 'building', 'road', 'car', 'tree', 'vegetation', 'human')
+PALETTE = [(0, 0, 0), (128, 0, 0), (128, 64, 128), (192, 0, 192),
+           (0, 128, 0), (128, 128, 0), (64, 64, 0)]
+# ⛔ THE MERGE THAT IS NOT IN THE PALETTE. UAVidDataset's docstring says
+# "convert Moving_Car to Static_Car", and UAVid ships TWO car colours: static
+# (192,0,192), which is in the palette, and moving (64,0,128), which is not.
+# Without this line every moving car becomes 255/ignore -- a silent partial
+# deletion of a class that still evaluates cleanly.
+EXTRA = {(64, 0, 128): 3}          # moving car -> `car`
 
-    ⭐ Parsed rather than imported: importing pulls in mmseg, sam3 and a CUDA
-    build, none of which this script needs.
-    """
+
+def verify_meta(repo):
+    """Re-check the hardcoded map against custom_datasets.py."""
     src = (Path(repo).expanduser() / 'custom_datasets.py').read_text()
     i = src.index('class UAVidDataset')
-    block = src[i:i + 4000]
-    ns = {}
-    try:
-        j = block.index('METAINFO')
-        k = block.index('}', block.index('palette')) + 1
-        exec('METAINFO' + block[j + len('METAINFO'):k], {}, ns)
-    except Exception as e:
-        raise SystemExit(
-            f'could not parse UAVidDataset METAINFO ({e}).\n'
-            f'Print it by hand and pass --classes/--palette instead:\n\n'
-            f'    sed -n "/class UAVidDataset/,/^class /p" '
-            f'{repo}/custom_datasets.py\n')
-    m = ns['METAINFO']
-    return list(m['classes']), [tuple(c) for c in m['palette']]
+    block = src[i:i + 2000]
+    for c in CLASSES:
+        if f"'{c}'" not in block:
+            raise SystemExit(f'class {c!r} is no longer in UAVidDataset; '
+                             f'the hardcoded map is stale.')
+    for r, g, b in PALETTE:
+        if f'[{r}, {g}, {b}]' not in block:
+            raise SystemExit(f'palette colour {(r, g, b)} is no longer in '
+                             f'UAVidDataset; the hardcoded map is stale.')
+    return list(CLASSES), list(PALETTE)
 
 
 def main():
@@ -70,7 +78,7 @@ def main():
     ap.add_argument('--dry-run', action='store_true')
     args = ap.parse_args()
 
-    classes, palette = dataset_meta(args.repo)
+    classes, palette = verify_meta(args.repo)
     print(f'  UAVidDataset: {len(classes)} classes')
     for c, p in zip(classes, palette):
         print(f'    {c:22} {p}')
@@ -86,6 +94,9 @@ def main():
 
     # ⭐ colour -> index, straight off the loader's own palette
     lut = {tuple(p): i for i, p in enumerate(palette)}
+    lut.update(EXTRA)                       # <<< the moving-car merge
+    print(f'\n  colour map: {len(lut)} colours -> {len(palette)} classes '
+          f'({len(EXTRA)} merged)')
     if len(lut) != len(palette):
         raise SystemExit('the palette contains duplicate colours; the mapping '
                          'would be ambiguous')
