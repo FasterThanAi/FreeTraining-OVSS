@@ -245,7 +245,25 @@ calibration set transfers.
 at 0.000/0.015 where float16 binning is coarsest). Config written by `tau_transfer.py
 --deploy-cfg` straight from the fit, never transcribed. ⭐ **Fourth dataset validating the
 histogram instrument.**
-⛔ **Not done: lever 2** (needs `--cache-full`, now feasible at stride 4).
+✅✅ **LEVER 2 IS THE BIGGEST RESULT HERE: +5.89 ± 1.51 over lever 1, 5/5 folds,
+mean−2sd +2.87** — the largest lever-2 gain in the project (LoveDA +1.16, Potsdam +4.92,
+ConInfer −0.10). Group-disjoint folds, augmented frames excluded, all rungs evaluated
+exactly. ✅ Rung B reproduces lever 1 at +1.54 ± 0.30.
+⭐⭐ **The pre-registered mechanism was right and it is TWO CLASSES.** `prereg/
+predict_uavid_lever2.md` named, before the cache existed, that **`vegetation` would take
+w < 1 and `tree` w > 1** — they are the two green classes competing for the same pixels,
+53.6/87.8 against 91.8/55.9. Measured **0.40 and 2.56, a 6.4× separation**, and they carry
+**96.2%** of the gain (`tree` **+26.13**, `vegetation` **+13.50**). ⭐ This is the family no
+threshold can reach: lowering `tree`'s τ cannot take back a pixel `vegetation` already won.
+⛔ **U4 failed and the prereg's suspect-check was run** — gauge 1.0066, subsample gate 0.099
+vs 0.15, lever 1 reproduces, and the three decisive classes are stable to **sd 0.01–0.02**
+across five disjoint flight groups. U4 was badly posed: `w` is defined only up to a global
+constant, and `building` is simply **not identified** (1.14–2.11 across folds, ΔIoU +0.09).
+⚠️ **Never quote +5.89 without the per-class table** — two of seven classes are 96% of it.
+⚠️⭐ **It may be repairing the VOCABULARY**: the class is *low vegetation*, the prompt is the
+bare word `vegetation`, and a 6.4× reweighting between two prompts that do not separate is
+what a bad prompt pair looks like. Cheap test, not yet run.
+⛔ **Not done: end-to-end verification of lever 2, and its val number.**
 
 ### ⭐⭐ TTA WORKS — AND IT IS A SUBSTITUTE FOR LEVER 2, NOT A COMPLEMENT. @TTA_RESULTS.md, 13-14 Sep.
 

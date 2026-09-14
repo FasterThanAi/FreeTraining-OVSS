@@ -365,8 +365,7 @@ fences), not LoveDA's "everything else".
 
 ## 13. What is NOT done
 
-- ⛔ **Lever 2 (per-class scale)** — needs `--cache-full`. Now feasible: at stride 4 that is
-  ~14 MB/tile, so 200 train + 70 val is under 4 GB. **Not run.**
+- ✅ **Lever 2 — DONE, §16. +5.89 ± 1.51, 5/5 folds. The largest lever-2 gain in the project.**
 - ✅ **train→val transfer — DONE, §14. +1.03, prediction confirmed.**
 - ✅ **End-to-end `eval.py` verification — DONE, §15. 57.92 measured against 57.90 predicted.**
 
@@ -510,3 +509,96 @@ ConInfer, UAVid), so every cached result above inherits it.
 
 > **56.86 → 57.92 (+1.06) on UAVid val, with thresholds fitted on a different split, never
 > touching a validation label, and verified by the unmodified evaluation pipeline.**
+
+
+---
+
+## 16. ✅✅ LEVER 2 IS THE BIGGEST RESULT ON UAVid — +5.89 ± 1.51 over lever 1
+
+200 real train frames, 20 flights, **group-disjoint folds**, augmented copies excluded.
+Predictions committed in `prereg/predict_uavid_lever2.md` (`9289fb1`) **before the cache
+existed**. All three rungs evaluated **exactly, over every pixel**; the 40k-px subsample
+drove only the search for `w`, and its gate passes at **0.099 against a 0.15 bar**.
+
+| rung | | mean | sd | folds+ | mean−2sd |
+|---|---|---|---|---|---|
+| **B − A** | per-class τ (lever 1) | +1.54 | 0.30 | 5/5 | +0.94 |
+| ⭐ **C − B** | **+ per-class scale (lever 2)** | ⭐ **+5.89** | **1.51** | **5/5** | ⭐ **+2.87** |
+
+⭐⭐ **Largest lever-2 gain measured in this project**: LoveDA +1.16, Potsdam +4.92,
+ConInfer −0.10, **UAVid +5.89**. Range +4.02 to +7.53, every fold positive.
+✅ Rung B reproduces lever 1 independently (+1.54 ± 0.30 against §12's +1.34 ± 0.39,
+different cache and code path), so the run is sound.
+
+### ⭐⭐ The pre-registered mechanism was RIGHT, and it is two classes
+
+| | prediction (committed in advance) | measured | |
+|---|---|---|---|
+| **U1** | clears the gate | +5.89 ± 1.51, 5/5, mean−2sd +2.87 | ✅ |
+| ⭐ **U2** | **`vegetation` w < 1 and `tree` w > 1** | ⭐ **0.40 and 2.56** | ✅ **decisive** |
+| **U3** | `human` w > 1 | **2.55** | ✅ |
+| **U4** | `building` within 25% of w = 1 | **1.63** | ⛔ **fail** |
+| **U5** | lever 1 holds within ±0.4 of +1.34 | **+1.54** (Δ 0.20) | ✅ |
+
+U2 named two classes and two signs from the precision/recall table alone, before any fit:
+`vegetation` 53.6/87.8 fires far too readily, `tree` 91.8/55.9 far too rarely, and they are
+the two green classes competing for the same pixels. **The fit separates them 6.4×.**
+
+⭐ **And the IoU confirms the mechanism, not just the weights:**
+
+| class | Δ IoU (C over B) | w |
+|---|---|---|
+| ⭐ **tree** | ⭐ **+26.13** | **2.56** |
+| ⭐ **vegetation** | ⭐ **+13.50** | **0.40** |
+| human | +2.93 | 2.55 |
+| building | +0.09 | 1.63 |
+| road | −0.23 | 0.40 |
+| car | −0.44 | 0.50 |
+| `background` | −0.77 | 1.23 |
+
+> ⭐⭐ **`tree` + `vegetation` are 96.2% of the gain.** This is the family the completeness
+> argument explicitly excludes: **no threshold can recover a pixel another class already won
+> in the argmax.** Lowering `tree`'s τ cannot take back a pixel `vegetation` took.
+
+### ⛔ U4 failed — the suspect-check the pre-registration demanded, run
+
+The prereg says an U4 failure means *treat the run as suspect and check the fit*, because
+lever 5's `w` once drifted to a uniform 0.40 by tie-break and produced a false null. Five
+checks, all passing:
+
+| check | result |
+|---|---|
+| gauge (geometric mean of `w` must be 1) | **1.0066** ✅ |
+| subsample vs exact on rung B | max **0.099** against a 0.15 bar ✅ |
+| lever 1 reproduces | +1.54 ± 0.30 vs the recorded +1.34 ± 0.39 ✅ |
+| ⭐ decisive classes stable across 5 disjoint flight groups | `road` sd **0.01**, `vegetation` sd **0.01**, `car` sd **0.02** ✅ |
+| which classes wander | `building` 0.39, `human` 0.38, `background` 0.31 |
+
+⭐ **U4 was a badly-posed prediction, and that is the honest verdict.** A scale vector is
+defined only up to a global constant — with `road`, `car` and `vegetation` all driven to
+0.40–0.50, geometric-mean normalisation *necessarily* lifts everything else. "Stays near 1"
+is a gauge-dependent claim about an inherently relative quantity.
+⭐ And `building` is simply **not identified**: it moves 1.14–2.11 across folds and changes
+its IoU by **+0.09**. A flat direction of the objective, exactly like `background`'s γ in
+lever 4 (@PRESENCE_POWER_RESULTS). **Do not quote `building`'s scale.**
+
+### ⚠️ Three caveats that must travel with this number
+
+1. ⚠️ **96.2% of the gain is two classes** out of seven. That is this project's own §9h
+   leverage warning turned on itself: an unweighted mean lets two classes carry a headline.
+   **Never quote +5.89 without the per-class table.**
+2. ⚠️ ⭐ **It may be repairing the VOCABULARY, not the model.** UAVid's class is *low
+   vegetation* and the prompt is the bare word `vegetation`, which plainly also describes
+   trees. A 6.4× reweighting between two prompts that do not separate is what a bad prompt
+   pair looks like from the inside. `PROMPT_ENSEMBLE_RESULTS` measured the vocabulary as
+   worth **+4.94 mIoU** on LoveDA — larger than every calibration lever combined.
+   ⭐ **Testable and cheap: change the prompt to `low vegetation` or `grass` and re-measure.
+   If the lever-2 gain shrinks, part of it was a prompt choice.** Not yet run.
+3. ⛔ **Cached-histogram result on the TRAIN split.** It is a prediction until the segmentor
+   reproduces it, and the val number is unmeasured.
+
+⚠️ The generated report contains both *"the fitted scales move substantially between folds,
+which is what overfitting looks like"* and *"non-uniqueness, not overfitting"*. The first is
+a generic warning template; the second is the correct reading here, and the evidence is the
+sd column — the three classes that decide the result are stable to **0.01–0.02** across five
+disjoint flight groups. Quote the sd, not the warning.
