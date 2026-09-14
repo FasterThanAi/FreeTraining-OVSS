@@ -660,7 +660,85 @@ therefore preserve the structure that matters — *greens split, small objects u
 seven individually meaningful numbers.** A shuffle that breaks the grouping costs 1.58 mIoU
 below the published baseline, an 8-point swing from the real assignment.
 
-⛔ **Still to verify end-to-end.** The deploy config
-`configs/cfg_uavid_val_scale.py` is written from the fit; `eval.py` should report **63.55**.
-The first attempt **CUDA-OOMed because another process held 10.61 GB of the 16 GB card** —
-a scheduling collision, not a fault in the run; the cached result above is unaffected.
+✅ **VERIFIED END-TO-END — see §18.** `eval.py` reports **63.5500** against a predicted
+**63.55**. ⚠️ The first attempt CUDA-OOMed because another process held 10.61 GB of the
+16 GB card — a scheduling collision, not a fault in the run.
+
+
+---
+
+## 18. ✅✅✅ UAVid IS COMPLETE — 56.86 → 63.55, verified by the pipeline, exactly as predicted
+
+| | predicted from the cache | **`eval.py`** | Δ |
+|---|---|---|---|
+| **mIoU** | **63.55** | ⭐ **63.5500** | ⭐ **0.00** |
+| tree | 74.04 | **74.04** | **0.00** |
+| road | 67.40 | 67.39 | 0.01 |
+| vegetation | 63.04 | 63.00 | 0.04 |
+| car | 63.65 | 63.59 | 0.06 |
+| background | 55.96 | 56.09 | 0.13 |
+| building | 91.58 | 91.73 | 0.15 |
+| human | 29.20 | 29.00 | 0.20 |
+
+The deployed vectors were written by `scale_transfer.py --deploy-cfg` straight from the fit,
+and the segmentor echoed both back (`per-class prob_thd: …`, `class_scale: …`) before the run.
+
+### The full chain on UAVid val
+
+| rung | mIoU | aAcc | mPrecision | mRecall |
+|---|---|---|---|---|
+| published τ = 0.3 | 56.86 | 79.24 | 78.99 | 69.12 |
+| + per-class τ *(lever 1)* | 57.92 | 79.52 | 77.92 | 70.32 |
+| ⭐ **+ per-class scale *(lever 2)*** | ⭐ **63.55** | ⭐ **84.81** | **79.59** | **74.04** |
+| **total** | ⭐ **+6.69** | **+5.57** | **+0.60** | **+4.92** |
+
+Both parameter sets are fitted on the **train** split and applied unchanged; no validation
+label is touched by either fit.
+
+### ⭐⭐ Two checks that answer the obvious objections
+
+**1. "The mIoU gain is two classes in an unweighted mean of seven."** ⛔ **That caveat was
+too pessimistic and is corrected here.** `aAcc` — overall pixel accuracy, weighted by pixel
+count and therefore impossible to move with a rare class — rises **79.24 → 84.81, +5.57**.
+And `tree` (23.55%) plus `vegetation` (14.15%) are **37.7% of every pixel in the dataset**.
+They are the two *largest* classes after `building`, not rare ones. The caveat applies to
+`human` (0.19% of pixels), not to the classes carrying this result.
+
+**2. ⭐ Precision AND recall both rise.** `TTA_RESULTS` records that as the signature of
+better decisions rather than redistributed ones, and called dihedral TTA *"the only
+intervention in this project where precision AND recall both rise"*. **The two levers
+together now do it as well: mPrecision +0.60, mRecall +4.92.**
+⭐ And the split is informative: **lever 1 alone TRADES** (precision −1.07, recall +1.20) —
+it lowers thresholds to collect discarded pixels. **Lever 2 pays the precision back** and
+adds recall on top, because it is not lowering a bar, it is handing the pixel to the class
+that should have won it.
+
+Visible per class, and it is exactly the pre-registered mechanism:
+
+| class | precision → | recall → |
+|---|---|---|
+| **tree** | 91.96 → **84.65** | ⭐ **56.43 → 85.53** |
+| **vegetation** | ⭐ **55.71 → 79.78** | 84.04 → 74.97 |
+| human | 76.61 → 62.96 | **20.28 → 34.97** |
+
+**The two green classes move toward each other from opposite extremes** — `tree` buys 29
+points of recall for 7 of precision, `vegetation` buys 24 points of precision for 9 of
+recall. That is the argmax competition between them being rebalanced, which is what the
+pre-registration predicted and what no threshold can do.
+
+### The deployed configuration
+
+| class | `class_scale` | `prob_thd` |
+|---|---|---|
+| background | 1.212 | 0.300 *(no effect)* |
+| building | 1.788 | 0.160 |
+| road | 0.383 | 0.405 |
+| car | 0.495 | 0.005 |
+| **tree** | **2.522** | 0.115 |
+| **vegetation** | **0.383** | 0.180 |
+| human | 2.522 | 0.005 |
+
+⚠️ **Against SegEarth-OV3's published 54.7 this is +8.85 — do NOT quote that as our gain.**
+Our own reproduction is 2.16 above their number for reasons we cannot explain, so **the
+honest claim is +6.69 over our own reproduced baseline**, exactly as the ConInfer row is
+handled in the other direction.

@@ -263,7 +263,24 @@ constant, and `building` is simply **not identified** (1.14–2.11 across folds,
 ⚠️⭐ **It may be repairing the VOCABULARY**: the class is *low vegetation*, the prompt is the
 bare word `vegetation`, and a 6.4× reweighting between two prompts that do not separate is
 what a bad prompt pair looks like. Cheap test, not yet run.
-⛔ **Not done: end-to-end verification of lever 2, and its val number.**
+✅✅✅ **UAVid IS COMPLETE AND VERIFIED: 56.86 → 57.92 (lever 1) → 63.55 (lever 2), +6.69
+total**, both parameter sets fitted on the TRAIN split and applied unchanged. `eval.py`
+reports **63.5500** against a predicted **63.55** — exact — every class within 0.20.
+Lever 2 transfers at **+5.64**, keeping **96%** of its within-split +5.89 and reaching 90%
+of the destination bound. ⭐ **The scale transfers BETTER than the threshold** (lever 1 keeps
+77% of its own) and **repairs the class the threshold hurt**: `road` −0.68 → +0.15.
+⭐⭐ **Two checks answer the obvious objections.** (a) ⛔ The "two classes in an unweighted
+mean" caveat was too pessimistic: **aAcc rises 79.24 → 84.81 (+5.57)** — pixel-weighted, so
+a rare class cannot move it — and `tree`+`vegetation` are **37.7% of all pixels**, the
+largest classes after `building`. (b) ⭐ **Precision AND recall both rise** (+0.60 / +4.92),
+which `TTA_RESULTS` calls the signature of better decisions rather than redistribution.
+⭐ **Lever 1 alone TRADES** (precision −1.07, recall +1.20); lever 2 pays the precision back,
+because it is not lowering a bar, it hands the pixel to the class that should have won it.
+`tree` 56.4 → **85.5** recall, `vegetation` 55.7 → **79.8** precision.
+⚠️ **+8.85 over their published 54.7 is NOT our gain** — our reproduction is 2.16 high for
+unexplained reasons. **Quote +6.69 over our own baseline.**
+⛔ **Not done: the vocabulary test** — the class is *low vegetation*, the prompt is the bare
+word `vegetation`, and part of lever 2's gain may be repairing that rather than the model.
 
 ### ⭐⭐ TTA WORKS — AND IT IS A SUBSTITUTE FOR LEVER 2, NOT A COMPLEMENT. @TTA_RESULTS.md, 13-14 Sep.
 
