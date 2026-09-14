@@ -130,6 +130,29 @@ def main():
     groups = {re.compile(RE).search(n).group(1) for n in kept}
     check(len(groups) == 20, f'200 real frames carry 20 sequences ({len(groups)})')
 
+    # --- lever 2 (argmax_reorder) must have the SAME protections -----------
+    ar = (pathlib.Path(__file__).resolve().parent / 'argmax_reorder.py').read_text()
+    check("ap.add_argument('--group-re', default=None," in ar,
+          'argmax_reorder accepts --group-re')
+    check("ap.add_argument('--exclude-re', default=None," in ar,
+          'argmax_reorder accepts --exclude-re')
+    check('    if _gid is None:\n        folds = np.array_split(order, args.folds)' in ar,
+          'argmax_reorder ungrouped path is the original split, verbatim')
+    # the flag must not perturb the seeded partition of every recorded run
+    pre = ar[ar.index('_frng = np.random.default_rng(args.seed)'):ar.index('rng = np.random.default_rng(args.seed + 1000)')]
+    body = pre[pre.index('_gid = None'):]
+    check('_frng.' not in body and 'rng.' not in body,
+          'argmax_reorder grouping block draws no randomness when unused '
+          '(recorded LoveDA/Potsdam/OEM partitions are unchanged)')
+    check('a group-disjoint fold came out empty' in ar,
+          'argmax_reorder refuses an empty fold')
+    mdr = (pathlib.Path(__file__).resolve().parent / 'measure_discard_rate.py').read_text()
+    check("ap.add_argument('--exclude-re', default=None," in mdr,
+          'measure_discard_rate accepts --exclude-re (saves 3x disk AND 3x GPU)')
+    check(mdr.index("names = sorted(p.stem") < mdr.index("if args.exclude_re:")
+          < mdr.index('if args.limit:'),
+          'measure_discard_rate excludes BEFORE --limit/--sample and the disk probe')
+
     print()
     print('ALL PASS' if not fail else f'{fail} FAILURE(S)')
     return 1 if fail else 0

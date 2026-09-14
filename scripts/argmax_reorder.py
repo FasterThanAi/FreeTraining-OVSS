@@ -72,6 +72,7 @@ import argparse
 import sys
 from pathlib import Path
 
+import re
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -247,6 +248,17 @@ def main():
     ap.add_argument('--no-exact-eval', action='store_true',
                     help='skip the exact evaluation pass. Faster, but then the '
                          'result rests on the subsample and its gate.')
+    ap.add_argument('--exclude-re', default=None,
+                    help='drop cache files whose stem matches this REGEX. UAVid '
+                         'train ships 400 augmented copies among 600 frames; an '
+                         'image and its own mirror on opposite sides of a fold '
+                         'is the same pixels twice.')
+    ap.add_argument('--group-re', default=None,
+                    help='REGEX defining a SCENE; tiles sharing a match stay in '
+                         'the same fold. UAVid is video -- 10 consecutive frames '
+                         'per flight -- and a frame-level split inflated lever 1 '
+                         'by +0.54 mIoU before this was caught (@UAVID_RESULTS '
+                         '§8). Example: "([a-z]+[0-9]*)(?=[-_][0-9]+$)"')
     ap.add_argument('--md', default=None)
     args = ap.parse_args()
 
@@ -255,6 +267,14 @@ def main():
     print(f'  classes: {LB}')
 
     files = sorted(Path(args.cache).expanduser().glob('*.npz'))
+    if args.exclude_re:
+        _ex = re.compile(args.exclude_re)
+        _n0 = len(files)
+        files = [f for f in files if not _ex.search(f.stem)]
+        if not files:
+            raise SystemExit(f'--exclude-re {args.exclude_re!r} removed all {_n0}')
+        print(f'  --exclude-re {args.exclude_re!r}: dropped {_n0 - len(files)} '
+              f'of {_n0} tiles')
     if args.limit:
         files = files[:args.limit]
 
@@ -332,13 +352,47 @@ def main():
     #
     # This changes the partition relative to runs before 5 Sep 2026. Recorded
     # results from those runs stand as measured on their own partitions.
-    order = np.random.default_rng(args.seed).permutation(T)
+    _frng = np.random.default_rng(args.seed)
+    order = _frng.permutation(T)
+    # <<< GROUPED FOLDS. Correlated tiles must not straddle a fold: video frames
+    # from one flight are near-duplicates, so a frame-level split lets the fit
+    # memorise the scene it is scored on. Measured cost of getting this wrong on
+    # UAVid lever 1: +0.54 mIoU and two flipped folds.
+    _gid = None
+    if args.group_re:
+        _pat = re.compile(args.group_re)
+        _keys = []
+        for f in files:
+            m = _pat.search(f.stem)
+            if m is None:
+                raise SystemExit(f'--group-re {args.group_re!r} matched nothing '
+                                 f'on {f.stem!r} -- every tile must have a group')
+            _keys.append(m.group(1) if m.groups() else m.group(0))
+        _uniq = sorted(set(_keys))
+        if len(_uniq) < args.folds:
+            raise SystemExit(f'{len(_uniq)} groups is fewer than {args.folds} folds')
+        _pos = {g: i for i, g in enumerate(_uniq)}
+        _gid = np.array([_pos[k] for k in _keys])
+        print(f'  grouping: {len(_uniq)} groups from {T} tiles '
+              f'(sizes {np.bincount(_gid).min()}-{np.bincount(_gid).max()}), '
+              f'folds are group-disjoint')
     rng = np.random.default_rng(args.seed + 1000)
     S, G, PT = load_full(files, args.subsample, nc, NBINS, rng)
     grid = np.round(np.exp(np.linspace(np.log(0.40), np.log(2.50), 11)), 3)
     print(f'\n  w grid: {list(grid)}\n')
 
-    folds = np.array_split(order, args.folds)
+    if _gid is None:
+        folds = np.array_split(order, args.folds)
+    else:
+        _gof = np.empty(_gid.max() + 1, dtype=int)
+        for _k, _part in enumerate(np.array_split(
+                _frng.permutation(_gid.max() + 1), args.folds)):
+            _gof[_part] = _k
+        _own = _gof[_gid]
+        folds = [np.where(_own == _k)[0] for _k in range(args.folds)]
+        if any(len(f) == 0 for f in folds):
+            raise SystemExit('a group-disjoint fold came out empty; use fewer folds')
+        print(f'  fold sizes: {[len(f) for f in folds]}')
     rows, gate_rows = [], []
 
     for k in range(args.folds):

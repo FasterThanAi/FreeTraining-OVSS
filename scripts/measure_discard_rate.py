@@ -106,6 +106,13 @@ def main():
                          'domains with disjoint ID ranges — on LoveDA val (Rural '
                          '992 + Urban 677) --limit 500 is essentially rural-only. '
                          'Use --sample for a subset you intend to generalise from.')
+    ap.add_argument('--exclude-re', default=None,
+                    help='skip images whose stem matches this REGEX, before any '
+                         '--limit or --sample. The UAVid Kaggle repack ships 200 '
+                         'real train frames plus 400 flipped*/shifted* augmented '
+                         'copies; caching those costs 3x the disk and 3x the GPU '
+                         'time for data that must be excluded from any fold '
+                         'anyway. Example: --exclude-re "_(flipped|shifted)"')
     ap.add_argument('--sample', type=int, default=0,
                     help='draw n images at RANDOM instead of taking the first n. '
                          'Use this whenever the subset stands in for the split.')
@@ -180,6 +187,15 @@ def main():
     ann_ext = next((e for e in ['.png', '.tif', '.tiff']
                     if any(Path(args.ann_dir).glob(f'*{e}'))), ext)
     names = sorted(p.stem for p in Path(args.img_dir).glob(f'*{ext}'))
+    if args.exclude_re:
+        import re as _re
+        _ex = _re.compile(args.exclude_re)
+        _n0 = len(names)
+        names = [n for n in names if not _ex.search(n)]
+        if not names:
+            sys.exit(f'--exclude-re {args.exclude_re!r} removed all {_n0} images')
+        print(f'  --exclude-re {args.exclude_re!r}: skipping '
+              f'{_n0 - len(names)} of {_n0} images')
     print(f'  image ext {ext}, annotation ext {ann_ext}')
     if args.limit and args.sample:
         sys.exit('ERROR: --limit and --sample both given; they mean different '
