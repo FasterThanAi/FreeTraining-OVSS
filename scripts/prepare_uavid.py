@@ -76,6 +76,9 @@ def main():
     ap.add_argument('--repo', default='~/SegEarth-OV-3')
     ap.add_argument('--split', default='val', choices=['val', 'train'])
     ap.add_argument('--dry-run', action='store_true')
+    ap.add_argument('--allow-partial', action='store_true',
+                    help='proceed on an incomplete split. ⛔ The result cannot '
+                         'be compared with a published number.')
     args = ap.parse_args()
 
     classes, palette = verify_meta(args.repo)
@@ -87,19 +90,34 @@ def main():
     if not src.is_dir():
         raise SystemExit(f'{src} does not exist')
     seqs = sorted(d for d in src.iterdir() if d.is_dir())
-    print(f'\n  {len(seqs)} sequences under {src}')
+    print(f'\n  {len(seqs)} sequences under {src}: '
+          f'{", ".join(d.name for d in seqs)}')
+    # ⛔ UAVid's official val split is FIVE sequences (seq16-seq20). Fewer means
+    # an incomplete download, and a partial split evaluates cleanly while landing
+    # nowhere near the published number -- which then looks like a method
+    # failure. Refuse rather than let that happen.
+    if args.split == 'val' and len(seqs) < 5 and not args.allow_partial:
+        raise SystemExit(
+            f'\n⛔ UAVid val has 5 sequences (seq16-seq20); this download has '
+            f'{len(seqs)}.\n   Re-download the val split before evaluating -- '
+            f'a partial split cannot reproduce the published 54.7, and the\n'
+            f'   shortfall would be indistinguishable from a broken pipeline.\n'
+            f'   Pass --allow-partial only to inspect what you have.\n')
 
     dst = Path(args.dst).expanduser()
     img_out, ann_out = dst / 'img_dir' / args.split, dst / 'ann_dir' / args.split
 
     # ⭐ colour -> index, straight off the loader's own palette
     lut = {tuple(p): i for i, p in enumerate(palette)}
-    lut.update(EXTRA)                       # <<< the moving-car merge
-    print(f'\n  colour map: {len(lut)} colours -> {len(palette)} classes '
-          f'({len(EXTRA)} merged)')
+    # ⛔ Check the PALETTE for duplicates BEFORE merging. A first version ran
+    # this after lut.update(EXTRA), so the merge itself -- which is supposed to
+    # add an eighth colour for seven classes -- always tripped the check.
     if len(lut) != len(palette):
         raise SystemExit('the palette contains duplicate colours; the mapping '
                          'would be ambiguous')
+    lut.update(EXTRA)                       # <<< the moving-car merge
+    print(f'\n  colour map: {len(lut)} colours -> {len(palette)} classes '
+          f'({len(EXTRA)} merged)')
 
     pairs = []
     for s in seqs:
