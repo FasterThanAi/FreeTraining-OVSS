@@ -137,7 +137,8 @@ different classes in **opposite** directions. Fitted span **0.000 to 0.700**.
 | vegetation | 0.265 | 50.17 | 50.13 | −0.04 |
 | `background` | *(no effect)* | 55.22 | 58.13 | +2.91 |
 
-⭐ **`human` alone is 41% of the ceiling**, and its oracle threshold is **0.000** -- the
+⭐ **`human` alone is 59% of the ceiling (6.23 of the 10.58 IoU points, and 81%
+of the real-class gain)**, and its oracle threshold is **0.000** -- the
 optimum is to stop thresholding it entirely. At 62.07% of its pixels discarded on 78.91%
 precision that is exactly what WEEK3 §9g predicts from the precision-recall gap (+60.4).
 ⭐ `road` moves the other way to **0.700**, so UAVid reproduces the opposite-directions
