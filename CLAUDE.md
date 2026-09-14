@@ -172,6 +172,42 @@ shrink. ConInfer's reproduction gate **failed** — report LoveDA with both numb
 39.33, ours 36.99), drop their OEM row. Potsdam pre-registered at 4.29% catch-all.
 Target EarthVision 2027 (~March 2027, **unverified**); **content freeze 1 Jan 2027.**
 
+### ⭐⭐ TTA WORKS — AND IT IS A SUBSTITUTE FOR LEVER 2, NOT A COMPLEMENT. @TTA_RESULTS.md, 13-14 Sep.
+
+Dihedral test-time augmentation: average the score stacks over flipped/rotated views of the
+**whole image**. ⭐ Unlike sliding-window crops, the field of view, scene context and presence
+semantics are identical across views — the failure mode that cost −3.85 is removed by construction,
+and the sign flips. Aerial imagery has no canonical orientation, so this is RS-specific.
+
+| | mIoU | mPrec | mRecall | classes up | cost |
+|---|---|---|---|---|---|
+| baseline | 47.38 | 67.1 | 62.0 | — | 0.85 s/img |
+| **`hflip`** (2 views) | **47.67** | **67.5** | **62.1** | ⭐ **7/7** | 1.67 s |
+| `d4` (8 views) | **47.84** | 67.7 | 62.2 | 5/7 | 6.59 s |
+
+⭐ **The only intervention in this project where precision AND recall both rise** — every other one
+trades. That is the signature of better scores rather than a redistributed decision. ⭐ And the
+discard rate does **not** move (28.89% → 28.86% on a matched 800-tile pair): TTA keeps the same
+*quantity* of pixels and a better *selection* of them. ⚠️ 4× the views buys 1.6× the gain, and `d4`
+is not uniformly better (`background` −0.70, `agricultural` −0.21, `road` +1.17) — **quote `hflip`,
+treat `d4` as the ceiling.**
+
+⭐⭐ **THE FINDING, paired fold-by-fold on the same 800 tiles/seed/folds:** TTA's gain is
+**+0.42 (5/5 folds)** at rung A, **+0.58 (5/5)** at rung B, and ⛔ **+0.06 (2/5)** at rung C.
+Lever 2's own gain drops **+1.26 → +0.74** under TTA, in 4 of 5 folds.
+> **TTA survives per-class thresholds and is ABSORBED by per-class scaling** — both change which
+> class wins the argmax, while lever 1 acts after it.
+⭐ **And the scale is the better deal: +1.26 for ~200 tiles fitted once and free at inference,
+against +0.42 for 2× inference forever.** Given the scale, TTA buys +0.06.
+⭐ **This refines the five-lever picture** — levers 3/4 *reallocated* evidence and were null; TTA
+*adds* evidence and works, but **adding evidence and fixing the decision are substitutes**: both
+move the same argmax decisions, so whichever is applied second finds the work done. First measured
+overlap between two interventions in the project.
+⚠️ TTA arm's search gate marginal (0.175 vs 0.15 bar) — biases against TTA's lever 2, so −0.52 is
+an **upper bound** on the overlap. ⚠️ 800 tiles, unstable fitted scales in both arms.
+⛔ **Not caching/refitting `d4`**: 14% measured survival projects it to ~+0.07 past rung C for 8×
+inference and 3.5 GPU hours.
+
 ### ⛔ DROPPING THE CATCH-ALL FROM THE VOCABULARY — killed by its ceiling in 2 min. @DROP_CATCHALL_RESULTS.md, 13 Sep.
 
 `background` is undetectable (median `S_pres` **0.022**) yet competes in the argmax. Drop its
