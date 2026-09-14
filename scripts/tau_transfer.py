@@ -115,6 +115,14 @@ def main():
                          'caches may be at different --cache-stride settings, and a '
                          'label-convention slip would otherwise pass silently.')
     ap.add_argument('--expect-tol', type=float, default=0.15)
+    ap.add_argument('--deploy-cfg', default=None,
+                    help='write an mmseg config carrying arm C\'s threshold '
+                         'vector, so the number can be verified end-to-end by '
+                         'eval.py instead of only in cached arithmetic (WEEK3 '
+                         '§9c). Needs --base-cfg.')
+    ap.add_argument('--base-cfg', default=None,
+                    help='the config to copy for --deploy-cfg (e.g. '
+                         '~/SegEarth-OV-3/configs/cfg_uavid_val.py)')
     ap.add_argument('--md', default=None)
     args = ap.parse_args()
 
@@ -314,6 +322,37 @@ def main():
                   f'earns nothing across this split pair.')
     md.append('\n⚠️ Quote the per-class table, never the mean alone — a per-class rule '
               'can hurt a per-class result.')
+
+    # ---- optional: emit a deployable config -------------------------------
+    # ⛔ The vector is written straight from the fit. Retyping seven numbers out
+    # of a markdown table is exactly how a silently misaligned threshold vector
+    # gets deployed -- the segmentor's own length check would not catch a
+    # PERMUTATION, and the permutation control above shows a shuffled vector
+    # costs 3.08 mIoU while still producing a perfectly plausible table.
+    if args.deploy_cfg:
+        if not args.base_cfg:
+            raise SystemExit('--deploy-cfg needs --base-cfg')
+        from mmengine import Config
+        cfg = Config.fromfile(str(Path(args.base_cfg).expanduser()))
+        vec = [round(float(t), 4) for t in taus_src]
+        vec[bg] = float(args.tau)        # bg's tau has no effect; keep it honest
+        if len(vec) != nc:
+            raise SystemExit(f'vector length {len(vec)} != {nc} classes')
+        cfg.model.prob_thd = vec
+        out = Path(args.deploy_cfg).expanduser()
+        cfg.dump(str(out))
+        print(f'\n  deploy config -> {out}')
+        print('  prob_thd = ' + ', '.join(
+            f'{LD.names[i]}={v:.3f}' for i, v in enumerate(vec)))
+        print(f'  expect eval.py to report mIoU {miou(C_tr):.2f} '
+              f'(published-τ run gives {m_pub:.2f})')
+        md.append(f'\n## Deployed\n\n`{out}` carries arm C\'s vector, written '
+                  f'from the fit rather than transcribed. Running `eval.py` on it '
+                  f'should report **{miou(C_tr):.2f}** against the published-τ '
+                  f'**{m_pub:.2f}**.\n\n| class | τ |\n|---|---|\n' +
+                  '\n'.join(f'| {LD.names[i]} | {v:.3f}'
+                             f'{" *(no effect)*" if i == bg else ""} |'
+                             for i, v in enumerate(vec)))
 
     text = '\n'.join(md)
     print('\n' + text)
