@@ -146,6 +146,17 @@ def main():
                          '(`inst`, `sem`), pre-presence. Implies --cache-full, '
                          'because `logits` is the gate: max(inst,sem)*presence '
                          'must reproduce it. ~3x the disk of --cache-full.')
+    ap.add_argument('--cache-stride', type=int, default=1,
+                    help='write every k-th pixel in each axis to the CACHE only '
+                         '(arr[::k, ::k]). Reported mIoU, the confusion matrix '
+                         'and every discard figure stay at FULL resolution, so '
+                         'the validation gate is untouched. k=4 is 16x less '
+                         'disk. Safe for threshold fitting: a stride is a '
+                         'uniform subsample of the score/label joint '
+                         'distribution, with no interpolation and no value '
+                         'invented -- and on UAVid the model never saw more '
+                         'than 1008x1008 anyway (max_side), so the full 3840x'
+                         '2160 cache is storing an upsample of its own output.')
     ap.add_argument('--cache-full', action='store_true',
                     help='also store the full per-class score stack `logits` '
                          '(N, H, W) float16. ~10x the cache size; required by '
@@ -277,17 +288,25 @@ def main():
             _w, _h = _probe.size
         _n = int(getattr(model, 'num_cls', 0)) or int(getattr(model, 'num_queries', 8))
         _per = 15 + (2 * _n if args.cache_full else 0) + (4 * _n if args.cache_heads else 0)
-        need_gb = _per * _w * _h * len(names) / 2**30
+        if args.cache_stride < 1:
+            sys.exit(f'--cache-stride must be >= 1, got {args.cache_stride}')
+        _k = args.cache_stride
+        _cw, _ch = -(-_w // _k), -(-_h // _k)     # ceil, matching a[::k] length
+        need_gb = _per * _cw * _ch * len(names) / 2**30
         print(f'  cache -> {cache_dir}  ({_w}x{_h}, {_n} classes -> '
-              f'~{_per * _w * _h / 2**20:.1f} MB/tile uncompressed)')
+              f'~{_per * _cw * _ch / 2**20:.1f} MB/tile uncompressed)')
+        if _k > 1:
+            print(f'  cache stride {_k}: tiles stored at {_cw}x{_ch} '
+                  f'({_k * _k}x less disk). Reported mIoU and discard stay at '
+                  f'full resolution.')
         print(f'  need ~{need_gb:.1f} GB before compression, free {free_gb:.1f} GB')
         if free_gb < need_gb * 1.2:
             sys.exit(
                 f'ERROR: not enough disk for the cache ({need_gb:.1f} GB needed, '
                 f'{free_gb:.1f} free).\n'
                 f'  --sample {max(1, int(len(names) * free_gb / (need_gb * 1.5)))} '
-                f'--seed 0   would fit, or use --cache-dir on a bigger volume, '
-                f'or --no-cache.')
+                f'--seed 0   would fit, or --cache-stride {max(2, int(np.ceil(np.sqrt(need_gb * 1.5 / max(free_gb, 1e-9)))) * args.cache_stride)}   (same tiles, '
+                f'coarser grid), or --cache-dir on a bigger volume, or --no-cache.')
 
     global CLASSES, N, BACKGROUND
     _lab = labels.from_model(model, cfg.get('model', cfg))
@@ -460,19 +479,24 @@ def main():
             top = torch.topk(lg, k=k, dim=0)
             vals = top.values.cpu().numpy()
             idxs = top.indices.cpu().numpy().astype(np.uint8)
+            # ⭐ stride applies to the CACHE ONLY. Everything reported above --
+            # the confusion matrix, mIoU, every discard figure -- was accumulated
+            # from the full-resolution arrays, so the gate is unaffected.
+            _cs = args.cache_stride
+            _sub = (lambda a: a[..., ::_cs, ::_cs]) if _cs > 1 else (lambda a: a)
             np.savez_compressed(
                 cache_dir / f'{name}.npz',
-                conf=vals[0].astype(np.float16),            # best score  (== max_vals)
-                pred=idxs[0],                               # argmax, 0-indexed, PRE-threshold
-                conf2=(vals[1] if k > 1 else vals[0]).astype(np.float16),
-                pred2=(idxs[1] if k > 1 else idxs[0]),
-                gt=gt.astype(np.uint8),
+                conf=_sub(vals[0].astype(np.float16)),            # best score  (== max_vals)
+                pred=_sub(idxs[0]),                               # argmax, 0-indexed, PRE-threshold
+                conf2=_sub((vals[1] if k > 1 else vals[0]).astype(np.float16)),
+                pred2=_sub((idxs[1] if k > 1 else idxs[0])),
+                gt=_sub(gt.astype(np.uint8)),
                 spres=pres_views,                           # (n_views, N) full fidelity
                 classes=np.array(CLASSES),
-                **fused_arrays,                             # <<< P_fused, pre-gating
-                **({'logits': lg.cpu().numpy().astype(np.float16)}
-                   if args.cache_full else {}),             # <<< VOCABULARY INTERVENTION
-                **head_stacks,                              # <<< HEAD FUSION
+                **{_k2: _sub(_v2) for _k2, _v2 in fused_arrays.items()},
+                **({'logits': _sub(lg.cpu().numpy().astype(np.float16))}
+                   if args.cache_full else {}),
+                **{_k3: _sub(_v3) for _k3, _v3 in head_stacks.items()},
             )
 
         if i % 100 == 0 or i == len(names):
