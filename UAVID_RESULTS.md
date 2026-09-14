@@ -281,3 +281,93 @@ discard-rate matching.
 ⭐ **And the pixel budget stops being the constraint:** 4.19 G real-class pixels, **3.8x
 LoveDA's entire val split** (1.09 G). Whether UAVid is underpowered is now purely a
 question of how many independent SCENES those 600 frames carry, not of sample size.
+
+
+---
+
+## 12. ✅✅ LEVER 1 PASSES ON UAVid — +1.34 ± 0.39, 5/5 folds
+
+200 real train frames (400 augmented copies excluded), **20 sequences**, folds
+**group-disjoint** so no flight appears on both sides.
+
+| | mean | sd | folds+ | **mean − 2sd** | gate |
+|---|---|---|---|---|---|
+| LoveDA (recorded) | +1.18 | 0.45 | 5/5 | +0.28 | ✅ |
+| ⭐ **UAVid train** | ⭐ **+1.34** | **0.39** | **5/5** | ⭐ **+0.56** | ✅ **PASS** |
+| UAVid val *(7 scenes)* | +0.51 | 0.95 | 3/5 | −0.67 | ⛔ |
+
+⭐⭐ **UAVid clears the project gate more comfortably than LoveDA does**, and it is the
+fourth pipeline/dataset where per-class τ works (SAM 3 on LoveDA, SAM 3 on Potsdam,
+ConInfer on LoveDA, now SAM 3 on UAVid).
+
+### ⭐ val was UNDERPOWERED, not null — the prediction was on the record and held
+
+Going from 7 scenes to 20: **sd collapses 0.95 → 0.39** and the mean *rises* 0.51 → 1.34.
+⭐ **The rise is `road`**, which was the diagnostic class: **−3.11 on 7 scenes, +0.72 on
+20.** The fit was pushing road's threshold to 0.700 on one or two flights and failing to
+transfer; with four flights per fold it stabilises. **So per-flight threshold specificity
+is a small-sample artefact here, not a property** -- a question WEEK3 §9e could not settle
+and this does.
+
+| class | val (7 scenes) | **train (20 scenes)** |
+|---|---|---|
+| **human** | +9.38 | ⭐ **+6.47** |
+| **road** | ⛔ **−3.11** | ✅ **+0.72** |
+| car | −0.89 | +0.39 |
+| vegetation | −1.14 | +0.06 |
+| building | +0.67 | +0.24 |
+| tree | +0.06 | +0.03 |
+| `background` | −1.41 | +1.45 |
+
+⭐ **No class loses under the well-powered protocol.** LoveDA's fit costs `road` 0.54 and
+`agricultural` 0.25; UAVid's costs nothing. That is the only dataset in the project where
+that is true of SAM 3.
+
+### The ceiling is essentially reached
+
+Oracle on the same 200 clean frames: **+1.40**. Fitted, held out: **+1.34** — **96%**.
+LoveDA captures 81%, Potsdam 73%, OpenEarthMap 11%.
+⚠️ **Flag the protocol mismatch rather than celebrating the number**: the oracle is fitted
+and scored on the pooled 200, the CV averages five held-out sets of 40, and mIoU does not
+decompose across subsets -- which is why the fitted real-class aggregate (**+7.91**) can
+exceed the oracle's (**+7.61**). Read it as "the fit reaches essentially all of the
+available headroom", not as a precise ratio.
+
+### Calibration cost — 25 tiles, and now measured on group-disjoint draws
+
+| calib tiles | mean Δ | sd | worst draw |
+|---|---|---|---|
+| 10 | ⛔ **−0.19** | 1.53 | −2.84 |
+| **25** | ✅ **+0.84** | 0.36 | **+0.26** |
+| 50 | +0.99 | 0.25 | +0.72 |
+| 100 | +1.18 | 0.23 | +0.86 |
+
+⭐ **Positive from ~25 tiles against LoveDA's ~200**, matching ConInfer's ~25. ⚠️ Because
+draws take whole sequences, "25 tiles" is really **3 scenes** -- quote it that way.
+⛔ And n=10 is **negative** (worst draw −2.84), reproducing LoveDA's shape. The earlier
+frame-level curve said **+0.85** at n=10; that was the leak, and it is now gone.
+
+### Both metrics agree, and the catch-all points a THIRD way
+
+| | full mIoU | catch-all-excluded | `background` IoU |
+|---|---|---|---|
+| published τ | 56.48 | 56.06 | 59.03 |
+| per-class τ | **57.80** | **57.29** | 60.86 |
+| **Δ** | **+1.32** | **+1.23** | +1.83 |
+
+✅ Full +1.32 and land cover +1.23 agree, so the gain is **not** a repaired catch-all.
+⭐ **New direction for §9h:** UAVid's `background` sits at **59.03 against a real-class mean
+of 56.06**, so the catch-all *inflates* the published headline by **0.42**. LoveDA's
+deflates (45.50 against ~48), OpenEarthMap's deflates severely (17.13 against 47.54).
+**Three datasets, and UAVid is the first where the catch-all is the BETTER-than-average
+class** — because UAVid's clutter is a real visual category (rooftop equipment, walls,
+fences), not LoveDA's "everything else".
+
+## 13. What is NOT done
+
+- ⛔ **Lever 2 (per-class scale)** — needs `--cache-full`. Now feasible: at stride 4 that is
+  ~14 MB/tile, so 200 train + 70 val is under 4 GB. **Not run.**
+- ⛔ **train→val transfer** — both caches exist, it is a CPU pass, and §11's prediction
+  (it should work, because the splits match to 0.08 pp discard) is **untested**.
+- ⛔ **End-to-end `eval.py` verification.** Everything above is cached-histogram arithmetic.
+  WEEK3 §9c's rule: verify in the segmentor before it is written up.

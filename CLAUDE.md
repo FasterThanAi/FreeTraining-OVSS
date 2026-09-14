@@ -179,6 +179,55 @@ shrink. ConInfer's reproduction gate **failed** — report LoveDA with both numb
 39.33, ours 36.99), drop their OEM row. Potsdam pre-registered at 4.29% catch-all.
 Target EarthVision 2027 (~March 2027, **unverified**); **content freeze 1 Jan 2027.**
 
+### ✅✅ UAVid IS A FOURTH DATASET AND LEVER 1 PASSES ON IT. @UAVID_RESULTS.md, 14 Sep.
+
+Baseline **56.86** against a published **54.7** (⚠️ **+2.16, unexplained** — same code,
+config, vocabulary and thresholds; their `data_prefix` points at a split with no public
+labels and no prep doc exists, so it is not resolvable from the release. Report both, as
+the ConInfer row does at −2.34). Labels verified to the pixel: 0 ignored, and the
+597,196,800 total decomposes exactly as 40 frames at 3840×2160 + 30 at 4096×2160.
+
+| | mean | sd | folds+ | mean−2sd | gate |
+|---|---|---|---|---|---|
+| LoveDA | +1.18 | 0.45 | 5/5 | +0.28 | ✅ |
+| ⭐ **UAVid** *(200 frames, 20 scenes, group-disjoint)* | ⭐ **+1.34** | **0.39** | **5/5** | ⭐ **+0.56** | ✅ |
+
+⭐ **Fourth pipeline/dataset where per-class τ works**, and the only one where **no class
+loses**. Oracle **+1.40**, so the fit reaches essentially all the headroom. Both metrics
+agree (+1.32 full, +1.23 excluded). **`human` carries it: +6.47**, at an oracle τ of ~0.00
+— it discards **62%** of its pixels at **78.9%** precision, a +60.4 P−R gap, the largest in
+the project.
+
+⛔⛔ **THREE TRAPS, all of which produced plausible wrong numbers first:**
+1. **`predict()` re-opens the ORIGINAL file and discards mmseg's `inputs`**, so a `Resize`
+   in the test pipeline does NOTHING. UAVid's 3840×2160 frames OOM a 16 GB card. Fixed by
+   `max_side` (default 0, strict `>`, `scripts/test_max_side.py`). ⭐ Costs nothing: SAM 3
+   resizes to 1008² internally and its semantic head emits 288².
+2. ⛔ **UAVid val is 7 flight sequences of 10 CONSECUTIVE frames.** A frame-level 5-fold
+   straddles **all 7** groups and reported **+1.05 ± 0.86 (5/5)** where the truth is
+   **+0.51 ± 0.95 (3/5)** — **the leak was worth +0.54 and two folds.** Its flat learning
+   curve (+0.85 from 10 tiles) was the tell. Use `tau_cv.py --group-re`.
+3. ⛔ **The Kaggle repack's "train" is 200 real frames + 400 `flipped*`/`shifted*`
+   AUGMENTED copies.** An image and its own mirror in different folds is the same pixels on
+   both sides. Use `--exclude-re '_(flipped|shifted)'`. Regex for both splits:
+   `([a-z]+[0-9]*)(?=[-_][0-9]+$)`.
+
+⭐ **`--cache-stride` makes big-frame datasets affordable**: a full-res cache stores an
+*upsample* of a 1008² forward pass. Stride 4 is 16× less disk (118.7 → 7.4 MB/tile) and
+recomputes the published-τ row at **55.49 against 55.48** — Δ0.01. Reported mIoU and
+discard stay full-resolution, so the gate is untouched.
+
+⚠️ **val (70 frames, 7 scenes) is UNDERPOWERED, not null** — fold baselines span 18 mIoU
+points. It gives +0.51 ± 0.95; the same method on 20 scenes gives +1.34 ± 0.39. ⭐ `road`
+goes **−3.11 → +0.72**, so per-flight threshold specificity is a small-sample artefact.
+⭐ Calibration is positive from **~25 tiles (3 scenes)** against LoveDA's 200.
+⭐ Catch-all share **16.16%** fills the gap between Potsdam 4.29% and LoveDA-urban 26.0%;
+discard **6.81%** sits between Potsdam 4.69% and LoveDA 29.25% as §7 predicts.
+⭐ **UAVid's catch-all INFLATES the headline** (59.03 against a real-class mean of 56.06) —
+the first of three datasets to do so, because its clutter is a real visual category.
+⛔ **Not done: lever 2 (needs `--cache-full`, now feasible at stride 4), train→val transfer,
+and end-to-end `eval.py` verification.**
+
 ### ⭐⭐ TTA WORKS — AND IT IS A SUBSTITUTE FOR LEVER 2, NOT A COMPLEMENT. @TTA_RESULTS.md, 13-14 Sep.
 
 Dihedral test-time augmentation: average the score stacks over flipped/rotated views of the
