@@ -250,3 +250,34 @@ headline here, the LoveDA-urban direction rather than the OpenEarthMap one.
 Cache the **train** split: 600 labelled frames, and ~300 fit on disk at 43 MB/frame. If
 train carries many more scenes than val's 7, a group-disjoint 5-fold there separates
 "underpowered" from "null" — which 70 frames from 7 flights cannot.
+
+
+---
+
+## 11. ⭐⭐ Train and val are the SAME distribution — which LoveDA's never were
+
+600 train frames cached at `--cache-stride 4` (7.4 MB/tile against 118.7, 4.3 GB against
+34.8 -- the full-resolution cache was storing an upsample of a 1008x1008 forward pass).
+
+| | UAVid train (600) | UAVid val (70) | gap |
+|---|---|---|---|
+| **discard rate** | **6.73%** | **6.81%** | ⭐ **0.08 pp** |
+| `human` lost to bg | **62.47%** | 62.07% | 0.40 pp |
+| `car` lost to bg | 28.92% | 22.73% | ⚠️ **6.19 pp** |
+| baseline mIoU | 55.48 | 56.87 | 1.39 |
+| real-class pixels | 4,191,571,414 | 500,664,688 | 8.4x |
+
+⭐⭐ **WEEK3 §9b's train->val failure on LoveDA (−0.12) was diagnosed as "identical
+background share, 2.04x different discard" (14.54% vs 29.68%). UAVid's two splits differ
+by 0.08 percentage points.** So UAVid is the first dataset in this project where
+calibrate-on-train / evaluate-on-val is a *fair* transfer test rather than a domain shift
+in disguise -- and a committed prediction: **it should work here.** If it does not, the
+rule "calibrate on the distribution you will evaluate on" needs a sharper statement than
+discard-rate matching.
+
+⚠️ `car` is the one class that moves materially between the splits, and it is already
+−0.89 IoU under the fitted rule on val. Watch it.
+
+⭐ **And the pixel budget stops being the constraint:** 4.19 G real-class pixels, **3.8x
+LoveDA's entire val split** (1.09 G). Whether UAVid is underpowered is now purely a
+question of how many independent SCENES those 600 frames carry, not of sample size.
