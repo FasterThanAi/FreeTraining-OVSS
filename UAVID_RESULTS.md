@@ -106,3 +106,78 @@ one left the failing CUDA allocation at exactly 2.63 GiB with 12.9 GB resident -
 smaller input that moves no memory is the tell. `max_side` exists because that is the only
 point where the frame can be shrunk; it defaults to 0 and its condition is a strict `>`, so
 every recorded LoveDA and Potsdam number is untouched (`scripts/test_max_side.py`).
+
+
+---
+
+## 7. Per-class tau on UAVid — the ceiling, and a LEAK in the first 5-fold
+
+`tau_oracle.py` / `tau_cv.py` on the 70-frame val cache at their published tau = 0.3.
+✅ Cross-check passes: the histogram path recomputes the published-tau row at **56.87**,
+matching `measure_discard_rate.py` and `eval.py`'s 56.86.
+
+### The oracle ceiling — +1.51
+
+| rung | free params | mIoU | delta |
+|---|---|---|---|
+| published tau = 0.3 | 0 | 56.87 | — |
+| best global tau = 0.230 | 1 | 57.34 | +0.47 |
+| **best per-class tau** | 6 | **58.38** | **+1.51** |
+
+Comparable to LoveDA's **+1.46**, and the same shape: one global value is wrong for
+different classes in **opposite** directions. Fitted span **0.000 to 0.700**.
+
+| class | oracle tau | IoU before | after | delta |
+|---|---|---|---|---|
+| **human** | **0.000** | 17.59 | 23.82 | ⭐ **+6.23** |
+| building | 0.100 | 90.76 | 91.54 | +0.77 |
+| road | **0.700** | 67.88 | 68.37 | +0.48 |
+| tree | 0.125 | 53.12 | 53.24 | +0.12 |
+| car | 0.035 | 63.33 | 63.44 | +0.11 |
+| vegetation | 0.265 | 50.17 | 50.13 | −0.04 |
+| `background` | *(no effect)* | 55.22 | 58.13 | +2.91 |
+
+⭐ **`human` alone is 41% of the ceiling**, and its oracle threshold is **0.000** -- the
+optimum is to stop thresholding it entirely. At 62.07% of its pixels discarded on 78.91%
+precision that is exactly what WEEK3 §9g predicts from the precision-recall gap (+60.4).
+⭐ `road` moves the other way to **0.700**, so UAVid reproduces the opposite-directions
+result on a dataset whose failure mode is small objects rather than amorphous stuff.
+⚠️ `background` gains **+2.91** without a threshold of its own -- it is the residue of the
+real classes' moves, not something the fit optimised (the objective is `real`).
+
+### ⛔ The 5-fold number is CONTAMINATED — do not quote it
+
+**+1.05 +/- 0.86, 5/5 folds positive, range +0.24 to +2.51.** Fails the project gate
+(`mean − 2*sd > 0` gives **−0.67**) -- but that is not the reason to withhold it.
+
+⛔ **UAVid val is 7 flight sequences of 10 CONSECUTIVE frames.** `tau_cv.py` split at the
+frame level, so `scripts/test_group_folds.py` measures that a frame-level 5-fold straddles
+**all 7 of 7 groups**: near-duplicate frames of every evaluation scene were in the
+calibration set. The fit could memorise the scene it was scored on.
+⛔ **The learning curve is contaminated the same way**, and more severely -- its flatness
+(n=10 **+0.85**, n=25 +0.98, n=50 +0.80, no trend where LoveDA needs 200 tiles to turn
+reliably positive) is exactly what leakage looks like. **Do not report "UAVid calibrates
+from 10 tiles" until it is re-measured group-disjoint.**
+
+✅ **Fixed:** `tau_cv.py --group-re` permutes GROUPS and deals them into folds whole, and
+does the same for the learning curve. Absent, the flag is a no-op -- the ungrouped path is
+the original permutation split verbatim and the grouping block draws no randomness, so
+every recorded LoveDA / Potsdam / OEM / ConInfer number is untouched. Both properties are
+asserted in `scripts/test_group_folds.py`.
+
+⚠️ **Two honest notes for whatever the grouped number turns out to be.**
+- With 7 groups a 5-fold gives folds of 20/20/10/10/10 tiles, so the spread will be *wider*,
+  not narrower. UAVid is **underpowered, not null** -- the same position OpenEarthMap holds
+  (384 tiles swinging 10 points against a ~1 mIoU effect).
+- `road` **−1.18** across folds against an oracle **+0.48**: the fit moves road's threshold
+  to 0.700 on calibration data and it does not transfer. A per-class rule can hurt a
+  per-class result; quote the table, never the mean alone.
+
+### Disk, measured
+
+**43 MB per frame compressed** (3.0 GB for 70), against the 118.7 MB/tile uncompressed
+estimate -- 2.7x pessimistic. So the 600 labelled train frames would need **~26 GB** against
+~20 GB free: ⛔ not cacheable whole, ~300 frames fits at ~13 GB.
+⛔ `--cache-full`, which lever 2 requires, roughly doubles the per-pixel cost and is
+infeasible at 3840x2160 on this disk. Caching at the inference resolution (1008x567, a
+14x reduction) is the obvious answer and is not yet implemented.

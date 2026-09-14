@@ -34,6 +34,7 @@ import argparse
 import sys
 from pathlib import Path
 
+import re
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -117,6 +118,15 @@ def main():
                          "full mIoU either way.")
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--limit', type=int, default=0)
+    ap.add_argument('--group-re', default=None,
+                    help='REGEX matched against each cache filename stem; tiles '
+                         'sharing a match are kept in the SAME fold and in the '
+                         'same side of every learning-curve draw. UAVid val is '
+                         '7 flight sequences of 10 consecutive frames, so a '
+                         'frame-level split puts the same flight in both '
+                         'calibration and evaluation and inflates the gain. '
+                         'Use group 1 if the pattern has one, else the whole '
+                         'match. Example: --group-re "^(seq[0-9]+)"')
     ap.add_argument('--md', default=None)
     args = ap.parse_args()
 
@@ -135,9 +145,44 @@ def main():
     def ev(idx, taus):
         return miou(confusion_at(PT[idx].sum(0).astype(np.int64), taus, bg, NBINS))
 
+    # ---------------- grouping
+    # ⛔ Correlated tiles must not straddle a fold. Video frames from one flight
+    # are near-duplicates, so a frame-level split lets the fit memorise the very
+    # scene it is scored on. Groups are permuted, then dealt into folds whole.
+    gid = None
+    if args.group_re:
+        pat = re.compile(args.group_re)
+        keys = []
+        for f in files:
+            m = pat.search(f.stem)
+            if m is None:
+                raise SystemExit(f'--group-re {args.group_re!r} matched nothing '
+                                 f'on {f.stem!r} -- every tile must have a group')
+            keys.append(m.group(1) if m.groups() else m.group(0))
+        uniq = sorted(set(keys))
+        if len(uniq) < args.folds:
+            raise SystemExit(f'{len(uniq)} groups is fewer than {args.folds} '
+                             f'folds; pass --folds {len(uniq)} or fewer')
+        pos = {g: i for i, g in enumerate(uniq)}
+        gid = np.array([pos[k] for k in keys])
+        sizes = np.bincount(gid, minlength=len(uniq))
+        print(f'  grouping: {len(uniq)} groups from {n} tiles '
+              f'(sizes {sizes.min()}-{sizes.max()}), folds are group-disjoint')
+
     # ---------------- k-fold
-    order = rng.permutation(n)
-    folds = np.array_split(order, args.folds)
+    if gid is None:
+        order = rng.permutation(n)
+        folds = np.array_split(order, args.folds)
+    else:
+        gperm = rng.permutation(gid.max() + 1)
+        gof = np.empty(gid.max() + 1, dtype=int)
+        for k, part in enumerate(np.array_split(gperm, args.folds)):
+            gof[part] = k
+        owner = gof[gid]
+        folds = [np.where(owner == k)[0] for k in range(args.folds)]
+        if any(len(f) == 0 for f in folds):
+            raise SystemExit('a group-disjoint fold came out empty; '
+                             'use fewer folds')
     rows, gains, pc = [], [], []
     for k in range(args.folds):
         te = folds[k]
@@ -183,7 +228,9 @@ def main():
 
     # ---------------- learning curve
     md += ['## How many labelled tiles does calibration need?\n',
-           f'Fit on *n* randomly drawn tiles, evaluate on the rest, '
+           ((f'Fit on whole GROUPS until *n* tiles are reached, evaluate on '
+             f'the rest, ') if args.group_re else
+            (f'Fit on *n* randomly drawn tiles, evaluate on the rest, ')) +
            f'{args.repeats} draws each.\n',
            '| calib tiles | mean Δ | sd | worst draw |', '|---|---|---|---|']
     curve = []
@@ -192,8 +239,23 @@ def main():
             continue
         ds = []
         for r in range(args.repeats):
-            idx = rng.permutation(n)
-            tr, te = idx[:sz], idx[sz:]
+            if gid is None:
+                idx = rng.permutation(n)
+                tr, te = idx[:sz], idx[sz:]
+            else:
+                # draw whole groups until sz tiles are reached, so the curve
+                # cannot be read off near-duplicate frames of the eval scenes
+                gp = rng.permutation(gid.max() + 1)
+                take, cnt = [], 0
+                for g in gp:
+                    if cnt >= sz:
+                        break
+                    take.append(g)
+                    cnt += int((gid == g).sum())
+                sel = np.isin(gid, take)
+                tr, te = np.where(sel)[0], np.where(~sel)[0]
+                if len(te) == 0:
+                    continue
             taus = fit(PT[tr].sum(0).astype(np.int64), bg, NBINS,
                        objective=args.objective)
             ds.append(ev(te, taus) - ev(te, np.full(nc, args.tau)))
