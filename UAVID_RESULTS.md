@@ -367,7 +367,101 @@ fences), not LoveDA's "everything else".
 
 - ⛔ **Lever 2 (per-class scale)** — needs `--cache-full`. Now feasible: at stride 4 that is
   ~14 MB/tile, so 200 train + 70 val is under 4 GB. **Not run.**
-- ⛔ **train→val transfer** — both caches exist, it is a CPU pass, and §11's prediction
-  (it should work, because the splits match to 0.08 pp discard) is **untested**.
+- ✅ **train→val transfer — DONE, §14. +1.03, prediction confirmed.**
 - ⛔ **End-to-end `eval.py` verification.** Everything above is cached-histogram arithmetic.
   WEEK3 §9c's rule: verify in the segmentor before it is written up.
+
+
+---
+
+## 14. ✅⭐⭐ THRESHOLDS TRANSFER train→val — +1.03, and the diagnosis is confirmed
+
+Fitted on all 200 real train frames, applied **unchanged** to all 70 val frames. No
+val label is touched by the fit, and the two splits share no filenames.
+✅ **Gate exact**: the published-τ row reproduces **56.87** against the known 56.87,
+so the two caches agree on the label convention despite sitting at different
+`--cache-stride` settings (train 4, val 1).
+
+| arm | τ | full mIoU | Δ | excl. catch-all | Δ |
+|---|---|---|---|---|---|
+| A published τ = 0.3 | global | 56.87 | — | 57.14 | — |
+| B best **global** τ fitted on train | 0.190 | 56.99 | **+0.12** | 57.59 | +0.45 |
+| ⭐ **C per-class τ fitted on train** | per class | **57.90** | ⭐ **+1.03** | 58.15 | **+1.01** |
+| D per-class oracle *on val* | per class | 58.32 | *+1.45* | 58.44 | *+1.30* |
+
+⭐ **C captures 71% of the destination oracle**, and ⭐⭐ **arm B shows the per-class part
+is 89% of it**: a single global threshold fitted the same way on the same data buys
+**+0.12**. The gain is the *shape* of the vector, not its level.
+
+### ⭐⭐ The permutation control settles that independently
+
+Arm C's thresholds shuffled among the 6 real classes, 200 draws:
+
+| | Δ mIoU |
+|---|---|
+| **real assignment** | **+1.03** |
+| shuffled, mean | ⛔ **−3.08** |
+| shuffled, p95 | +0.53 |
+| shuffled, max | +0.92 |
+| **shuffles matching or beating it** | ⭐ **0 of 200** |
+
+**A shuffled vector is actively harmful (−3.08) and not one of 200 draws reached
++1.03.** What crosses the split boundary is *which class gets which threshold*.
+⛔ Note this is why `--deploy-cfg` writes the vector straight from the fit: the
+segmentor's length check cannot catch a **permutation**, and a permuted vector would
+produce a perfectly plausible table 3 points lower.
+
+### ⭐ And it needs almost no source data
+
+| source tiles | mean Δ | sd | worst draw |
+|---|---|---|---|
+| **25** *(3 scenes)* | ⭐ **+0.81** | 0.11 | **+0.72** |
+| 50 | +0.96 | 0.12 | +0.78 |
+| 100 | +1.02 | 0.04 | +0.96 |
+| 200 | +1.03 | 0.00 | +1.03 |
+
+**25 tiles from three flights, from a different split, reach 79% of the full-budget
+transfer — and the worst of five draws is +0.72.**
+
+### ⭐⭐ The transfer rule now has evidence, and it is LABEL-FREE on both sides
+
+WEEK3 §9b/§9e's rule was *"calibrate on the distribution you will evaluate on"*, with
+no way to know in advance whether two distributions were close enough. The discard
+rate is computable with **no ground truth at all**, and across four split pairs it
+orders the outcome:
+
+| split pair | discard rates | ratio | transfer Δ |
+|---|---|---|---|
+| ⭐ **UAVid train→val** | 6.73% / 6.81% | **1.01×** | ⭐ **+1.03** |
+| LoveDA train→val (§9b) | 14.54% / 29.68% | 2.04× | −0.12 |
+| LoveDA urban→rural (§9e) | 18.5% / 39.3% | 2.1× | −0.40 |
+| LoveDA rural→urban (§9e) | 39.3% / 18.5% | 2.1× | ⛔ −1.11 |
+
+⚠️ **Four points, two datasets, and the LoveDA rows come from a different protocol**
+(5-fold within a domain at a 200-tile budget) than the UAVid row (a single fit on one
+split applied whole to another). It is a consistent ordering, **not a fitted law**, and
+it must be stated that way.
+⚠️ It also does **not** overturn §9f, which asked a different question — *whether
+calibration pays at all* — and answered no. This asks whether a calibration set built
+somewhere else still applies, which §9f never tested.
+
+### ⛔ Per class — and my named prediction was wrong
+
+| class | τ from train | IoU published | transferred | Δ |
+|---|---|---|---|---|
+| **human** | **0.015** | 17.59 | 23.78 | ⭐ **+6.19** |
+| `background` | *(no effect)* | 55.22 | 56.39 | +1.17 |
+| building | 0.150 | 90.76 | 91.41 | +0.65 |
+| tree | 0.180 | 53.12 | 53.21 | +0.10 |
+| car | 0.000 | 63.33 | 63.40 | **+0.07** |
+| vegetation | 0.185 | 50.17 | 49.88 | −0.29 |
+| **road** | 0.405 | 67.88 | 67.21 | ⛔ **−0.68** |
+
+⛔ **I named `car` as the class to watch** — it is the only one whose discard rate moves
+materially between the splits (28.92% train vs 22.73% val) — and it comes back at
+**+0.07**, essentially neutral. **The per-class discard gap did not predict which class
+fails.**
+⭐ **`road` is the fragile class, and it is fragile everywhere**: −3.11 on val's own
+7-scene CV, +0.72 on train's 20-scene CV, −0.68 under transfer. Train fits it at
+**0.405** where val's oracle wants **0.700**. Its optimum genuinely differs between the
+splits, and it is the one class the transfer costs.

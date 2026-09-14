@@ -225,8 +225,23 @@ goes **−3.11 → +0.72**, so per-flight threshold specificity is a small-sampl
 discard **6.81%** sits between Potsdam 4.69% and LoveDA 29.25% as §7 predicts.
 ⭐ **UAVid's catch-all INFLATES the headline** (59.03 against a real-class mean of 56.06) —
 the first of three datasets to do so, because its clutter is a real visual category.
-⛔ **Not done: lever 2 (needs `--cache-full`, now feasible at stride 4), train→val transfer,
-and end-to-end `eval.py` verification.**
+✅⭐⭐ **THRESHOLDS TRANSFER train→val: +1.03** (fit on 200 train frames, applied unchanged
+to all 70 val). **71% of the destination oracle**, and ⭐ a global τ fitted the same way
+gives only **+0.12** — the per-class *shape* is 89% of it. ⭐⭐ **Permutation control: a
+shuffled assignment costs −3.08 and 0 of 200 draws reached +1.03.** ⭐ **25 tiles from 3
+scenes reach +0.81** (worst draw +0.72). ⛔ `road` is the one class it costs (−0.68; train
+fits 0.405, val's oracle wants 0.700) — fragile in every protocol. ⛔ **My named prediction
+was wrong**: `car`, the only class whose discard moves between splits (28.92/22.73), came
+back at +0.07.
+⭐⭐ **AND THE TRANSFER RULE IS NOW LABEL-FREE.** §9b/§9e said "calibrate on the
+distribution you will evaluate on" with no way to check in advance. Discard rate needs no
+ground truth, and across four split pairs it orders the outcome: UAVid train→val 1.01×
+ratio → **+1.03**; LoveDA train→val 2.04× → −0.12; LoveDA urban↔rural 2.1× → −0.40/−1.11.
+⚠️ Four points, two datasets, mixed protocols — a consistent **ordering, not a law**. ⚠️ It
+does not overturn §9f, which asked whether calibration pays *at all*, not whether a
+calibration set transfers.
+⛔ **Not done: lever 2 (needs `--cache-full`, now feasible at stride 4) and end-to-end
+`eval.py` verification.**
 
 ### ⭐⭐ TTA WORKS — AND IT IS A SUBSTITUTE FOR LEVER 2, NOT A COMPLEMENT. @TTA_RESULTS.md, 13-14 Sep.
 
