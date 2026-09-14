@@ -13,7 +13,7 @@ would work, when the table settles both. **Check here first before proposing any
 | iSAID | 27.6 | — | ⛔ excluded: 97.11% catch-all, confounded |
 | **Potsdam** | **57.8** | **57.83** | ✅ Δ 0.03 |
 | ⭐ **Vaihingen** | ⭐ **60.8** | — | ⭐ **their 2nd-best RS result** |
-| UAVid | **54.7** | — | config ✅ vocab ✅ |
+| ⭐ **UAVid** | **54.7** | ⭐ **56.86** | ⚠️ **+2.16 ABOVE** — unexplained, @UAVID_RESULTS.md |
 | UDD5 | **71.7** | — | config ✅ vocab ✅ |
 | VDD | **64.5** | — | config ✅ vocab ✅ |
 | *average* | *53.4* | | |
