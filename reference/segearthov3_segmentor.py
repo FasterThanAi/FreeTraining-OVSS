@@ -39,6 +39,20 @@ class SegEarthOV3Segmentation(BaseSegmentor):
                  bg_idx=0,
                  slide_stride=0,
                  slide_crop=0,
+                 # <<< MAX SIDE. `predict` re-opens the ORIGINAL file from disk
+                 # (see the Image.open below) and hands SAM 3 the full frame, so
+                 # a Resize in the mmseg test pipeline has NO effect on what the
+                 # model sees. UAVid frames are 3840x2160 = 7.9x a LoveDA tile
+                 # and OOM a 16 GB card inside sam3's own _forward_grounding.
+                 # SAM 3 resizes every input to 1008x1008 internally (ANALYSIS
+                 # 4.5) and its semantic head emits 288x288, so carrying more
+                 # than ~1008 on the long side buys the model nothing -- only a
+                 # finer output upsample, and seg_logits are interpolated back to
+                 # ori_shape for the metric regardless.
+                 # 0 = off, the published behaviour. A frame whose long side is
+                 # already <= max_side is untouched, so LoveDA (1024) and Potsdam
+                 # are bit-identical at any max_side >= 1024.
+                 max_side=0,
                  # <<< GLOBAL PRESENCE. Sliding-window inference costs 3.85 mIoU
                  # (@SLIDING_WINDOW_RESULTS.md) and the measured reason is that
                  # S_pres is computed PER VIEW: a class absent from a crop is
@@ -95,6 +109,12 @@ class SegEarthOV3Segmentation(BaseSegmentor):
         self.set_class_scale(class_scale)
         self.slide_stride = slide_stride
         self.slide_crop = slide_crop
+        if max_side < 0:
+            raise ValueError(f'max_side must be >= 0, got {max_side}')
+        self.max_side = int(max_side)               # <<< MAX SIDE
+        if self.max_side:
+            print(f'  max_side: {self.max_side} '
+                  f'(frames longer than this are downscaled before SAM 3)')
         if presence_mode not in ('per_view', 'max', 'global'):
             raise ValueError(f'presence_mode must be per_view|max|global, '
                              f'got {presence_mode!r}')
@@ -404,6 +424,13 @@ class SegEarthOV3Segmentation(BaseSegmentor):
             # Load original image to preserve details for SAM3
             image_path = meta.get('img_path')
             image = Image.open(image_path).convert('RGB')
+            # <<< MAX SIDE: the ONLY place the frame handed to SAM 3 can be
+            # shrunk -- mmseg's `inputs` is discarded on the line above.
+            if self.max_side and max(image.size) > self.max_side:
+                _sc = self.max_side / float(max(image.size))
+                _ns = (max(1, int(round(image.size[0] * _sc))),
+                       max(1, int(round(image.size[1] * _sc))))
+                image = image.resize(_ns, Image.BILINEAR)
             ori_shape = meta['ori_shape']
 
             self.presence_log = []       # <<< INSTRUMENTATION: reset per image
