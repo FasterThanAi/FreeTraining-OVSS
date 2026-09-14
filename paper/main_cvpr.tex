@@ -401,6 +401,12 @@ Potsdam & \texttt{grass}      & \emph{low vegetation} & \best{\vocPotsGain{}} \\
 \end{tabular}
 \end{table}
 
+\begin{figure*}[t]\centering
+\includegraphics[width=\textwidth]{fig11_vocab_lever.pdf}
+\caption{One word against the whole method. \textbf{(a)} On UAVid the correction is surgical: two classes move, four move by at most \vocUavElse{}. \textbf{(b)} The same rule on Potsdam \emph{costs} mIoU, and \texttt{tree}'s recall does not move at all --- the two datasets present identically in a results table and have different causes. \textbf{(c)} The word and the multiplier are substitutes: correcting the prompt first, or leaving it and letting both levers repair it, end \vocRouteDelta{}~mIoU apart.}
+\label{fig:vocab}
+\end{figure*}
+
 Every training-free open-vocabulary method inherits a hand-written list of class
 prompts, and none of the work we compare against reports how that list was chosen.
 Our own results above are stated at a vocabulary we did not write. We therefore

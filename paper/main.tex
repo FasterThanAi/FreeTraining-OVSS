@@ -1012,6 +1012,12 @@ Potsdam & \texttt{grass}      & \emph{low vegetation} & \best{\vocPotsGain{}} \\
 \end{tabular}
 \end{table}
 
+\begin{figure}[t]\centering
+\includegraphics[width=\textwidth]{fig11_vocab_lever.pdf}
+\caption{One word against the whole method. \textbf{(a)} On UAVid the correction is surgical: two classes move, four move by at most \vocUavElse{}. \textbf{(b)} The same rule on Potsdam \emph{costs} mIoU, and \texttt{tree}'s recall does not move at all --- the two datasets present identically in a results table and have different causes. \textbf{(c)} The word and the multiplier are substitutes: correcting the prompt first, or leaving it and letting both levers repair it, end \vocRouteDelta{}~mIoU apart.}
+\label{fig:vocab}
+\end{figure}
+
 \paragraph{On UAVid it is worth \vocUavGain{}~mIoU, and it is surgical.}
 \texttt{tree} gains \vocUavTree{} and the low-vegetation class \vocUavVeg{}, while
 \emph{every other real class moves by at most \vocUavElse{}}. The mechanism is
