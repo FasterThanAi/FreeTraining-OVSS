@@ -182,3 +182,71 @@ estimate -- 2.7x pessimistic. So the 600 labelled train frames would need **~26 
 ⛔ `--cache-full`, which lever 2 requires, roughly doubles the per-pixel cost and is
 infeasible at 3840x2160 on this disk. Caching at the inference resolution (1008x567, a
 14x reduction) is the obvious answer and is not yet implemented.
+
+
+---
+
+## 8. ⭐⭐ The leak was worth +0.54 mIoU and two folds — measured, not argued
+
+`--group-re '([a-z]+[0-9]+)(?=[-_][0-9]+$)'`. ✅ Confirmed: **7 groups from 70 tiles,
+sizes 10-10.** The Kaggle repack flattened all seven val sequences into one directory
+called `seq16` and renamed six of them `fileNN-k.png`, so scene identity survives in the
+filename even though the directory structure lost it.
+
+| protocol | mean | sd | folds+ | gate (`mean − 2sd > 0` and 5/5) |
+|---|---|---|---|---|
+| frame-level folds *(leaking)* | **+1.05** | 0.86 | **5/5** | ⛔ |
+| ⭐ **group-disjoint folds** | **+0.51** | 0.95 | **3/5** | ⛔ |
+
+⭐⭐ **Half the apparent gain was the model being scored on near-duplicates of frames it
+calibrated on**, and the leak also flipped two folds from negative to positive. This is a
+clean measurement of how much a correlated-tile split inflates a result, on a protocol
+this project uses everywhere else, and it is worth a methods paragraph in its own right.
+
+⭐ **The learning curve is the tell, and it reverses completely:**
+
+| calib tiles | leaking | **group-disjoint** |
+|---|---|---|
+| 10 | +0.85 | ⭐ **−0.69** |
+| 25 | +0.98 | +0.85 |
+| 50 | +0.80 | +0.17 |
+
+Leaking, it was flat and positive from 10 tiles — which would have been a headline
+("UAVid calibrates from 10 tiles" against LoveDA's 200). Clean, it is **negative at n=10**,
+exactly the shape LoveDA has (−2.14 at n=10). ⛔ **The flat curve was the leak**, and the
+suspicion was recorded before the re-run.
+
+## 9. ⚠️ Underpowered, not null — and the reason is 7 scenes, not 70 tiles
+
+⛔ **+0.51 ± 0.95 with 3/5 folds fails the gate.** Do not report UAVid as a positive result.
+
+But the fold **baselines** span **45.68 to 63.83 — 18 mIoU points** — against an effect of
+about half a point. That is OpenEarthMap's position exactly (384 tiles swinging 10 points
+against a ~1 mIoU effect), and it is what "underpowered" looks like: 70 frames is really
+**7 scenes**, and a 5-fold leaves 10-20 frames from 1-2 flights to score on.
+
+⭐ **`human` gets STRONGER under the clean protocol: +9.38** (leaking: +7.64), against an
+oracle of +6.23. Its threshold move is the one thing that transfers across scenes.
+⛔ **`road` −3.11**, against an oracle of **+0.48** at τ 0.700. The fit pushes road's
+threshold far up on the calibration scenes and it does not transfer — WEEK3 §9e's
+"thresholds are domain-specific" appearing at the level of individual **flights**.
+
+| class | Δ IoU |
+|---|---|
+| **human** | ⭐ **+9.38** |
+| building | +0.67 |
+| tree | +0.06 |
+| car | −0.89 |
+| vegetation | −1.14 |
+| `background` *(catch-all)* | **−1.41** |
+| **road** | ⛔ **−3.11** |
+
+⭐ **Report both metrics, per §9h.** Real classes sum to **+4.96**, i.e. **+0.83
+catch-all-excluded mIoU** against **+0.51** full — the catch-all is *deflating* the
+headline here, the LoveDA-urban direction rather than the OpenEarthMap one.
+
+## 10. The decisive next test
+
+Cache the **train** split: 600 labelled frames, and ~300 fit on disk at 43 MB/frame. If
+train carries many more scenes than val's 7, a group-disjoint 5-fold there separates
+"underpowered" from "null" — which 70 frames from 7 flights cannot.
