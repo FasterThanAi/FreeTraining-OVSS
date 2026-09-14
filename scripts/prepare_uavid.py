@@ -92,17 +92,18 @@ def main():
     seqs = sorted(d for d in src.iterdir() if d.is_dir())
     print(f'\n  {len(seqs)} sequences under {src}: '
           f'{", ".join(d.name for d in seqs)}')
-    # ⛔ UAVid's official val split is FIVE sequences (seq16-seq20). Fewer means
-    # an incomplete download, and a partial split evaluates cleanly while landing
-    # nowhere near the published number -- which then looks like a method
-    # failure. Refuse rather than let that happen.
-    if args.split == 'val' and len(seqs) < 5 and not args.allow_partial:
-        raise SystemExit(
-            f'\n⛔ UAVid val has 5 sequences (seq16-seq20); this download has '
-            f'{len(seqs)}.\n   Re-download the val split before evaluating -- '
-            f'a partial split cannot reproduce the published 54.7, and the\n'
-            f'   shortfall would be indistinguishable from a broken pipeline.\n'
-            f'   Pass --allow-partial only to inspect what you have.\n')
+    # ⚠️ How many sequences the official val split contains is NOT hardcoded
+    # here, because an earlier version asserted "five, seq16-seq20" on no
+    # evidence and that was a guess dressed as a fact. What matters is that the
+    # number is stated loudly: a split smaller than the one a published figure
+    # was computed on evaluates perfectly cleanly and lands nowhere near it,
+    # and the shortfall then reads as a broken pipeline rather than as missing
+    # data. Print it, and let the reproduction gate be the judge.
+    n_img = sum(len(list((d / 'Images').glob('*.png'))) for d in seqs)
+    print(f'  ⚠️ {len(seqs)} sequence(s), {n_img} frames. SegEarth-OV3 reports '
+          f'UAVid at 54.7 on a split whose exact composition is not stated in\n'
+          f'     their config (it points at test/, which ships no labels). If the '
+          f'reproduction lands far from 54.7, SUSPECT THE SPLIT before the method.')
 
     dst = Path(args.dst).expanduser()
     img_out, ann_out = dst / 'img_dir' / args.split, dst / 'ann_dir' / args.split
