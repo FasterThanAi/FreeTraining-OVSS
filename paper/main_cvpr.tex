@@ -30,6 +30,7 @@
 \input{numbers}
 
 \newcommand{\best}[1]{\textbf{#1}}
+\providecommand{\etal}{\textit{et al.}}
 \newcommand{\bg}{\texttt{background}}
 \newcommand{\suppref}[1]{the supplementary material}
 
@@ -216,12 +217,14 @@ vocabulary, we manipulate it directly with class count controlled.}
 
 \begin{table}[t]\centering\small
 \caption{The residual is ordered by the catch-all's share of ground truth, across
-four datasets. The Potsdam row was predicted from ground-truth masks alone and
-registered before the pipeline was run.}
+four datasets. \emph{catch-all} is that class's share of ground truth;
+\emph{discarded} is the share of real-class pixels assigned to it. The Potsdam row
+was predicted from ground-truth masks alone and registered before the pipeline was
+run.}
 \label{tab:cmech}
 \begin{tabular}{lrr}
 \toprule
- & catch-all share & real-class pixels discarded \\
+ & catch-all & discarded \\
 \midrule
 OpenEarthMap & \bgShareOEM{} & \discardOEM{} \\
 Potsdam      & \potsShare{} & \potsDiscard{} \\
@@ -461,6 +464,35 @@ offer a method for choosing prompts --- our two arms disagree, which is the poin
 offer the measurement, and the recommendation that prompt lists be reported and
 ablated alongside the architecture, because on these benchmarks they are worth more
 than the methods being compared.
+
+\subsection{Three further levers, and what their failure delimits}
+\label{sec:levers}
+
+Per-class thresholds are everything available after the argmax, and the scale acts
+\emph{at} it. That leaves the score the argmax reads, and we fitted three further
+per-class corrections on the same tiles, the same protocol and the same acceptance
+gate --- mean less twice the fold standard deviation above zero, \emph{and} every
+fold positive. \best{All three are null.}
+
+Fusing SAM~3's two heads per class rather than by a hardcoded maximum gives
+\lvThreePots{} on Potsdam and \lvThreeLove{} on LoveDA. Weighting the presence
+score per class gives \lvFour{}. Allowing an additive term as well as a
+multiplicative one --- vector scaling in the sense of
+Kull~\etal~\cite{kull2019}, the family a reader of the calibration literature
+would ask for next --- gives \lvFive{}~$\pm$~\lvFiveSD{}. \best{We
+pre-registered each as a small positive and were wrong three times};
+\suppref{sec:levers} gives the fits and the diagnosis of each.
+
+\best{The pattern is worth more than any of the three.} The two corrections that
+work reshape the \emph{decision} --- which label a score earns, and which class
+wins. The three that fail reshape the \emph{evidence} the decision reads. Each
+null lever nevertheless recovers the structure it was designed for: the head fit
+rediscovers the things/stuff duality with no supervision about which class is
+which, and the presence weight orders the classes by how much the gate touches
+them at Spearman $+0.886$ with exact $p = 0.017$. \best{They identify the right
+thing to correct and find that the two working levers have already collected that
+mass by another route.} We report them because a method claiming two corrections
+is stronger when the neighbouring three are measured rather than left unasked.
 
 % =====================================================================
 \section{Why the calibration set is irreducible}
