@@ -279,8 +279,26 @@ because it is not lowering a bar, it hands the pixel to the class that should ha
 `tree` 56.4 → **85.5** recall, `vegetation` 55.7 → **79.8** precision.
 ⚠️ **+8.85 over their published 54.7 is NOT our gain** — our reproduction is 2.16 high for
 unexplained reasons. **Quote +6.69 over our own baseline.**
-⛔ **Not done: the vocabulary test** — the class is *low vegetation*, the prompt is the bare
-word `vegetation`, and part of lever 2's gain may be repairing that rather than the model.
+⛔⭐⭐ **THE VOCABULARY TEST IS DONE AND 64% OF LEVER 2's UAVid GAIN WAS THE PROMPT.**
+`prereg/predict_uavid_vocabulary.md` (`b20eaf8`), one line changed, `vegetation` → **`low
+vegetation`**, arity unchanged. ⭐ **The word alone is worth +3.53** (56.86 → 60.39), and it
+is **surgical**: `tree` **+14.66**, `vegetation` **+11.14**, every other real class ≤ 0.04.
+`vegetation` precision 53.6 → **71.5**, `tree` recall 55.9 → **72.8** — both predicted.
+⛔ **V3 confirmed: lever 2 falls +5.64 → +2.03**, below the pre-registered +2.8 bar.
+⭐⭐⭐ **BUT BOTH ROUTES END IN THE SAME PLACE: bad prompt + both levers = 63.55; one word +
+both levers = 63.62 — 0.07 apart**, and per class within ~1. **Typing two words and fitting a
+6.4× reweighting on 200 labelled frames are SUBSTITUTES.** Third substitution in the project
+(TTA↔lever 2 was the first). ⛔ **`human` does NOT substitute** (+5.39 either way) — the word
+cannot help a class that is merely too timid.
+⛔ **V4 failed and its failure is the point**: the fit still wants a **5.04×** separation, so
+the correction is unchanged in direction — there is just far less mass left to move.
+✅ Lever 2 is **not** a null on the corrected prompt: +3.22 total, shuffles −2.82, 1.5% match,
+**no class loses**.
+⭐ **CORRECTED UAVid HEADLINE — quote this:** reproduction **56.86** (their vocabulary,
+unchanged) · one-word fix **+3.53** *(its own result)* · **method +3.22** (lever 1 +1.19,
+lever 2 +2.03) · final **63.62**, still above the Oracle's 59.7.
+⛔ **The method's UAVid contribution is +3.22, NOT +6.69** — the earlier figure bundled a
+prompt defect into the method. Consistent with LoveDA +2.32 and Potsdam +5.67.
 
 ### ⭐⭐ TTA WORKS — AND IT IS A SUBSTITUTE FOR LEVER 2, NOT A COMPLEMENT. @TTA_RESULTS.md, 13-14 Sep.
 

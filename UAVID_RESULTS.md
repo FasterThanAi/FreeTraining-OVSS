@@ -800,8 +800,88 @@ by the baseline, and it is worth more than anything else measured in this projec
   is precisely what the pre-registration exists to prevent.
 - **The +3.53 is reported as its own result**, not folded into the method's gain.
 
-⏳ **V3 — the actual test — is still running.** Lever 2 was **+5.64** with the bad prompt.
+✅ **V3 answered — see §20.**  *(original text of this paragraph retained below)*
+⏳ **V3 — the actual test — was still running when this section was written.** Lever 2 was **+5.64** with the bad prompt.
 The new baseline already reaches `tree` 67.81 and `vegetation` 61.33, where lever 2 with the
 old prompt reached 74.04 and 63.00 — so some headroom remains, but much of the mass lever 2
 was collecting has now been collected by the word. **V3 asks whether lever 2's gain falls
 below +2.8.**
+
+
+---
+
+## 20. ⛔⭐⭐ V3 CONFIRMED — 64% of lever 2's UAVid gain WAS the vocabulary
+
+| | prediction, committed in advance | measured | |
+|---|---|---|---|
+| **V1** | baseline rises | 56.86 → **60.39** | ✅ |
+| **V2** | `vegetation` precision ↑, `tree` recall ↑ | 53.6→**71.5**, 55.9→**72.8** | ✅ |
+| ⭐ **V3** | **lever 2's gain falls below +2.8** | ⛔ **+5.64 → +2.03** | ✅ **confirmed** |
+| **V4** | tree/veg scale ratio falls below 3.0 | **5.04×** (from 6.4×) | ⛔ **failed** |
+| **V5** | lever 1 holds within ±0.5 of +1.04 | **+1.19** | ✅ |
+
+⛔ **Lever 2 lost 64% of its UAVid gain once the prompt was corrected.** The branch table
+called this outcome in advance: *"Lever 2 was substantially repairing the vocabulary on this
+dataset. Report it."* **Reported.**
+
+### ⭐⭐⭐ But the real finding is that BOTH ROUTES LAND IN THE SAME PLACE
+
+| route | chain | end |
+|---|---|---|
+| **A** — keep the bad prompt, let the method fix it | 56.86 → 57.92 → **63.55** | 63.55 |
+| **B** — ⭐ **retype one word**, then the method | 56.86 → **60.40** → 61.59 → **63.62** | 63.62 |
+
+**0.07 mIoU apart.** And per class the two routes are nearly indistinguishable:
+`tree` 74.04 / 73.84 · `vegetation` 63.00 / 63.97 · `human` 29.20 / 29.17 ·
+`road` 67.39 / 67.40 · `car` 63.59 / 63.68.
+
+> ⭐⭐ **Typing two words and fitting a 6.4× multiplicative reweighting on 200 labelled frames
+> are SUBSTITUTES: they repair the same error mass and reach the same endpoint.** One is free
+> and takes ten seconds; the other costs a labelled calibration set.
+
+⭐ This is the third substitution measured in the project, and the pattern now has a shape:
+`TTA_RESULTS` found **adding evidence** and **fixing the decision** substitute; this finds
+**naming the class correctly** and **fixing the decision** substitute too. ⛔ What does *not*
+substitute is `human` (**+5.39** under either route) — the word never touches it, because
+`human` is not losing an argmax to a mis-named neighbour, it is simply too timid.
+
+### ⛔ V4 failed, and its failure is the useful part
+
+The fit still separates `tree` from `low vegetation` by **5.04×**, barely down from 6.4×.
+⭐ **So the correction the fit wants is unchanged in DIRECTION and magnitude — there is
+simply far less mass left to move.** The scale is not "less needed per pixel"; it applies to
+a much smaller set of contested pixels. That distinction matters: it says the argmax
+competition between the two greens is real and survives a correct prompt, while most of the
+*pixels* were mis-assigned by the word.
+
+### ✅ Lever 2 is not a null — it still clears its controls on the corrected prompt
+
+| | Δ vs published |
+|---|---|
+| **real assignment** | **+3.22** |
+| shuffled, mean | **−2.82** |
+| shuffles matching or beating it | **1.5%** |
+
+And `tree` **+5.72**, `low vegetation` **+2.72**, `human` **+5.39**, `car` +0.26, `road`
++0.16, `building` +0.01, catch-all −0.03 — **no class loses.**
+
+### ⭐ The corrected headline for UAVid, and what goes in the paper
+
+| | |
+|---|---|
+| reproduction *(their vocabulary — unchanged, or it is not a reproduction)* | **56.86** vs published 54.7 |
+| ⭐ **one-word vocabulary fix, reported as its own result** | **+3.53** → 60.40 |
+| **our method on the corrected baseline** | **+3.22** (lever 1 +1.19, lever 2 +2.03) |
+| **final** | ⭐ **63.62** |
+
+⛔ **The method's UAVid contribution is +3.22, not +6.69.** The earlier figure bundled a
+prompt defect into the method's gain. In context that is still consistent with the other
+datasets — LoveDA **+2.32**, Potsdam **+5.67**, UAVid **+3.22** — and it is the number that
+survives scrutiny.
+⚠️ It remains **above the Oracle's 59.7**, by either route.
+
+⭐⭐ **And the vocabulary finding gets stronger, not weaker.** On a dataset where a reviewer
+might suspect the calibration method of doing the prompt's job, we measured exactly that,
+predicted it in advance, and quantified it: **one word = +3.53, which is 64% of what the
+fitted scale was buying.** That is a far more useful sentence for the paper than an
+unexamined +6.69.
