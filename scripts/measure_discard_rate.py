@@ -533,6 +533,22 @@ def main():
         if i % 100 == 0 or i == len(names):
             print(f'  {i}/{len(names)}')
 
+    # ---- cache sidecar ---------------------------------------------------
+    # ⭐ `bg_idx` is where the segmentor sends sub-τ pixels, and it is NOT
+    # recoverable from the cached arrays. Without it every analysis script has
+    # to locate the catch-all by NAME, which works until a dataset has none --
+    # then `labels.py` guessed the first class and DLRSD's oracle and 5-fold
+    # both produced complete, plausible, entirely void tables with `airplane`
+    # as the discard target. Record it beside the cache instead of guessing.
+    if args.cache:
+        import json
+        (cache_dir / labels.CACHE_META).write_text(json.dumps({
+            'bg_idx': int(getattr(model, 'bg_idx', 0)),
+            'classes': list(CLASSES),
+            'tau': float(args.tau),
+            'sink': bool(_lab.sink),
+        }, indent=2))
+
     # ---- derived numbers -------------------------------------------------
     total_valid = conf.sum()
     # ⚠️ Rows are 0-indexed classes, so the catch-all is row BACKGROUND-1 -- NOT

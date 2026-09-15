@@ -71,14 +71,27 @@ class Labels:
                   f'false negative for its true class and a false positive for '
                   f'nothing. Full mIoU == catch-all-excluded mIoU here.')
         elif self.bg is None:
-            self.bg = 1
-            print(f'  !! no catch-all class found among {CATCH_ALL_ALIASES} in '
-                  f'{self.names}; assuming mask value 1 ({self.names[0]}). '
-                  f'Pass bg_name= explicitly if that is wrong — getting this '
-                  f'backwards invalidates every number silently.'
-                  + ('' if discard_idx is None else
-                     f' The segmentor\'s bg_idx={discard_idx} is INSIDE the '
-                     f'class range, so it cannot be an unscored sink either.'))
+            # ⛔ THIS USED TO BE A WARNING AND IT COST A WHOLE ANALYSIS PASS.
+            # On DLRSD it printed "assuming mask value 1 (airplane)" at the top
+            # of a two-minute run, scrolled away, and every sub-τ pixel in the
+            # dataset was then counted as a predicted `airplane`. Both the
+            # oracle and the 5-fold produced complete, plausible, entirely void
+            # tables. A warning at the start of a long run is not a safeguard.
+            raise SystemExit(
+                f'⛔ NO CATCH-ALL CLASS, AND NO DISCARD TARGET GIVEN.\n'
+                f'   classes: {self.names}\n'
+                f'   none matches {CATCH_ALL_ALIASES}, and '
+                + (f'the segmentor\'s bg_idx={discard_idx} is INSIDE the class '
+                   f'range, so it is a real class rather than an unscored sink.\n'
+                   if discard_idx is not None else
+                   'no `bg_idx` was supplied, so where sub-τ pixels go is '
+                   'unknown.\n')
+                + f'   Guessing would silently make `{self.names[0]}` the discard '
+                  f'target and pile every thresholded pixel onto it.\n\n'
+                  f'   Fix: pass bg_name=, or write the cache sidecar so this is '
+                  f'read rather than guessed:\n'
+                  f'     python scripts/write_cache_meta.py --cache <dir> '
+                  f'--bg-idx <n>')
         elif self.bg != 1:
             # The segmentor's `bg_idx` decides where sub-tau pixels go. Its
             # DEFAULT is 0, so on a dataset whose catch-all is not first the
@@ -136,14 +149,31 @@ class Labels:
         return f'Labels({self.n} classes, {where}, {", ".join(self.names)})'
 
 
+CACHE_META = '_meta.json'
+
+
 def from_cache(cache_dir, bg_name=None, discard_idx=None):
     """Read the class list written into the .npz cache.
 
-    `discard_idx` is not stored in the cache, so callers that know it (from the
-    config that produced the cache) should pass it; otherwise the catch-all check
-    reports itself as unverified rather than guessing.
+    ⭐ `discard_idx` -- where the segmentor sends sub-τ pixels -- is read from a
+    `_meta.json` sidecar written beside the cache, because it is NOT derivable
+    from the arrays. Where the catch-all is findable by name this only turns an
+    assumption into a check; where a dataset has no catch-all at all (DLRSD) it
+    is the difference between a correct run and a void one, and the void one
+    does not look void.
     """
-    files = sorted(Path(cache_dir).expanduser().glob('*.npz'))
+    cache_dir = Path(cache_dir).expanduser()
+    if discard_idx is None:
+        meta = cache_dir / CACHE_META
+        if meta.is_file():
+            import json
+            try:
+                discard_idx = json.loads(meta.read_text()).get('bg_idx')
+                if discard_idx is not None:
+                    print(f'  cache meta: bg_idx={discard_idx}')
+            except Exception as e:                        # noqa: BLE001
+                print(f'  !! could not read {meta}: {e}')
+    files = sorted(cache_dir.glob('*.npz'))
     if not files:
         raise SystemExit(f'no .npz under {cache_dir}')
     z = np.load(files[0], allow_pickle=True)

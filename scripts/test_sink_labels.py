@@ -68,10 +68,24 @@ for name, cls, bgi, want_bg in [
     check(len(lb2.real) == lb2.n - 1,
           f'{name}: {lb2.n - 1} real classes beside the catch-all')
 
-print('\n3. A missing catch-all with bg_idx INSIDE the range still warns')
-lb3 = L.Labels(DLRSD, None, 3)          # bg_idx 3 is a real class here
-check(not lb3.sink, 'not treated as a sink — bg_idx points at a real class')
-check(lb3.bg == 1, 'falls back to mask value 1, loudly')
+print('\n3. An unresolvable catch-all must be FATAL, not a warning')
+# ⛔ This used to warn and nominate the first class, and that is exactly how
+# DLRSD's oracle and 5-fold both produced complete, plausible, void tables with
+# `airplane` as the discard target. A warning at the top of a long run is not a
+# safeguard -- it scrolls away. Refusing to run is.
+for desc, bgi in [('bg_idx inside the class range', 3),
+                  ('no bg_idx at all', None)]:
+    try:
+        L.Labels(DLRSD, None, bgi)
+        check(False, f'{desc}: did NOT refuse — it guessed')
+    except SystemExit as e:
+        check('NO CATCH-ALL CLASS' in str(e),
+              f'{desc}: refused to run, with an actionable message')
+
+print('\n3b. But a catch-all findable by NAME still needs no bg_idx')
+lb3 = L.Labels(LOVEDA, None, None)
+check(not lb3.sink and lb3.bg == 1,
+      'LoveDA resolves from the name alone, as every existing cache does')
 
 print('\n4. The sink semantics, on the widened matrix')
 # 3 classes, sink at index 3. GT all class 0; predictions: 1 correct, 1 wrong
