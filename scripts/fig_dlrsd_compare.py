@@ -244,6 +244,11 @@ def main():
                          'per-tile mean IoU is 0 or 100 and nothing between, so '
                          'the extremes are degenerate by construction and the '
                          'panels are near-solid colour.')
+    ap.add_argument('--min-baseline', type=float, default=40.0,
+                    help='--auto: the "barely moved" tile must have had at least '
+                         'this baseline IoU. That panel exists to show the rule '
+                         'LEAVING a working tile alone; a 0 -> 0 tile shows '
+                         'something weaker and looks like two failures.')
     ap.add_argument('--min-changed', type=float, default=0.02,
                     help='--auto: minimum fraction of pixels the rule must have '
                          'changed. A panel where nothing moved shows nothing.')
@@ -306,7 +311,9 @@ def main():
             # method, and it would have gone into the paper.
             ngt = int(np.unique(gt[gt >= 0]).size)
             changed_frac = float((a != c).mean())
-            rows.append((stem, d, dead, ngt, changed_frac))
+            base = float(np.mean([va.get(k, 0) for k in ks])) if ks else 0.0
+            wiped = bool((c == sink).all())
+            rows.append((stem, d, dead, ngt, changed_frac, base, wiped))
             if (i + 1) % 100 == 0:
                 print(f'    {i + 1}/{min(args.scan, len(files))}')
         rows.sort(key=lambda r: -r[1])
@@ -332,13 +339,35 @@ def main():
                     used.add(r[0])
                     chosen.append((r[0], why(r)))
                     return
-            print(f'  ⚠️ no distinct tile left for: {why(("", 0.0, False))}')
+            print('  ⚠️ no distinct tile left for one of the four roles')
 
-        take(rich,                                   lambda r: f'biggest gain {r[1]:+.1f}')
-        take(rich[::-1],                             lambda r: f'⛔ a LOSS {r[1]:+.1f}')
-        take(sorted(rich, key=lambda r: abs(r[1])),  lambda r: f'barely moved {r[1]:+.1f}')
+        # ⛔ EACH ROLE NEEDS ITS OWN ELIGIBILITY, not just "rich enough".
+        #
+        # The LOSS: exclude tiles discarded ENTIRELY. Those are real and they are
+        # counted in DLRSD_RESULTS §10b, but as a picture a solid sink panel
+        # teaches nothing about HOW the rule degrades. A graded loss does.
+        #
+        # BARELY MOVED: require the baseline to have been doing well. The point
+        # of that panel is "the rule does not churn a tile that was already
+        # right". A 0.0 -> 0.0 tile says "it cannot rescue a hopeless tile" --
+        # true, weaker, and visually two wrong pictures side by side. The first
+        # run of this selector chose exactly that (harbor13, 0.0 -> 0.0).
+        losses = [r for r in rich[::-1] if not r[6]]
+        steady = sorted([r for r in rich if r[5] >= args.min_baseline],
+                        key=lambda r: abs(r[1]))
+        take(rich,                                  lambda r: f'biggest gain {r[1]:+.1f}')
+        take(losses or rich[::-1],                  lambda r: f'⛔ a LOSS {r[1]:+.1f}')
+        take(steady or sorted(rich, key=lambda r: abs(r[1])),
+                                                    lambda r: f'barely moved {r[1]:+.1f} '
+                                                              f'(baseline {r[5]:.0f})')
         take([r for r in rich if r[2]] or [r for r in rows if r[2]],
-                                                     lambda r: '⛔ holds a class that scores zero')
+                                                    lambda r: '⛔ holds a class that scores zero')
+        if not losses:
+            print('  ⚠️ every losing tile is discarded entirely; the loss panel '
+                  'will be a solid sink')
+        if not steady:
+            print(f'  ⚠️ no tile with baseline >= {args.min_baseline} barely '
+                  f'moved; lower --min-baseline')
         if len(chosen) < 4:
             print(f'  ⚠️ only {len(chosen)} distinct tiles available — raise '
                   f'--scan, or the cache is very small.')
