@@ -49,6 +49,11 @@ for f in configs/segearth/cls_dlrsd.txt configs/segearth/cfg_dlrsd.py \
 done
 cp "$HERE/configs/segearth/cls_dlrsd.txt" "$REPO/configs/cls_dlrsd.txt"
 cp "$HERE/configs/segearth/cfg_dlrsd.py"  "$REPO/configs/cfg_dlrsd.py"
+# the corrected-vocabulary arm (prereg/predict_dlrsd_vocabulary.md), if present
+for f in cls_dlrsd_v2.txt cfg_dlrsd_v2.py; do
+  [[ -f "$HERE/configs/segearth/$f" ]] && cp "$HERE/configs/segearth/$f" "$REPO/configs/$f" \
+    && echo "  ✅ configs/$f  (vocabulary arm)"
+done
 echo "  ✅ configs/cls_dlrsd.txt  ($(wc -l < "$REPO/configs/cls_dlrsd.txt") classes)"
 echo "  ✅ configs/cfg_dlrsd.py"
 

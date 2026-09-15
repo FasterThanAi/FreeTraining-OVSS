@@ -1,0 +1,17 @@
+airplane
+bare soil
+buildings
+cars
+shrubs
+court
+dock
+crop field
+grass
+trailer
+pavement
+sand
+sea
+ship
+tanks
+trees
+water
