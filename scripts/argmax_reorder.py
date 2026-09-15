@@ -494,7 +494,8 @@ def main():
 
     md = ['# Per-class scaling before the argmax\n',
           f'- cache: `{args.cache}`  |  tiles: **{T}**  |  classes: **{nc}**, '
-          f'catch-all `{LB.names[bg]}`',
+          ('no catch-all class (unscored sink)' if LB.catch_all is None
+           else f'catch-all `{LB.catch_all}`'),
           f'- published τ: **{args.tau}**  |  {args.folds}-fold  |  objective '
           f'**`{args.objective}`**  |  subsample **{args.subsample}** px/tile\n',
           'Rule: `pred = argmax_c (w_c · s_c)`, then keep `pred` if '
@@ -584,11 +585,11 @@ def main():
     # and gating on the former would have discarded a result the latter supports.
     ridx = [c for c in range(nc) if c != bg]
     worst = float(np.max(rel[ridx]))
-    bg_rel = float(rel[bg])
+    bg_rel = float(rel[bg]) if bg < nc else float('nan')
     md.append(f'Largest relative spread across the **real** classes: '
               f'**{100 * worst:.1f}%** '
               f'(`{LB.names[ridx[int(np.argmax(rel[ridx]))]]}`); the catch-all '
-              f'`{LB.names[bg]}` spreads {100 * bg_rel:.1f}%. '
+              f'`{LB.catch_all}` spreads {100 * bg_rel:.1f}%. '
               + ('⚠️ The catch-all is the least stable, which is expected: '
                  '`--objective real` does not score it, so its scale is only '
                  'weakly identified and its spread is not evidence about the fit. '

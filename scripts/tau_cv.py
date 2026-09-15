@@ -240,7 +240,9 @@ def main():
             md.append(f'| {LB.names[c]}{" *(catch-all)*" if c == bg else ""} | '
                       f'**{pc[c]:+.2f}** |')
     realsum = float(np.nansum([pc[c] for c in range(nc) if c != bg]))
-    md.append(f'\n`{LB.names[bg]}` **{pc[bg]:+.2f}**, the {nc - 1} real classes '
+    _bgn = LB.catch_all
+    md.append(('' if _bgn is None else
+               f'\n`{_bgn}` **{pc[bg]:+.2f}**, ') + f'the {nc if _bgn is None else nc - 1} real classes '
               f'**{realsum:+.2f}** in aggregate.\n')
 
     # ---------------- learning curve

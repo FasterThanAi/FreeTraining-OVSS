@@ -105,6 +105,16 @@ class Labels:
         self.real = [c for c in range(1, self.nc) if c != self.bg]
 
     @property
+    def catch_all(self):
+        """Display name of the catch-all, or None where none exists.
+
+        Four report scripts did `LB.names[LB.bg - 1]` directly, which is an
+        IndexError the moment a dataset has no catch-all. Ask for this instead
+        and handle None.
+        """
+        return None if self.sink else self.names[self.bg - 1]
+
+    @property
     def n_pred(self):
         """Width of a confusion matrix's PREDICTED axis.
 

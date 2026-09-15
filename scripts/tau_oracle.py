@@ -84,7 +84,17 @@ def confusion_at(H, taus, bg, nbins):
     excluded from the search rather than silently swept.
     """
     nc = H.shape[0]
-    C = np.zeros((nc, nc), np.int64)
+    # ⛔ NOT (nc, nc). Where a dataset has no catch-all, `bg` is an UNSCORED
+    # SINK sitting one past the class list (DLRSD: 17 classes, bg 17), and
+    # `C[:, bg]` below would raise IndexError. Widening the PREDICTED axis is
+    # the whole fix, and it is automatically a no-op wherever bg < nc -- every
+    # other dataset in this project.
+    #
+    # ⭐ The extra column is deliberately not a class: per_class_iou loops over
+    # C.shape[0] rows, so a pixel in the sink column counts in its true class's
+    # union (a false negative) and in nobody's predicted area (a false positive
+    # for nothing). Verified by scripts/test_dlrsd_sink.py.
+    C = np.zeros((nc, max(nc, bg + 1)), np.int64)
     # np.rint, NOT .astype(int). Truncation was the original, and it was wrong:
     # the search grid is k/nbins, but k/200*200 evaluates to 28.999999999999996
     # for k=29, so int() gave bin 28 -- confusion_at silently scored a threshold
@@ -194,7 +204,8 @@ def main():
     v0, v2 = per_class_iou(C0), per_class_iou(C2)
     d = v2 - v0
     real = [k for k in range(nc) if k != bg]
-    bg_gain = d[bg] if np.isfinite(d[bg]) else 0.0
+    # With an unscored sink there is no catch-all ROW to read.
+    bg_gain = (d[bg] if bg < nc and np.isfinite(d[bg]) else 0.0)
     real_gain = float(np.nansum(d[real]))
 
     md = ['# Oracle bound on threshold tuning\n',
@@ -226,8 +237,13 @@ def main():
         md.append(f'| {LB.names[k]} | {t} | {v0[k]:.2f} | {v2[k]:.2f} | '
                   f'**{d[k]:+.2f}** |')
 
-    md += [f'\n`background` **{bg_gain:+.2f}**, the {nc - 1} real classes '
-           f'**{real_gain:+.2f}** in aggregate.\n']
+    if bg < nc:
+        md += [f'\n`background` **{bg_gain:+.2f}**, the {nc - 1} real classes '
+               f'**{real_gain:+.2f}** in aggregate.\n']
+    else:
+        md += [f'\n⭐ **No catch-all class**, so all **{nc}** classes are real '
+               f'and they gain **{real_gain:+.2f}** in aggregate. Full mIoU is '
+               f'catch-all-excluded mIoU here, by construction.\n']
     if m2 - m0 > 0.5 and bg_gain > 0.8 * (bg_gain + real_gain):
         md.append('> ⚠️ **The gain is mostly the background row again.** Same pattern as '
                   'the recovery experiments: mIoU rises because one over-predicted class '

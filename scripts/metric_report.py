@@ -46,7 +46,10 @@ def both(C, bg):
     """(full mIoU, catch-all-excluded mIoU, catch-all IoU) from one matrix."""
     v = per_class_iou(C)
     real = [v[c] for c in range(len(v)) if c != bg]
-    return (float(np.nanmean(v)) , float(np.nanmean(real)), float(v[bg]))
+    # With an unscored sink `bg` indexes past the class list: there is no
+    # catch-all IoU to report, and `real` is already every class.
+    bg_iou = float(v[bg]) if bg < len(v) else float('nan')
+    return (float(np.nanmean(v)), float(np.nanmean(real)), bg_iou)
 
 
 def main():
@@ -111,15 +114,32 @@ def main():
     md = [f'# Both metrics: full mIoU and catch-all-excluded mIoU\n',
           f'- cache: `{args.cache}` | tiles: **{len(files)}** | published τ = '
           f'**{args.tau}** | {args.folds}-fold | fit objective **`{args.objective}`**',
-          f'- catch-all class: **`{LB.names[bg]}`**, {nc} classes total\n',
+          (f'- ⭐ **no catch-all class** — all {nc} are real, so full mIoU '
+           f'IS catch-all-excluded mIoU\n' if LB.catch_all is None else
+           f'- catch-all class: **`{LB.catch_all}`**, {nc} classes total\n'),
           '⚠️ **Full mIoU stays the headline** — it is what the literature reports and what '
           'makes this comparable to the baseline. The second column is reported *beside* '
           'it, never instead of it.\n',
-          f'⭐ **The leverage, stated plainly.** mIoU is an unweighted mean over {nc} '
-          f'classes, so the catch-all owns exactly **{lever:.1f}%** of the metric however '
-          f'meaningful that class is. A 10-point move in `{LB.names[bg]}` alone is '
-          f'**{10 / nc:.2f} mIoU** before anything real has changed.\n',
-          '| | full mIoU | catch-all-excluded mIoU | `' + LB.names[bg] + '` IoU |',
+          # ⚠️ The leverage argument is about the catch-all wherever one exists.
+          # With no catch-all it does NOT disappear -- it moves to the rare
+          # classes, which is the sharper version: every class owns 1/nc of the
+          # metric whatever its pixel share, so a dataset with many small
+          # classes is levered by them instead. Saying "the catch-all owns
+          # 5.9%" when there is no catch-all would print the word None.
+          (f'⭐ **The leverage, stated plainly.** mIoU is an unweighted mean over '
+           f'{nc} classes, so EVERY class owns exactly **{lever:.1f}%** of the '
+           f'metric whatever its pixel share. There is no catch-all here, so the '
+           f'leverage sits with the smallest classes: a 10-point move in any one '
+           f'of them is **{10 / nc:.2f} mIoU** before anything else has changed. '
+           f'⛔ Quote the per-class table with every mean.\n'
+           if LB.catch_all is None else
+           f'⭐ **The leverage, stated plainly.** mIoU is an unweighted mean over '
+           f'{nc} classes, so the catch-all owns exactly **{lever:.1f}%** of the '
+           f'metric however meaningful that class is. A 10-point move in '
+           f'`{LB.catch_all}` alone is **{10 / nc:.2f} mIoU** before anything '
+           f'real has changed.\n'),
+          '| | full mIoU | catch-all-excluded mIoU | `'
+          + (LB.catch_all or '—') + '` IoU |',
           '|---|---|---|---|',
           f'| published τ | {fb:.2f} | {rb:.2f} | {gb:.2f} |',
           f'| per-class τ (fitted) | **{ff:.2f}** | **{rf:.2f}** | {gf:.2f} |',
@@ -142,7 +162,7 @@ def main():
     if abs(bg_mIoU) >= 0.5 * abs(d_full) and abs(bg_mIoU) > 0.1:
         md.append(f'⛔ **The headline is not measuring land cover here.** Full mIoU moves '
                   f'{d_full:+.2f}, and that splits into **{land_mIoU:+.2f} from the '
-                  f'{nc - 1} real classes** and **{bg_mIoU:+.2f} from `{LB.names[bg]}` '
+                  f'{nc - 1} real classes** and **{bg_mIoU:+.2f} from `{LB.catch_all}` '
                   f'alone** ({d_bg:+.2f} IoU spread over {nc} classes). '
                   + ('The catch-all **cancels most of a real gain**, so the headline '
                      'understates the method.' if land_mIoU * bg_mIoU < 0 and land_mIoU > 0
