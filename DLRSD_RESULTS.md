@@ -431,6 +431,48 @@ pixels the rule discards were mostly wrong already, and it fixes far more elsewh
 ⛔ **It also names the most valuable remaining fix** — the thresholds that are too
 aggressive on a minority of scenes, which is `field` again.
 
+### ⭐⭐ What the panels show that the tables cannot — `docs/dlrsd_compare`
+
+⭐⭐ **The discarded regions are ROADS, and the method recovers them as `pavement`.**
+On `freeway22` and `freeway58` the baseline's discard mask sits almost exactly on the
+road surface — the tile is scored 19.3 and 18.8 while the road itself is thrown away.
+Our column fills it correctly and the changed panel is near-solid green: **49,973
+pixels fixed against 226 broken**, a 221:1 ratio. ⭐ **And the cause is checkable in
+the fitted vector: `pavement` is fitted at τ = 0.000 — never discard it.** This is the
+qualitative confirmation of the project's motivating claim, that presence-gated
+pipelines discard real land cover and per-class calibration recovers it.
+
+⭐ **A second mechanism is visible in the same panel, and it is the other lever.** In
+the baseline, `field` (grey) covers both the grass and the bare soil — the class with
+the worst precision in the dataset, **16.39%**, over-firing across two neighbours. In
+our column it is gone, replaced by correct `grass` and `bare soil`. That is `field` at
+**w = 0.805** losing argmaxes it should never have won. **One tile therefore shows the
+two levers doing different jobs: a threshold recovering discarded pixels, and a scale
+demoting an over-firing class.**
+
+⛔ **`ship` is pinned at the grid ceiling and still loses.** On `harbor13` the ground
+truth is `ship` / `water` / `dock`; both rungs predict **`cars`** for the boats and
+**`grass`** for the water, 8.8% of pixels change and **0 are fixed and 0 broken**. The
+fit gives `ship` **w = 2.488**, the maximum the 0.40–2.50 search allows, and `cars`
+still wins. ⚠️ **Same saturation as `mobile home`** (also 2.488, also 0.00 IoU), so the
+`w` grid is binding on at least two classes and a wider grid is an untested, cheap
+follow-up. ⭐ It is also a failure neither lever can reach: the scale is already
+maximal.
+
+⭐ **A small change can cost a lot, and `buildings93` shows it.** 71.8 → 43.0 with only
+**2.6%** of pixels changed — 1,647 broken. A class holding a few thousand pixels loses
+most of them, its IoU collapses, and the tile mean over three or four classes falls
+~29 points. **That is the leverage argument of §12 appearing at tile level**, and it is
+a far more instructive failure panel than a fully-discarded tile, because the method is
+visibly touching almost nothing.
+
+⚠️ **The figure's tile selection needed two fixes, and both were real.** `--auto` first
+chose single-class tiles, where per-tile mean IoU can only be 0 or 100 so the extremes
+are ±100 **by construction** — four near-solid panels showing the arithmetic of a
+degenerate metric. It then chose a fully-discarded tile as the loss and a 0.0 → 0.0
+tile as the no-op. A tile now needs ≥3 ground-truth classes and ≥2% changed; the loss
+excludes annihilated tiles; the no-op requires a baseline ≥40 IoU.
+
 ### ⛔ 22 tiles are discarded ENTIRELY, and that is a stated failure mode
 
 `agricultural` 18 · `beach` 2 · `chaparral` 1 · `golfcourse` 1. Every pixel sent to
