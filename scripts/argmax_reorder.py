@@ -521,8 +521,11 @@ def main():
 
     md = ['# Per-class scaling before the argmax\n',
           f'- cache: `{args.cache}`  |  tiles: **{T}**  |  classes: **{nc}**, '
-          ('no catch-all class (unscored sink)' if LB.catch_all is None
-           else f'catch-all `{LB.catch_all}`'),
+          # ⛔ `+`, not adjacency. An f-string followed by a parenthesised
+          # expression is a CALL, not implicit concatenation -- Python warns
+          # "'str' object is not callable" and then raises TypeError at runtime.
+          + ('no catch-all class (unscored sink)' if LB.catch_all is None
+             else f'catch-all `{LB.catch_all}`'),
           f'- published τ: **{args.tau}**  |  {args.folds}-fold  |  objective '
           f'**`{args.objective}`**  |  subsample **{args.subsample}** px/tile\n',
           'Rule: `pred = argmax_c (w_c · s_c)`, then keep `pred` if '
