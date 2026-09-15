@@ -43,6 +43,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import labels                                                     # noqa: E402
 from tau_oracle import confusion_at, per_class_iou, miou, NBINS   # noqa: E402
 from tau_cv import fit as fit_tau                                 # noqa: E402
+import folds as foldlib                                           # noqa: E402
 from argmax_reorder import hist_at, fit_scale, load_full          # noqa: E402
 
 
@@ -125,8 +126,19 @@ def main():
     ap.add_argument('--split-out', required=True)
     ap.add_argument('--cfg-out', default=None)
     ap.add_argument('--tau-cfg-out', default=None)
+    # ⛔ THESE DEFAULT TO LoveDA AND THAT IS A TRAP ON ANY OTHER DATASET. The
+    # generated config inherits `_base_` and names a vocabulary; leave them and
+    # a DLRSD deployment would run LoveDA's 7 prompts against 17-class imagery.
+    # The guard below refuses when the prompt count disagrees with the cache.
     ap.add_argument('--base-cfg', default='cfg_loveda.py')
     ap.add_argument('--cls-file', default='cls_loveda.txt')
+    ap.add_argument('--stratify-re', default=None,
+                    help='draw the calibration tiles PROPORTIONALLY from each '
+                         'stratum instead of uniformly at random. On DLRSD '
+                         '`airplane`, `dock` and `tanks` each live in one of 21 '
+                         'scene categories, so a draw that misses a category '
+                         'leaves that class with no calibration pixels. '
+                         'Example: --stratify-re "^([a-z]+)"')
     ap.add_argument('--md', default=None)
     args = ap.parse_args()
 
@@ -138,13 +150,45 @@ def main():
     T = len(files)
     if args.calib >= T:
         raise SystemExit(f'--calib {args.calib} but only {T} tiles')
+
+    # ⛔ The prompt file IS the class ladder: the i-th line is class i. If it
+    # disagrees with the cache the deployed run scores the right pixels against
+    # the wrong names, and nothing crashes -- WEEK3 §11's recurring failure.
+    # Resolve it next to the config being written, where the segmentor will
+    # look for it, and refuse on a mismatch rather than warn.
+    if args.cfg_out or args.tau_cfg_out:
+        _ref = Path(args.cfg_out or args.tau_cfg_out).expanduser().parent
+        _cls = _ref / args.cls_file
+        if _cls.is_file():
+            _n = len([l for l in _cls.read_text().splitlines() if l.strip()])
+            if _n != nc:
+                raise SystemExit(
+                    f'⛔ VOCABULARY MISMATCH. --cls-file {args.cls_file!r} has '
+                    f'{_n} prompts but this cache has {nc} classes '
+                    f'({", ".join(LB.names[:4])}...).\n'
+                    f'   The i-th prompt IS class i, so the deployed run would '
+                    f'score the right pixels against the wrong names.\n'
+                    f'   Pass --cls-file and --base-cfg for THIS dataset; they '
+                    f'default to LoveDA.')
+            print(f'  vocabulary: {args.cls_file} — {_n} prompts, matches the cache')
+        else:
+            print(f'  ⚠️ cannot find {_cls} to check --cls-file against the '
+                  f'cache\'s {nc} classes. Verify by hand: the i-th prompt is '
+                  f'class i, and a mismatch does not crash.')
     print(f'{T} tiles | published τ = {args.tau} | calib {args.calib}\n')
 
     rng = np.random.default_rng(args.seed)
     S, G, PT = load_full(files, args.subsample, nc, NBINS, rng)
 
-    idx = rng.permutation(T)
-    cal, held = idx[:args.calib], idx[args.calib:]
+    if args.stratify_re:
+        sid, suniq = foldlib.parse_keys(files, args.stratify_re, '--stratify-re')
+        print(foldlib.describe(suniq, sid, T, 1))
+        cal, held = foldlib.stratified_draw(sid, args.calib, T, rng)
+        print(f'  calibration draw: {len(cal)} tiles covering '
+              f'{len(set(sid[cal]))}/{len(suniq)} strata')
+    else:
+        idx = rng.permutation(T)
+        cal, held = idx[:args.calib], idx[args.calib:]
 
     # ---- the held-out tile list, written before anything is fitted on it
     stems = sorted(files[i].stem for i in held)
