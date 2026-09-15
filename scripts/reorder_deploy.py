@@ -325,23 +325,47 @@ def main():
         written.append(p)
 
     if written:
-        md += ['\n## Run it — three passes, same tiles\n', '```bash',
-               'cd ~/SegEarth-OV-3',
-               '# 1. baseline, restricted to the held-out tiles',
-               f'python eval.py ./configs/{args.base_cfg} \\',
-               f'  --cfg-options test_dataloader.dataset.ann_file={sp}']
+        # ⛔ CHAINED WITH `&&`, DELIBERATELY. These three passes take hours, and
+        # rung A failing while B and C run anyway produces three stacked
+        # tracebacks for one cause -- which is exactly what happened when this
+        # command was written out by hand with bare newlines. Each pass is also
+        # a prerequisite for reading the next: B minus A and C minus B are the
+        # results, so a missing A makes the others meaningless rather than
+        # merely lonely.
+        _runs = [f'python eval.py ./configs/{args.base_cfg} '
+                 f'--cfg-options test_dataloader.dataset.ann_file={sp}']
         if args.tau_cfg_out:
-            md += ['# 2. per-class thresholds only',
-                   f'python eval.py ./configs/{Path(args.tau_cfg_out).name}']
+            _runs.append(f'python eval.py ./configs/'
+                         f'{Path(args.tau_cfg_out).name}')
         if args.cfg_out:
-            md += ['# 3. thresholds + scale',
-                   f'python eval.py ./configs/{Path(args.cfg_out).name}']
+            _runs.append(f'python eval.py ./configs/{Path(args.cfg_out).name}')
+        md += ['\n## Run it — three passes, same tiles\n',
+               '⭐ Copy this whole block. The `&&` are load-bearing: each pass '
+               'gates the next, so one failure stops the chain instead of '
+               'producing three tracebacks for one cause.\n',
+               '```bash', 'cd ~/SegEarth-OV-3 && \\']
+        for _i, _r in enumerate(_runs):
+            _tail = ' && \\' if _i < len(_runs) - 1 else ''
+            md.append(f'  {_r}{_tail}')
         md += ['```\n',
                'Each printed mIoU should match its predicted row above. Per-class '
                'values may differ by a few hundredths: the cache stores `conf` as '
                'float16 and rung 3 is subsampled.\n']
         for p in written:
             md.append(f'`{p}` written.')
+
+    # ⛔ Fail loudly if an output the caller asked for is not on disk. The next
+    # step is hours of GPU time that assumes these exist, and a missing file
+    # surfaces there as an mmengine traceback about `ann_file` rather than as
+    # "the step before this one did not run".
+    _want = [('--split-out', args.split_out),
+             ('--tau-cfg-out', args.tau_cfg_out),
+             ('--cfg-out', args.cfg_out)]
+    _missing = [f'{flag} {v}' for flag, v in _want
+                if v and not Path(v).expanduser().is_file()]
+    if _missing:
+        raise SystemExit('⛔ requested outputs were not written:\n   '
+                         + '\n   '.join(_missing))
 
     md.append('\n⛔ If pass 3 does not reproduce its prediction, **do not adjust the '
               'number** — find out which side is wrong. `verify_argmax_reorder.py` '
