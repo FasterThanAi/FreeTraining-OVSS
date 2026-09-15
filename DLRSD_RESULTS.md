@@ -374,6 +374,86 @@ not been run.
 
 ---
 
+## 10b. ⭐⭐ TILE BY TILE — 769 of 2100 get WORSE, and why that is not a defect
+
+`fig_dlrsd_compare.py --all` renders every tile and `tile_delta_report.py` scores
+them. **1057 improve, 769 get worse, 274 are unchanged.** A reader is entitled to
+ask what a dataset-level gain is worth against 769 worse pictures, and a count
+cannot answer it.
+
+| | tiles | mean Δ | median | total mass |
+|---|---|---|---|---|
+| improved | **1057** | **+6.89** | +3.29 | **+7,283** |
+| worse | **769** | **−4.29** | −1.32 | **−3,302** |
+| unchanged | 274 | — | — | — |
+| **net** | | **+1.90** | **+0.07** | ⭐ **+3,980** |
+
+⭐ **Win mass ÷ loss mass = 2.21x.** Each win is **1.61x larger** than each loss and
+there are **1.37x** more of them. ⭐ **And the median tile moves +0.07** — the rule
+leaves most scenes alone and acts decisively on a minority, which is what a decision
+rule should look like and the opposite of churn.
+
+### ⭐⭐ Two failure shapes, which a mean cannot tell apart
+
+| category | mean Δ | worse | loss shape |
+|---|---|---|---|
+| ⛔ **agricultural** | **−6.68** | **26**/100 | ⭐ **RARE + severe** |
+| river | −2.84 | 65/100 | near-universal + mild |
+| ⛔ **parkinglot** | **−1.51** | **89**/100 | ⭐ **near-UNIVERSAL + mild** |
+| buildings | −0.98 | 53/100 | mixed |
+| mobilehomepark | −0.37 | 66/100 | near-universal + mild |
+| *baseballdiamond* | *+13.53* | *4/100* | |
+| *golfcourse* | *+9.91* | *15/100* | |
+| *forest* | *+8.97* | *5/100* | |
+
+> ⭐⭐ **`agricultural` loses 6.68 across a QUARTER of its tiles; `parkinglot` loses
+> 1.51 across NINE TENTHS of them. Same kind of number, different findings, and they
+> need different fixes.**
+
+- **`agricultural` is a PROMPT problem.** `field` has the worst precision of any class
+  (**16.39%**) and the worst discard rate (**30.84%**), and **18 of the 22 tiles our
+  rule discards entirely are agricultural**. A handful of scenes destroyed.
+- ⛔ **`parkinglot` is the PRICE OF ONE VECTOR.** `pavement` is fitted at **w = 0.829**
+  — down-weighted because it over-predicts across the dataset — which is right on
+  average and wrong on tiles that genuinely *are* mostly pavement. **No prompt fixes
+  this.** It is the honest cost of fitting one parameter set for 2100 images, and it
+  belongs in limitations.
+
+### ⭐ 70% of the damage is DISCARDING, not mislabelling
+
+| | pixels | share of the damage |
+|---|---|---|
+| ⭐ **newly sent to the sink** | **11,131,177** | ⭐ **70%** |
+| were right, became wrong | 4,704,016 | 30% |
+
+11.1M is **8.1%** of the dataset. ⭐ **This is why `aAcc` still rises 6.84 points**: the
+pixels the rule discards were mostly wrong already, and it fixes far more elsewhere.
+⛔ **It also names the most valuable remaining fix** — the thresholds that are too
+aggressive on a minority of scenes, which is `field` again.
+
+### ⛔ 22 tiles are discarded ENTIRELY, and that is a stated failure mode
+
+`agricultural` 18 · `beach` 2 · `chaparral` 1 · `golfcourse` 1. Every pixel sent to
+the sink, nothing mislabelled. ⭐ **A tile that falls to zero with nothing wrongly
+labelled is a different failure from one that falls to zero wrongly labelled**, and
+only the second is a segmentation error — but both are real costs. **1.0% of the
+dataset annihilated is a limitation even where the average improves.**
+
+⚠️ **Per-tile mean IoU is NOT the dataset mIoU**, and the two need not agree in sign:
+per-tile averages over the classes in that tile, mIoU averages each class once over
+every pixel. `field` gains **+8.14 as a class** while individual agricultural tiles
+collapse to zero. ⛔ Quote this section to say WHERE the method helps and hurts, never
+to argue whether it does — that rests on `eval.py` over every pixel.
+
+⛔ **A verdict bug found writing this, and it is the fifth of its kind in the project.**
+`tile_delta_report.py` first divided the COUNT of a category's losing tiles by the
+count of all losing tiles, and reported *"agricultural at 3.4%, losses are spread"* —
+for the category carrying ~20% of the loss MASS and 18 of the 22 destroyed tiles.
+**Counting tiles treats a −60 and a −0.1 as the same event.** Tables right, prose
+wrong, again.
+
+---
+
 ## 11. Predictions, scored — four hold, three do not
 
 | | prediction | measured | |

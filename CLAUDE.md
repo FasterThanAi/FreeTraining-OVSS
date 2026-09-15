@@ -377,6 +377,18 @@ use is a property of the data, not a house style.**
   stated and not used to overturn anything.
 - ✅ **D7** confirmed: `airplane`, **0.33% of pixels**, is **38%** of lever 1's gain.
 
+⭐⭐ **TILE BY TILE: 1057 improve, 769 get WORSE, 274 unchanged — and the wins are
+bigger.** Win mass ÷ loss mass **2.21x** (mean +6.89 against −4.29), median tile
+**+0.07**, so the rule leaves most scenes alone. ⭐⭐ **Two failure shapes a mean
+cannot separate**: `agricultural` −6.68 across **26**/100 tiles (RARE + severe — a
+PROMPT problem, `field` at 16.39% precision, and **18 of the 22 tiles discarded
+entirely**) against `parkinglot` −1.51 across **89**/100 (near-UNIVERSAL + mild — the
+**price of one fitted vector**: `pavement` w=0.829 is right on average and wrong on
+tiles that really are pavement; no prompt fixes it). ⭐ **70% of the damage is
+DISCARDING** (11.1M px) rather than mislabelling (4.7M) — which is why aAcc still
+rises 6.84. ⛔ **22 tiles annihilated (1.0%) is a stated failure mode, not a
+footnote.** @DLRSD_RESULTS.md §10b.
+
 ⛔ **Never quote a DLRSD mean without the per-class table.** Six classes under 2% of the
 pixels own **35.3%** of the metric — WEEK3 §9h at its most extreme.
 ⚠️ **Do not compare 44.42 with Potsdam's 57.83.** mIoU is comparable only within a

@@ -55,6 +55,35 @@ ran, and editing a prompt because a result disappointed is the thing that
 pre-registration exists to prevent. If we test it, it is a separate experiment with its
 own prediction filed first.
 
+**Looking at all 2100 pictures, not just the score.** Rendering every tile
+side-by-side showed 769 of them get *worse* under our method, which is a fair thing to
+be alarmed by. Counting them settles nothing, though: what matters is whether the wins
+are bigger, and they are — each win averages 1.6x larger than each loss, so the winning
+side outweighs the losing side **2.21 to 1**. The typical tile barely moves at all
+(+0.07). The method leaves most scenes alone and acts hard on a few, which is what it
+is supposed to do.
+
+**And the browse found two different problems wearing the same disguise.** Farm scenes
+lose 6.7 points across a quarter of their tiles; car parks lose 1.5 across nine tenths
+of theirs. As averages they look similar. They are not the same thing at all: the farm
+scenes are a handful of images being *destroyed* by one bad word (`field`, our worst
+prompt by every measure, and 18 of the 22 tiles our method wipes out completely), while
+the car parks are *every* image being nudged down slightly because one number tuned for
+2100 pictures is slightly wrong for the ones that really are mostly pavement. The first
+is fixable. **The second is the honest price of having a single setting for a whole
+dataset, and it goes in the limitations.**
+
+**Most of the harm is throwing pixels away, not labelling them wrong** — 11.1 million
+against 4.7 million. That is why overall pixel accuracy still climbs nearly 7 points
+despite the 769: the pixels being discarded were mostly wrong already.
+
+**A mistake in my own analysis, and the fifth of this exact kind.** My script judged
+"is the damage concentrated?" by counting how many losing tiles each scene type had. By
+that measure farm scenes were 3.4% of the losses and it declared the damage evenly
+spread. But counting tiles treats a tile that lost 60 points the same as one that lost
+0.1. By *size* of damage, that one scene type carries about a fifth of it. Table right,
+conclusion wrong — again.
+
 **Something I had backwards, caught by measuring.** On the previous dataset, frames from
 the same flight had to be kept together in a fold or the method scored itself on
 near-duplicates. DLRSD has 21 obvious groups, so I said do the same. **The data says the
