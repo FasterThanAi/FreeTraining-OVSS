@@ -106,6 +106,119 @@ def per_class_iou(pred, gt, n, sink):
     return out
 
 
+def strip(panels, pad=6, header=16):
+    """Five panels side by side, composed with PIL.
+
+    ⭐ Not matplotlib. A figure per tile through pyplot costs ~0.4 s and 2100 of
+    them is twenty minutes of wall time for a browse; pasting arrays is ~20 ms.
+    """
+    from PIL import ImageDraw
+    h, wd = panels[0][0].shape[:2]
+    W = len(panels) * wd + (len(panels) + 1) * pad
+    out = Image.new('RGB', (W, h + header + 2 * pad), (255, 255, 255))
+    d = ImageDraw.Draw(out)
+    # ⚠️ Clip each title to what its own panel can hold. The default PIL font is
+    # ~6 px per character, so an untruncated caption runs under the NEXT panel
+    # and labels the wrong picture -- which is worse than a shortened one.
+    cap = max(6, wd // 6)
+    for i, (im, title) in enumerate(panels):
+        x = pad + i * (wd + pad)
+        out.paste(Image.fromarray(im.astype(np.uint8)), (x, header + pad))
+        d.text((x, 3), title[:cap], fill=(0, 0, 0))
+    return out
+
+
+def batch(args, files, load, w, tau, base_tau, sink, n):
+    """One strip per tile, plus the index that makes 2100 of them usable."""
+    out = Path(args.out).expanduser()
+    tiles_dir = out / 'tiles'
+    tiles_dir.mkdir(parents=True, exist_ok=True)
+    stems = list(files)[:args.limit] if args.limit else list(files)
+    print(f'\n  batch: {len(stems)} tiles -> {tiles_dir}')
+
+    rows = []
+    for i, stem in enumerate(stems, 1):
+        lg, gt = load(stem)
+        a = predict(lg, None, base_tau, sink)
+        c = predict(lg, w, tau, sink)
+        va, vc = per_class_iou(a, gt, n, sink), per_class_iou(c, gt, n, sink)
+        ks = set(va) | set(vc)
+        ma = float(np.mean([va.get(k, 0) for k in ks])) if ks else 0.0
+        mc = float(np.mean([vc.get(k, 0) for k in ks])) if ks else 0.0
+
+        changed = a != c
+        ch = np.full(gt.shape + (3,), 245, np.uint8)
+        ch[changed & (c == gt)] = (40, 160, 60)
+        ch[changed & (a == gt)] = (200, 50, 50)
+        ch[changed & (c != gt) & (a != gt)] = (190, 190, 190)
+        fixed = int((changed & (c == gt)).sum())
+        broke = int((changed & (a == gt)).sum())
+        # ⭐ how many pixels the SINK swallowed. A tile can go to zero with no
+        # label being "wrong" -- everything simply discarded -- and that reads
+        # very differently from a misclassification.
+        sunk = int(((c == sink) & (a != sink)).sum())
+
+        img_p = Path(args.img_dir).expanduser() / f'{stem}.png'
+        panels = [(np.array(Image.open(img_p).convert('RGB')), stem),
+                  (colourise(gt, sink), 'ground truth'),
+                  (colourise(a, sink), f'baseline {ma:.1f}'),
+                  (colourise(c, sink), f'ours {mc:.1f}  ({mc-ma:+.1f})'),
+                  (ch, f'+{fixed} -{broke}')]
+        strip(panels).save(tiles_dir / f'{stem}.png')
+
+        rows.append(dict(tile=stem, baseline=round(ma, 2), ours=round(mc, 2),
+                         delta=round(mc - ma, 2),
+                         changed_pct=round(100 * changed.sum() / gt.size, 2),
+                         fixed=fixed, broke=broke, newly_discarded=sunk,
+                         all_discarded=int((c == sink).all())))
+        if i % 200 == 0 or i == len(stems):
+            print(f'    {i}/{len(stems)}')
+
+    import csv
+    with open(out / 'index.csv', 'w', newline='') as f:
+        wr = csv.DictWriter(f, fieldnames=list(rows[0]))
+        wr.writeheader()
+        wr.writerows(rows)
+
+    # ⭐ THE INDEX IS THE DELIVERABLE, not the images. 2100 strips cannot be
+    # browsed; a sorted list of the worst losses and the biggest wins can, and
+    # the losses are the half that gets skipped without one.
+    rows.sort(key=lambda r: r['delta'])
+    nz = [r for r in rows if r['all_discarded']]
+    L = [f'# DLRSD, tile by tile — {len(rows)} comparisons\n',
+         'Each `tiles/<name>.png` is: image · ground truth · baseline · ours · '
+         'what changed (green fixed, red broken, grey wrong either way).\n',
+         f'- mean per-tile Δ **{np.mean([r["delta"] for r in rows]):+.2f}**  |  '
+         f'improved **{sum(1 for r in rows if r["delta"] > 0.05)}**  |  '
+         f'worse **{sum(1 for r in rows if r["delta"] < -0.05)}**  |  '
+         f'unchanged **{sum(1 for r in rows if abs(r["delta"]) <= 0.05)}**',
+         f'- ⛔ tiles our rule discards ENTIRELY: **{len(nz)}**'
+         + (f' — {", ".join(r["tile"] for r in nz[:10])}'
+            f'{" ..." if len(nz) > 10 else ""}' if nz else ''),
+         '',
+         '⚠️ Per-tile mean IoU is not the dataset mIoU and the two need not agree '
+         'in sign: mIoU averages each class once over all tiles, this averages '
+         'each tile once over its own classes. A class can improve overall while '
+         'individual tiles collapse.\n',
+         '## ⛔ The 15 worst tiles — look at these first\n',
+         '| tile | baseline | ours | Δ | newly discarded |', '|---|---|---|---|---|']
+    for r in rows[:15]:
+        L.append(f'| `{r["tile"]}` | {r["baseline"]:.1f} | {r["ours"]:.1f} | '
+                 f'**{r["delta"]:+.1f}** | {r["newly_discarded"]:,} |')
+    L += ['\n## The 15 biggest gains\n',
+          '| tile | baseline | ours | Δ |', '|---|---|---|---|']
+    for r in rows[-15:][::-1]:
+        L.append(f'| `{r["tile"]}` | {r["baseline"]:.1f} | {r["ours"]:.1f} | '
+                 f'**{r["delta"]:+.1f}** |')
+    (out / 'README.md').write_text('\n'.join(L) + '\n')
+    print(f'\n  written: {tiles_dir}/  ({len(rows)} strips)')
+    print(f'  written: {out / "index.csv"}   <- sort this')
+    print(f'  written: {out / "README.md"}')
+    print(f'\n  improved {sum(1 for r in rows if r["delta"] > 0.05)}  |  '
+          f'worse {sum(1 for r in rows if r["delta"] < -0.05)}  |  '
+          f'⛔ entirely discarded {len(nz)}')
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--cache', required=True)
@@ -125,6 +238,11 @@ def main():
     ap.add_argument('--out', default='docs/dlrsd_compare')
     ap.add_argument('--scan', type=int, default=300,
                     help='tiles to score when choosing with --auto')
+    ap.add_argument('--all', action='store_true',
+                    help='BATCH MODE: one panel strip per tile for the whole '
+                         'dataset, plus index.csv and a sorted README. ⛔ ~2100 '
+                         'files -- write them OUTSIDE the repo.')
+    ap.add_argument('--limit', type=int, default=0, help='batch mode: stop after n')
     args = ap.parse_args()
 
     L = LB_MOD.from_cache(args.cache)
@@ -146,6 +264,11 @@ def main():
             raise SystemExit(f'⛔ {stem}.npz has no `logits`. Re-cache with '
                              f'--cache-full; the scale needs the whole stack.')
         return z['logits'].astype(np.float32), z['gt'].astype(np.int32) - 1
+
+    # ---- batch mode: every tile, with a sort key
+    if args.all:
+        batch(args, files, load, w, tau, base_tau, sink, n)
+        return
 
     # ---- choose the tiles
     if args.tiles:
