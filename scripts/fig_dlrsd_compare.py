@@ -238,6 +238,15 @@ def main():
     ap.add_argument('--out', default='docs/dlrsd_compare')
     ap.add_argument('--scan', type=int, default=300,
                     help='tiles to score when choosing with --auto')
+    ap.add_argument('--min-classes', type=int, default=3,
+                    help='--auto: a tile needs at least this many ground-truth '
+                         'classes to be eligible. ⛔ On a single-class tile the '
+                         'per-tile mean IoU is 0 or 100 and nothing between, so '
+                         'the extremes are degenerate by construction and the '
+                         'panels are near-solid colour.')
+    ap.add_argument('--min-changed', type=float, default=0.02,
+                    help='--auto: minimum fraction of pixels the rule must have '
+                         'changed. A panel where nothing moved shows nothing.')
     ap.add_argument('--all', action='store_true',
                     help='BATCH MODE: one panel strip per tile for the whole '
                          'dataset, plus index.csv and a sorted README. ⛔ ~2100 '
@@ -286,10 +295,30 @@ def main():
             d = np.mean([vc.get(k, 0) - va.get(k, 0) for k in ks]) if ks else 0.0
             dead = any(vc.get(k, 0) == 0 and (gt == k).sum() > 200
                        for k in (4, 9))            # chaparral, mobile home
-            rows.append((stem, d, dead))
+            # ⛔ HOW MANY CLASSES THE TILE ACTUALLY CONTAINS, and it decides
+            # whether this tile can be in the figure at all. On a tile whose
+            # ground truth is ONE class, per-tile mean IoU is 0 or 100 and
+            # nothing between -- so "biggest gain" and "biggest loss" are
+            # +/-100 BY CONSTRUCTION and always land on those tiles. The first
+            # version of this selector duly chose four of them: two near-solid
+            # colour panels at +/-100 and one with 0.0% of pixels changed. That
+            # is the arithmetic of a degenerate metric on display, not the
+            # method, and it would have gone into the paper.
+            ngt = int(np.unique(gt[gt >= 0]).size)
+            changed_frac = float((a != c).mean())
+            rows.append((stem, d, dead, ngt, changed_frac))
             if (i + 1) % 100 == 0:
                 print(f'    {i + 1}/{min(args.scan, len(files))}')
         rows.sort(key=lambda r: -r[1])
+        # A tile earns a place only if it can SHOW something: at least three
+        # ground-truth classes, and the rule actually did something to it.
+        rich = [r for r in rows if r[3] >= args.min_classes
+                and r[4] >= args.min_changed]
+        print(f'  {len(rich)} of {len(rows)} tiles have >= {args.min_classes} '
+              f'classes and >= {100*args.min_changed:.0f}% changed')
+        if len(rich) < 3:
+            print('  ⚠️ too few; relaxing to all tiles — expect solid-colour panels')
+            rich = rows
         # ⛔ The four roles must land on FOUR DIFFERENT tiles. On a small or
         # uniformly-signed set the best tile can also be the one nearest zero,
         # and the figure would then show the same scene twice under two
@@ -305,10 +334,11 @@ def main():
                     return
             print(f'  ⚠️ no distinct tile left for: {why(("", 0.0, False))}')
 
-        take(rows,                                   lambda r: f'biggest gain {r[1]:+.1f}')
-        take(rows[::-1],                             lambda r: f'⛔ a LOSS {r[1]:+.1f}')
-        take(sorted(rows, key=lambda r: abs(r[1])),  lambda r: f'near no-op {r[1]:+.1f}')
-        take([r for r in rows if r[2]],              lambda r: '⛔ holds a class that scores zero')
+        take(rich,                                   lambda r: f'biggest gain {r[1]:+.1f}')
+        take(rich[::-1],                             lambda r: f'⛔ a LOSS {r[1]:+.1f}')
+        take(sorted(rich, key=lambda r: abs(r[1])),  lambda r: f'barely moved {r[1]:+.1f}')
+        take([r for r in rich if r[2]] or [r for r in rows if r[2]],
+                                                     lambda r: '⛔ holds a class that scores zero')
         if len(chosen) < 4:
             print(f'  ⚠️ only {len(chosen)} distinct tiles available — raise '
                   f'--scan, or the cache is very small.')
