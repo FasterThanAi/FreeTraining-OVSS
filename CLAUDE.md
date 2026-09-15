@@ -173,7 +173,9 @@ but `water` has identical share and asymmetry in both domains and an 8× differe
 - τ→0.1 recovers ⅔ of it and costs **5.54 mIoU** — 1 right per 1.73 wrong.
 - Discard outnumbers real-class confusion **3:1** — the dominant error is silence, not error.
 
-**Status.** ROADMAP Phases 1–6 closed; Phase 7 running. Paper drafted (7,101 words, 26 refs,
+**Status.** ROADMAP Phases 1–6 closed; Phase 7 running. ⭐ **FIVE datasets now** —
+LoveDA, OpenEarthMap, Potsdam, UAVid, DLRSD — plus ConInfer as a second pipeline, and
+four of the five are verified end-to-end by `eval.py` against a cached prediction. Paper drafted (7,101 words, 26 refs,
 1 `\todo`) with an Overleaf bundle script; ~2,000 words must **move** to supplementary, not
 shrink. ConInfer's reproduction gate **failed** — report LoveDA with both numbers (published
 39.33, ours 36.99), drop their OEM row. Potsdam pre-registered at 4.29% catch-all.
@@ -299,6 +301,96 @@ unchanged) · one-word fix **+3.53** *(its own result)* · **method +3.22** (lev
 lever 2 +2.03) · final **63.62**, still above the Oracle's 59.7.
 ⛔ **The method's UAVid contribution is +3.22, NOT +6.69** — the earlier figure bundled a
 prompt defect into the method. Consistent with LoveDA +2.32 and Potsdam +5.67.
+
+### ✅✅ DLRSD IS A FIFTH DATASET, AND THE ONLY ONE WITH NO CATCH-ALL. @DLRSD_RESULTS.md, 15 Sep.
+
+2100 images, 256x256, **17 classes, 21 UC Merced scene categories x 100**. Pre-registered
+in `prereg/predict_dlrsd.md` (`5081937`) **before any inference and before a config
+existed** — SegEarth-OV3 publishes no DLRSD row and ships no config, so the vocabulary,
+the threshold, the folds and the discard target were all ours and all fixed in advance.
+
+✅✅ **VERIFIED END-TO-END: 37.27 → 39.04 → 44.42**, predicted **37.33 / 39.09 / 44.45**
+— max Δ **0.03** on the headline, **44 of 51** per-class predictions within 0.20. Fifth
+dataset validating the histogram instrument. **Total +7.15** on 1701 held-out tiles.
+
+⭐⭐ **EVERY PIXEL CARRIES A REAL CLASS.** 137,625,600 = 2100 x 256 x 256 exactly, index
+0 absent from all 2100 files, and no class is a background/clutter. **So DLRSD sits at
+0.00% catch-all share** — below OpenEarthMap's 0.84% — and **three standing objections
+cannot be raised**: the gain cannot be a repaired catch-all (full mIoU **is**
+catch-all-excluded mIoU), the global threshold was not inherited (the oracle's best
+possible single τ is worth **+0.04**), and the vocabulary was committed in advance.
+⚠️ **The objection it invites instead: no published baseline to reproduce.** Say so.
+⭐ Anchor: OVRSISBench reports DLRSD at 14.80–26.31 for training-free CLIP methods
+against our 37.89 — plausible, **not a gate**, and mostly the backbone.
+
+⭐⭐ **ONE THRESHOLD IS WORTH NOTHING AND SEVENTEEN ARE WORTH THREE.** Oracle: published
+37.89 · best **global** τ **37.93 (+0.04)** · best **per-class** **40.88 (+2.99)**.
+⭐ **LoveDA's global row is also +0.04.** The level is already right; the shape is wrong.
+Fitted thresholds span **0.000–0.915**, the widest in the project — five classes want
+τ ≤ 0.02 and seven want τ ≥ 0.30.
+
+| | lever 1 | lever 2 |
+|---|---|---|
+| ⭐ **DLRSD** | ⭐ **+2.37 ± 0.63** (5/5, gate +1.11, **79%** of oracle) | ⭐ **+5.84 ± 1.03** (5/5, gate +3.78) |
+
+⭐⭐ **Lever 2 here is BROAD where UAVid's was not**: **7 classes gain over 8 IoU**, top
+two 45% and top four 74%, against UAVid's two classes at 96%. `grass` **+27.03**
+(precision 53.5→82.5 **and** recall 32.3→58.8), `court` +15.76, `airplane` +15.62.
+⭐ **aAcc rises 58.94 → 65.78 (+6.84)** — pixel-weighted, so no rare class can fake it.
+⭐ **Precision AND recall both rise** (+8.73 / +1.95), and the split reproduces UAVid:
+**lever 1 trades** (prec +10.98, recall −3.79), **lever 2 pays the recall back** (+5.74).
+⭐ `airplane` is the cleanest per-class-τ case in the project: recall **97.65%** at
+precision **59.03%**, fixed by τ = **0.955** → 85.05 / 84.87.
+⚠️ **3 classes lose**: `water` **−2.73** (under BOTH levers), `cars` −1.28, `buildings` −0.08.
+
+⛔⛔ **TWO PROMPTS ARE DEAD AND NEITHER LEVER REACHES THEM.** `chaparral` and
+`mobile home` score **0.00 IoU** at every rung. `mobile home` gets the largest scale in
+the vector (**2.488, at the grid ceiling**) and still reaches 0.29. **11.8% of the metric
+contributing nothing, worth ~+3.5 mIoU if they merely performed averagely — more than
+our whole method delivers here.** ⚠️ `field` is a third suspect (16.39% precision, 30.84%
+of its pixels discarded). ⛔ **NOT fixed here, deliberately** — the prereg fixes the
+vocabulary as published, and a vocabulary arm is a separate pre-registration.
+
+⛔⛔ **FOLDS ARE STRATIFIED, NOT GROUP-DISJOINT — the opposite of UAVid, and measured.**
+`dlrsd_class_map.py` found **5 classes live in ≤ 2 of the 21 categories** (`airplane`,
+`dock`, `tanks` in exactly one), so category-disjoint folds would leave them with **no
+calibration pixels** and the impossible ask would read as the method failing. New flag
+`--stratify-re` gives every fold exactly 20 of each category. ⛔ **Which correction to
+use is a property of the data, not a house style.**
+⭐ Calibration is positive from **~100 tiles** (LoveDA ~200); n=10 and n=25 are negative.
+
+⛔ **PREDICTIONS: four hold, three do not.**
+- ⛔ **D1 FAILED.** Predicted discard < OEM's 3.78% (bracket 0.5–4.0%); measured **6.16%**.
+  ⭐⭐ **The lowest catch-all share gives the SECOND-HIGHEST discard rate — WEEK3 §7's
+  surviving half does not survive extrapolation to 0%.** Suspects, neither established:
+  17 classes (vs OEM's 9) and **3.9x upsampling** of 256² tiles, a regime nothing else here
+  has run. ⚠️ Residual is bimodal — mean 6.16%, **median 0.43%**, 34 tiles (1.6%) above 99%.
+- ✅ **D3** holds by construction: with `bg` outside the class list the `real` filter removes
+  nothing, so `--objective real` ≡ `--objective all`. A clean test of SEPARABILITY's mechanism.
+- ⛔ **D4 half-failed.** Median fitted τ **0.150** is above the global optimum (0.070) ✅ but
+  below LoveDA's 0.375 ⛔ — right direction, wrong magnitude.
+- ✅ **D5** passes by **+2.33**: the oracle global bounds any fitted global at +0.04.
+- ⛔ **D6 FAILED AND THE GATE WAS MINE AND BAD.** Rung-A spread **5.41** against a 3.0 bar —
+  but the same statistic reads **2.31–5.41** across three partitions of the same data, so the
+  range of five numbers cannot be a gate. Recorded as badly posed, like UAVid's U4, **not
+  quietly relaxed.** ⚠️ Noise÷effect is 2.3x here against OpenEarthMap's 25x — post hoc, so
+  stated and not used to overturn anything.
+- ✅ **D7** confirmed: `airplane`, **0.33% of pixels**, is **38%** of lever 1's gain.
+
+⛔ **Never quote a DLRSD mean without the per-class table.** Six classes under 2% of the
+pixels own **35.3%** of the metric — WEEK3 §9h at its most extreme.
+⚠️ **Do not compare 44.42 with Potsdam's 57.83.** mIoU is comparable only within a
+dataset; 17 fine-grained classes against 6 broad ones, and 37.89 is a **high** score here.
+
+⛔⛔ **THE BUG WORTH REMEMBERING, and it happened twice.** `labels.py` locates the
+catch-all BY NAME, found none, and nominated the first class — **`airplane` became the
+discard target.** `measure_discard_rate.py` crashed on it (lucky); `from_cache` did **not**,
+and the oracle sweep plus the first 5-fold ran to completion producing **complete,
+plausible, void tables**. ⭐ **The tell was printed and scrolled past**: `tau_oracle.py`'s
+cross-check read 34.63 where `measure_discard_rate.py` had reported 37.89, in a section
+saying the two must agree. **Fixed three ways** — the fallback is now fatal, the cache
+carries a `_meta.json` sidecar with `bg_idx`, and `labels.py` widens the predicted axis for
+a sink. ⚠️ **A warning at the top of a long run is not a safeguard.**
 
 ### ⭐⭐⭐ THE VOCABULARY IS THE BIGGEST LEVER, AND THERE IS NO RULE FOR IT. @VOCABULARY_RESULTS.md, 14 Sep.
 

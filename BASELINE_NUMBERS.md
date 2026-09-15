@@ -17,6 +17,32 @@ would work, when the table settles both. **Check here first before proposing any
 | UDD5 | **71.7** | — | config ✅ vocab ✅ |
 | VDD | **64.5** | — | config ✅ vocab ✅ |
 | *average* | *53.4* | | |
+| ⛔ **DLRSD** | ⛔ **no row — they do not report it** | ⭐ **37.89** | see below |
+
+## ⭐ DLRSD has NO SegEarth-OV3 number, and we ran it anyway
+
+⛔ Their table has eight datasets and DLRSD is not one, nor does the repo ship
+`cfg_dlrsd.py` or `cls_dlrsd.txt`. **So DLRSD is the one dataset in this project with
+no reproduction gate**, and @DLRSD_RESULTS.md says so in its own §2 rather than
+waiting for a reviewer to notice.
+
+⭐ **The substitute anchor comes from OVRSISBench** (arXiv:2604.15652), which does
+report DLRSD for training-free methods:
+
+| method | DLRSD mIoU |
+|---|---|
+| ClearCLIP | 14.80 |
+| SCLIP | 20.17 |
+| SegEarth-OV | 23.76 |
+| ProxyCLIP | 24.03 |
+| Trident | 26.31 |
+| ⭐ **ours (SAM 3 baseline)** | **37.89** |
+| ⭐ **ours (both levers)** | ⭐ **44.42** |
+
+⚠️ **Not a gate** — CLIP at 384² against SAM 3 at 1008², their taxonomy unstated. ⭐ But
+**+14.13 over SegEarth-OV is the same order as SAM 3's uplift on LoveDA**, so a broken
+preparation would have landed far outside. ⚠️ Most of that margin is the backbone, not
+our contribution — the discipline @CONINFER_RESULTS.md applies to its 11.54.
 
 Their `Oracle` row, for reference: LoveDA 50.0, Potsdam 74.3, Vaihingen 61.2, OEM 64.4.
 ⚠️ Not the same object as our per-class-τ oracle — theirs bounds the masks, ours bounds the

@@ -1,5 +1,69 @@
 # Logbook
 
+## 2026-09-15 — DLRSD is the fifth dataset, and the one that cannot be argued with
+
+**In one line:** a dataset with **no background class at all**, where our method takes
+**37.27 → 44.42** on tiles it never calibrated on, and the pipeline reproduced the
+cached prediction to **0.03**.
+
+**Why this dataset was worth running.** Three times now a reviewer could have said
+*"your gain is just the model getting better at the leftover class"* — on OpenEarthMap
+110% of a +2.28 was `background`, on ConInfer a third of +2.51 was, and Potsdam's own
+published score is dragged down 8.18 points by `clutter`. **DLRSD has no leftover
+class.** All 17 are real things — airplane, dock, grass, ship — and every one of its
+137,625,600 pixels carries one. So that objection is gone by construction, not by
+argument. That was the point, and it worked.
+
+**The clearest number of the day.** Tuning the single confidence threshold *perfectly*,
+with the answers in hand, is worth **+0.04**. Giving each class its own threshold is
+worth **+2.99**. Seventy-five times more, for the same kind of effort. And LoveDA's
+figure for the same thing is also +0.04 — two very different datasets agreeing that the
+threshold's *level* was never the problem, its *shape* was.
+
+**What went wrong, twice, and what it teaches.** The code assumes every dataset has a
+"none of the above" class. DLRSD does not, so the code picked the first class on the
+list — `airplane` — and started throwing every uncertain pixel into it. The first time
+this happened the program crashed, which was lucky. The second time it did **not**
+crash: it produced two complete, sensible-looking tables that were entirely wrong. The
+warning that would have caught it was printed at the top of a two-minute run and
+scrolled away. **A warning at the start of a long job is not a safeguard**, so it is now
+a hard stop that refuses to run, and the cache records where discarded pixels go instead
+of leaving it to be guessed.
+
+**A default I got wrong and a guard that now prevents it.** The deployment script's
+vocabulary setting defaults to LoveDA's. Left alone, DLRSD would have been scored
+against seven wrong class names with no crash and a complete table. It now refuses when
+the prompt count disagrees with the data.
+
+**Three of seven predictions failed, and the failures are the useful part.**
+- We predicted the smallest residual yet, because DLRSD has no leftover class to absorb
+  pixels. **We got the second largest.** So the rule linking "size of the leftover
+  class" to "how much gets thrown away" — which held on three datasets and was
+  confirmed by a prediction on Potsdam — **does not hold at the extreme.** That is a
+  limit on our own explanation, found because the prediction was written down first.
+- The go/no-go gate I wrote turned out to measure nothing: the same statistic reads
+  anywhere from 2.31 to 5.41 depending on which of three equivalent runs you read.
+  **Recorded as a badly designed test, not quietly relaxed**, because relaxing a bar
+  after seeing the number is exactly what writing it down beforehand is meant to stop.
+
+**Two words that do not work.** `chaparral` and `mobile home` score **zero** — not low,
+zero. They never win a single pixel, and neither of our two techniques can rescue them:
+the fit pushes `mobile home` as hard as the search allows and it still reaches 0.29.
+That is a ninth of the whole score sitting idle because of two words we chose. ⛔ **We
+are not changing them now** — the wording was committed in writing before any of this
+ran, and editing a prompt because a result disappointed is the thing that
+pre-registration exists to prevent. If we test it, it is a separate experiment with its
+own prediction filed first.
+
+**Something I had backwards, caught by measuring.** On the previous dataset, frames from
+the same flight had to be kept together in a fold or the method scored itself on
+near-duplicates. DLRSD has 21 obvious groups, so I said do the same. **The data says the
+opposite**: three of its classes exist in only one group each, so keeping groups
+together would leave those classes with nothing to learn from — and the guaranteed
+failure would have looked like our method's fault. **Which correction to apply is a
+property of the dataset, not a habit.**
+
+
 One entry per working day: **what was tried, what broke, what the number was**
 (`ROADMAP.md`, "Weekly rhythm"). Newest first.
 
