@@ -78,6 +78,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import labels                                                     # noqa: E402
 from tau_oracle import confusion_at, per_class_iou, miou, NBINS   # noqa: E402
+import folds as foldlib                                          # noqa: E402
 from tau_cv import fit as fit_tau, obj_miou                       # noqa: E402
 from tau_domain import read_map                                   # noqa: E402
 
@@ -259,8 +260,23 @@ def main():
                          'per flight -- and a frame-level split inflated lever 1 '
                          'by +0.54 mIoU before this was caught (@UAVID_RESULTS '
                          '§8). Example: "([a-z]+[0-9]*)(?=[-_][0-9]+$)"')
+    ap.add_argument('--stratify-re', default=None,
+                    help='the OPPOSITE of --group-re: tiles sharing a match are '
+                         'SPREAD EVENLY across folds. For datasets whose groups '
+                         'carry different CLASSES rather than near-duplicate '
+                         'views -- on DLRSD `airplane`, `dock` and `tanks` each '
+                         'occur in one of the 21 scene categories, so holding a '
+                         'category out leaves them with no calibration pixels. '
+                         'Mutually exclusive with --group-re. '
+                         'Example: --stratify-re "^([a-z]+)"')
     ap.add_argument('--md', default=None)
     args = ap.parse_args()
+
+    if args.group_re and args.stratify_re:
+        raise SystemExit('⛔ --group-re and --stratify-re are opposite '
+                         'corrections: one keeps matching tiles together, the '
+                         'other spreads them apart. Pick the one the data calls '
+                         'for -- see scripts/folds.py.')
 
     LB = labels.from_cache(args.cache)
     nc, bg = LB.n, LB.bg - 1
@@ -381,8 +397,19 @@ def main():
     grid = np.round(np.exp(np.linspace(np.log(0.40), np.log(2.50), 11)), 3)
     print(f'\n  w grid: {list(grid)}\n')
 
-    if _gid is None:
+    _sid = None
+    if args.stratify_re:
+        _sid, _suniq = foldlib.parse_keys(files, args.stratify_re, '--stratify-re')
+        print(foldlib.describe(_suniq, _sid, T, args.folds))
+
+    # ⛔ The plain and grouped branches are UNCHANGED, and `order` above is
+    # still drawn unconditionally, so a run using neither flag consumes
+    # randomness exactly as before.
+    if _gid is None and _sid is None:
         folds = np.array_split(order, args.folds)
+    elif _sid is not None:
+        folds = foldlib.stratified(_sid, args.folds, _frng)
+        print(f'  fold sizes: {[len(f) for f in folds]}')
     else:
         _gof = np.empty(_gid.max() + 1, dtype=int)
         for _k, _part in enumerate(np.array_split(

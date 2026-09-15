@@ -39,6 +39,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import labels                                             # noqa: E402
+import folds as foldlib                                   # noqa: E402
 from tau_oracle import confusion_at, miou, per_class_iou, NBINS   # noqa: E402
 
 
@@ -135,8 +136,24 @@ def main():
                          'calibration and evaluation and inflates the gain. '
                          'Use group 1 if the pattern has one, else the whole '
                          'match. Example: --group-re "^(seq[0-9]+)"')
+    ap.add_argument('--stratify-re', default=None,
+                    help='the OPPOSITE of --group-re: tiles sharing a match are '
+                         'SPREAD EVENLY across folds instead of kept together. '
+                         'Use it where the groups carry different CLASSES rather '
+                         'than near-duplicate views. DLRSD is 21 UC Merced scene '
+                         'categories and `airplane`, `dock` and `tanks` each live '
+                         'in exactly one of them, so group-disjoint folds would '
+                         'leave those classes with no calibration pixels at all. '
+                         'Mutually exclusive with --group-re. '
+                         'Example: --stratify-re "^([a-z]+)"')
     ap.add_argument('--md', default=None)
     args = ap.parse_args()
+
+    if args.group_re and args.stratify_re:
+        raise SystemExit('⛔ --group-re and --stratify-re are opposite '
+                         'corrections: one keeps matching tiles together, the '
+                         'other spreads them apart. Pick the one the data calls '
+                         'for -- see scripts/folds.py.')
 
     LB = labels.from_cache(args.cache)
     nc, bg = LB.n, LB.bg - 1
@@ -186,10 +203,22 @@ def main():
         print(f'  grouping: {len(uniq)} groups from {n} tiles '
               f'(sizes {sizes.min()}-{sizes.max()}), folds are group-disjoint')
 
+    # ---------------- stratification (the opposite correction; see folds.py)
+    sid = None
+    if args.stratify_re:
+        sid, suniq = foldlib.parse_keys(files, args.stratify_re, '--stratify-re')
+        print(foldlib.describe(suniq, sid, n, args.folds))
+
     # ---------------- k-fold
-    if gid is None:
+    # ⛔ The plain and grouped branches below are UNCHANGED and consume
+    # randomness exactly as before, so every recorded LoveDA / Potsdam / UAVid /
+    # ConInfer number stands. The stratified branch is additional.
+    if gid is None and sid is None:
         order = rng.permutation(n)
         folds = np.array_split(order, args.folds)
+    elif sid is not None:
+        folds = foldlib.stratified(sid, args.folds, rng)
+        print(f'  fold sizes: {[len(f) for f in folds]}')
     else:
         gperm = rng.permutation(gid.max() + 1)
         gof = np.empty(gid.max() + 1, dtype=int)
@@ -258,9 +287,16 @@ def main():
             continue
         ds = []
         for r in range(args.repeats):
-            if gid is None:
+            if gid is None and sid is None:
                 idx = rng.permutation(n)
                 tr, te = idx[:sz], idx[sz:]
+            elif sid is not None:
+                # proportional per stratum: a plain draw of 25 from 2100 would
+                # miss whole categories, and on DLRSD a missed category is a
+                # class with zero calibration pixels.
+                tr, te = foldlib.stratified_draw(sid, sz, n, rng)
+                if len(te) == 0:
+                    continue
             else:
                 # draw whole groups until sz tiles are reached, so the curve
                 # cannot be read off near-duplicate frames of the eval scenes
