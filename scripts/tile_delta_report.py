@@ -67,28 +67,59 @@ def main():
         m = GROUP_RE.match(r['tile'])
         cat[m.group(1) if m else '?'].append(r['delta'])
     stats = sorted(((np.mean(v), k, len(v)) for k, v in cat.items()))
+    # ⭐ Loss MASS per category, not the count of losing tiles. A category can
+    # hold few losers and most of the damage, and the count hides exactly that.
+    lossmass = {k: -sum(x for x in v if x < -0.05) for k, v in cat.items()}
+    total_loss = sum(lossmass.values()) or 1.0
+
+    def shape(worse, nn):
+        """⭐ Two failure modes that a mean cannot tell apart, and they need
+        different fixes: a few tiles destroyed, or every tile nudged down."""
+        f = worse / nn
+        if f < 0.40:
+            return 'RARE + severe'
+        if f > 0.60:
+            return 'near-UNIVERSAL + mild'
+        return 'mixed'
+
     L += ['## Which scenes lose — a cause, or noise?\n',
-          '| scene category | tiles | mean Δ | worse |', '|---|---|---|---|']
+          '| scene category | tiles | mean Δ | worse | loss mass | share | shape |',
+          '|---|---|---|---|---|---|---|']
     for mu, k, nn in stats[:args.top]:
         w = sum(1 for x in cat[k] if x < -0.05)
-        L.append(f'| `{k}` | {nn} | **{mu:+.2f}** | {w}/{nn} |')
+        L.append(f'| `{k}` | {nn} | **{mu:+.2f}** | {w}/{nn} | '
+                 f'{lossmass[k]:,.0f} | **{100*lossmass[k]/total_loss:.1f}%** | '
+                 f'{shape(w, nn)} |')
     L.append('\n*(best few, for contrast)*\n')
     L += ['| scene category | tiles | mean Δ | worse |', '|---|---|---|---|']
     for mu, k, nn in stats[-3:][::-1]:
         w = sum(1 for x in cat[k] if x < -0.05)
         L.append(f'| `{k}` | {nn} | **{mu:+.2f}** | {w}/{nn} |')
+    L.append('')
+    L.append('⚠️ **`shape` matters more than `mean Δ`.** A category losing 6 points '
+             'across a quarter of its tiles has a few scenes destroyed; one losing '
+             '1.5 across nine tenths of them is being nudged down everywhere. The '
+             'first is a class or a prompt; the second is one fitted vector being '
+             'too coarse. **Different findings, different fixes, same mean.**\n')
 
-    worst = stats[0]
-    conc = sum(1 for x in cat[worst[1]] if x < -0.05) / max(len(lose), 1)
-    L.append(f'\n⭐ **`{worst[1]}` alone holds {100 * conc:.1f}% of all losing '
-             f'tiles.** A loss concentrated in one scene type has a cause worth '
-             f'naming; losses spread evenly across 21 categories would mean the '
-             f'fitted vector is simply too coarse.\n'
-             if conc > 0.15 else
-             f'\n⚠️ **Losses are spread across categories** (worst is '
-             f'`{worst[1]}` at {100 * conc:.1f}% of them), so there is no single '
-             f'scene type to blame — the fitted vector is too coarse for part of '
-             f'the dataset.\n')
+    # ⛔ CORRECTED. The first version of this verdict divided the COUNT of a
+    # category's losing tiles by the total count of losing tiles, and on DLRSD
+    # reported "agricultural at 3.4%, losses are spread" -- for the category
+    # holding ~20% of the loss MASS and 18 of the 22 tiles destroyed outright.
+    # Counting tiles treats a -60 and a -0.1 as the same event.
+    top_k = max(lossmass, key=lossmass.get)
+    conc = lossmass[top_k] / total_loss
+    nworse = sum(1 for x in cat[top_k] if x < -0.05)
+    if conc > 0.15:
+        L.append(f'\n⭐ **`{top_k}` alone carries {100 * conc:.1f}% of the total '
+                 f'loss mass**, from {nworse} of its {len(cat[top_k])} tiles. A '
+                 f'loss that concentrated has a cause worth naming rather than a '
+                 f'vector that is merely too coarse.\n')
+    else:
+        L.append(f'\n⚠️ **The loss mass is spread across categories** — the worst, '
+                 f'`{top_k}`, holds only {100 * conc:.1f}% of it. No single scene '
+                 f'type to blame: one fitted vector is too coarse for part of the '
+                 f'dataset.\n')
 
     # ---- how much of the damage is the discard sink rather than a wrong label?
     nd = np.array([r['newly_discarded'] for r in rows])
