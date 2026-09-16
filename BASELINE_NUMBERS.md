@@ -38,6 +38,11 @@ report DLRSD for training-free methods:
 | Trident | 26.31 |
 | ⭐ **ours (SAM 3 baseline)** | **37.89** |
 | ⭐ **ours (both levers)** | ⭐ **44.42** |
+| ⭐ **ours (corrected vocabulary + both levers)** | ⭐ **46.12** |
+
+⛔ **The same table also reports TRAINED methods**, and they go much higher: Pi-Seg (ViT-L)
+**45.64**, RSKT-Seg (ViT-L) 44.31, CAT-SEG (ViT-L) 43.89, Pi-Seg (ViT-B) 39.69 — all trained on
+OVRSIS95K. An earlier note quoted only the training-free column, which flattered us by omission.
 
 ⚠️ **Not a gate** — CLIP at 384² against SAM 3 at 1008², their taxonomy unstated. ⭐ But
 **+14.13 over SegEarth-OV is the same order as SAM 3's uplift on LoveDA**, so a broken

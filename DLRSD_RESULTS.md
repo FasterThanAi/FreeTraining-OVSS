@@ -553,7 +553,7 @@ the pixels own **35.3%** of the metric, a 5.5x leverage — `WEEK3 §9h` at its 
 extreme in the project.
 ⚠️ **Do not compare 44.42 against Potsdam's 57.83** and conclude anything. mIoU is
 comparable only within a dataset; DLRSD has 17 fine-grained classes against Potsdam's
-6 broad ones, and 37.89 is a **high** score here (best published training-free: 26.31).
+6 broad ones, and 37.89 is a **high** score here (best published training-free: 26.31; best **trained**: 45.64).
 
 ---
 
@@ -651,3 +651,79 @@ as the pre-registration requires. The **+1.69** is its own result. ⚠️ And un
 UAVid's +3.53, it is **not** a clean win to fold in: it is +1.69 net of a **−4.11**
 regression on `trees`/`shrubs`, it raises the annihilated-tile count from 22 to 29, and
 two of its three prompt changes did not do what they were chosen to do.
+
+### ✅✅ VERIFIED END-TO-END on the corrected vocabulary — and W7 settles
+
+`reorder_deploy.py` on the v2 cache (399 calibration tiles, same seed and stems), then
+three `eval.py` passes on the 1701 held-out tiles. ⭐ **Same held-out set as §1**:
+`sea` scores **43.98** and `ship` **15.00** at rung A in both runs, and neither prompt
+changed.
+
+| rung | predicted | **`eval.py`** | Δ |
+|---|---|---|---|
+| A — published τ | 39.05 | **38.98** | 0.07 |
+| B — per-class τ | 40.55 | **40.49** | 0.06 |
+| ⭐ **C — + scale** | 46.10 | ⭐ **46.12** | ⭐ **0.02** |
+
+**Sixth verified chain in the project.** `aAcc` 60.19 → 65.29 (+5.10), mPrecision
+**+10.58** and mRecall **+1.66** — both rise again, and lever 1 trades (recall −4.13)
+while lever 2 pays it back (+5.79), exactly as on the published vocabulary and on UAVid.
+
+⭐⭐ **W7 — the lever gains are UNCHANGED by the vocabulary, now on pipeline numbers:**
+
+| vocabulary | A | B | C | **total** |
+|---|---|---|---|---|
+| published | 37.27 | 39.04 | 44.42 | **+7.15** |
+| corrected | 38.98 | 40.49 | 46.12 | **+7.14** |
+
+The vocabulary is worth **+1.71** before the levers and **+1.70** after them. ⭐ **They
+add exactly.** On UAVid one word removed **64%** of lever 2 and both routes converged
+(63.55 vs 63.62); on DLRSD they are **independent**. ⚠️ Scored against its own bar W7
+passes by 0.01 — "total falls below +7.15" — which is noise; **the finding is the
+additivity, not the pass**. ⛔ **"The vocabulary and the levers substitute" does not
+generalise**, the second substitution reading in the project to fail on a new dataset
+after `SUBSTITUTION_RESULTS` refuted "the levers substitute".
+
+⭐ **The class-level picture is subtler than the total, and worth one paragraph.**
+Rung C, corrected minus published:
+
+| class | published C | corrected C | Δ |
+|---|---|---|---|
+| ⭐ `field` → `crop field` | 22.05 | **38.89** | **+16.84** |
+| ⭐ `chaparral` → `shrubs` | 0.00 | **13.35** | **+13.35** |
+| `sea` | 49.16 | 54.84 | +5.68 |
+| `grass` | 52.23 | 55.50 | +3.27 |
+| `tanks` | 35.46 | 38.37 | +2.91 |
+| ⛔ `court` | 56.43 | 55.85 | **−0.58** |
+| ⛔ `water` | 48.07 | 45.59 | −2.48 |
+| ⛔ **`trees`** | 67.06 | 54.09 | ⛔ **−12.97** |
+
+- ⭐ **`court` substitutes; `crop field` does not.** At the baseline the word released
+  **+12.63** to `court` — and after the levers that gain is **gone (−0.58)**, because lever
+  2 had already rescued `court` on the published vocabulary. `crop field` itself gains
+  **+16.84 that no lever reached**. So the words and the levers overlap on *some* classes
+  and not others, and the totals cancel into exact additivity.
+- ⭐ **The levers repair the `shrubs`/`trees` trade to break-even.** At the baseline
+  `shrubs` cost `trees` **−4.11 net**; after both levers `trees`+`shrubs` is **67.44**
+  against **67.06** — the fit re-divides the vegetation between the two prompts.
+- ⛔ **`water` loses under the corrected vocabulary even after the levers** (−2.48), on top
+  of losing −2.73 to the levers already. It is the dataset's most consistently harmed class.
+- ⛔ **`trailer` stays at 0.29** at every rung and vocabulary. Three interventions, no
+  effect: a visual confusion.
+
+### How to quote DLRSD now
+
+| | |
+|---|---|
+| reproduction, published vocabulary | **37.27** (held-out) |
+| **method** on the published vocabulary *(the pre-registered result)* | ⭐ **+7.15 → 44.42** |
+| vocabulary arm, its own result | **+1.71** at baseline, **+1.70** after the method |
+| best verified configuration | ⭐ **46.12** |
+
+⛔ The method's contribution is **+7.15 on either vocabulary** — the vocabulary does not
+inflate or deflate it here, which is the cleanest statement of that separation in the
+project. ⚠️ And 46.12 is **training-free**; OVRSISBench's best **training-free** DLRSD
+number is 26.31 and its best **trained** one is **45.64** (Pi-Seg, ViT-L, trained on
+OVRSIS95K). Different backbone, resolution and unstated taxonomy — **not a controlled
+comparison, and most of the margin over CLIP is SAM 3.**
+

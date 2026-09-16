@@ -412,6 +412,17 @@ STRUCTURAL** — a 0% catch-all does not give the smallest residual. Remaining s
 coupling, then predicted no movement through it. Third such case after UAVid's U4 and
 D6. @DLRSD_RESULTS.md §13.
 
+✅✅ **v2 VERIFIED END-TO-END: 38.98 → 40.49 → 46.12**, predicted 39.05/40.55/46.10 (max Δ
+0.07), same held-out tiles as v1. ⭐⭐ **W7: THE VOCABULARY AND THE LEVERS ADD EXACTLY** —
+method **+7.15** on the published vocabulary, **+7.14** on the corrected one; vocabulary
+**+1.71** before the levers, **+1.70** after. ⛔ **"Vocabulary and levers substitute" does NOT
+generalise** (UAVid: 64% removed, routes converged at 0.07). ⭐ At class level it is mixed:
+`court`'s +12.63 from the word is **absorbed** by lever 2 (−0.58 at rung C) while `crop field`
+keeps **+16.84** no lever reached; the levers bring `trees`+`shrubs` back to break-even
+(67.44 vs 67.06). ⛔ `water` is the most consistently harmed class (−2.48 more). **Best verified
+DLRSD: 46.12.** ⚠️ OVRSISBench: best training-free **26.31**, best **trained 45.64** (Pi-Seg
+ViT-L) — quote both, not a controlled comparison. @DLRSD_RESULTS.md §13.
+
 ⛔ **Never quote a DLRSD mean without the per-class table.** Six classes under 2% of the
 pixels own **35.3%** of the metric — WEEK3 §9h at its most extreme.
 ⚠️ **Do not compare 44.42 with Potsdam's 57.83.** mIoU is comparable only within a

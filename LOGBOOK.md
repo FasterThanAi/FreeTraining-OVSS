@@ -1,5 +1,27 @@
 # Logbook
 
+## 2026-09-17 — the corrected vocabulary, confirmed by the real pipeline
+
+Ran the corrected words through the actual evaluation, not just the cache. It landed within
+0.07 of the prediction on all three steps: **38.98 → 40.49 → 46.12**.
+
+**The clean result:** our two adjustments add **+7.15** with the original words and
+**+7.14** with the corrected ones. The better words add **+1.71** before our method and
+**+1.70** after it. **The two simply stack.** On the earlier drone dataset, fixing one word
+made most of our method redundant; here they fix different things. So the idea that "better
+words and our method are substitutes" was true once and is not a general rule.
+
+**Underneath, it is more mixed.** The better word for fields helped tennis courts a lot at
+first — but our method had already fixed tennis courts, so that part disappeared. The field
+class itself kept a gain our method never reached. And the trees-versus-shrubs fight that the
+new word started, our method settled back to a draw.
+
+**A correction I owed:** I had said the best published score on this dataset was 26.31. That
+is the best among methods that, like ours, use no training. The same table lists **trained**
+methods up to **45.64**. Leaving that out made us look further ahead than we are. It is now in
+the notes.
+
+
 ## 2026-09-16 — the vocabulary test, where most of the predictions were wrong
 
 We suspected three of DLRSD's seventeen words. Two classes scored **zero** however we
