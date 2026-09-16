@@ -1,5 +1,49 @@
 # Logbook
 
+## 2026-09-16 — the vocabulary test, where most of the predictions were wrong
+
+We suspected three of DLRSD's seventeen words. Two classes scored **zero** however we
+tuned things — `chaparral` and `mobile home` — and `field` was the worst-behaved word in
+the set. So we wrote down what we expected, committed it, and then changed exactly three
+words: `chaparral`→`shrubs`, `mobile home`→`trailer`, `field`→`crop field`.
+
+**Score rose 37.89 → 39.58. Four of our six predictions were wrong.**
+
+**The one thing that worked perfectly was the control.** Each class is scored by its own
+separate pass, so the fourteen words we did *not* touch should produce byte-for-byte
+identical numbers. They did — **560 checked, 0 different.** That matters: it means
+anything else that moved, moved because classes compete with each other, not because we
+accidentally changed the model.
+
+**And what moved was not what we renamed.** `crop field` improved itself by 7.8 points —
+but it handed **23.9 points to three classes we never touched**: baseball courts, bare
+soil and grass. The old word "field" had been stealing their pixels. ⭐ **Three quarters
+of the benefit of fixing one word landed on other words entirely.** That is a better
+lesson than the score: a bad prompt does not just fail, it takes territory from its
+neighbours.
+
+**One fix made things worse.** `shrubs` does work where `chaparral` did nothing — but it
+then steals from `trees`, and loses more than it gains. **A word the model understands
+better is not automatically a word that helps.**
+
+**And one word could not be fixed at all.** `trailer` still scores essentially zero. The
+model isn't confused about the word — it is confused about the picture, because mobile
+homes look like buildings. We saw exactly this on Potsdam months ago, where renaming a
+class changed its recall by literally nothing. **Renaming cannot fix seeing.**
+
+**The most useful failure.** We hoped the bad words explained why this dataset throws
+away more pixels than our theory predicted. Fixing them closed about a tenth of that gap,
+and the number of pictures destroyed outright went *up*, from 22 to 29. **So the words
+were not the cause.** That means our own theory has a real limit, and we now know it
+isn't something a better vocabulary can paper over.
+
+**A prediction I wrote badly.** One of the six said the untouched classes would not move —
+and gave, as its reason, that they could only move through competition between classes.
+Those are contradictory. The reason was right and the prediction was wrong, and the data
+shows competition is the dominant effect. Third time in this project I have written a
+test that could not measure what it claimed to.
+
+
 ## 2026-09-15 — DLRSD is the fifth dataset, and the one that cannot be argued with
 
 **In one line:** a dataset with **no background class at all**, where our method takes

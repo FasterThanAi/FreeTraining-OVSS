@@ -554,3 +554,100 @@ extreme in the project.
 ⚠️ **Do not compare 44.42 against Potsdam's 57.83** and conclude anything. mIoU is
 comparable only within a dataset; DLRSD has 17 fine-grained classes against Potsdam's
 6 broad ones, and 37.89 is a **high** score here (best published training-free: 26.31).
+
+---
+
+## 13. ⛔⭐ THE VOCABULARY ARM — four of six predictions fail, and the failures are the result
+
+`prereg/predict_dlrsd_vocabulary.md` (`122f6e7`), committed before the new vocabulary
+was cached. **Three lines changed, arity unchanged, fourteen identical:**
+`chaparral` → **`shrubs`** (regional biome term → common word) · `mobile home` →
+**`trailer`** (compound → ordinary term) · `field` → **`crop field`** (ambiguous → one
+disambiguating modifier).
+
+### ✅ The control is EXACT, and it matters more than anything below
+
+Each class is an independent forward pass with its own text prompt, so the fourteen
+untouched channels must be bit-identical. **Over 40 tiles × 14 classes: 560 identical,
+0 differing.** ⭐ **Every movement in an untouched class is therefore pure ARGMAX
+COMPETITION, not a side effect of re-running the model.**
+
+| | published vocabulary | corrected | Δ |
+|---|---|---|---|
+| **mIoU** | 37.89 | **39.58** | **+1.69** |
+| discard rate | 6.16% | 5.91% | −0.25 pp |
+| ⛔ tiles discarded entirely | 22 | ⛔ **29** | **+7** |
+
+### ⭐⭐ THE FINDING: `field` was eating its neighbours, and 75% of the fix lands on THEM
+
+| class | Δ IoU | prompt |
+|---|---|---|
+| ⭐ **court** | ⭐ **+12.63** | **unchanged** |
+| `crop field` | +7.80 | changed |
+| ⭐ **bare soil** | **+5.89** | **unchanged** |
+| ⭐ **grass** | **+5.40** | **unchanged** |
+| `shrubs` | +5.19 | changed |
+| ⛔ **trees** | ⛔ **−9.30** | **unchanged** |
+| *(the other 11)* | *≤ 0.50 each* | |
+| **sum** | **+28.60** → **+1.68 mIoU** | *(measured +1.69)* |
+
+> ⭐⭐ **`crop field` gains 7.80 for itself and releases 23.92 to three classes whose
+> prompt never changed — 75% of the benefit lands elsewhere.** `field` at 16.39%
+> precision was winning baseball-diamond grass, bare soil and lawns that belonged to
+> `court`, `bare soil` and `grass`. **The value of a prompt fix is in the argmax
+> competition it stops, not in the class being renamed**, and this is the cleanest
+> demonstration of that in the project because the control proves nothing else moved.
+
+⛔ **And the `chaparral` fix is NET NEGATIVE.** `shrubs` grounds where `chaparral` did
+not (0.00 → **5.19**) and then takes from `trees` (63.43 → **54.13**): **+5.19 against
+−9.30 = −4.11**, or −0.24 mIoU. ⭐ **A prompt that grounds better is not the same as a
+prompt that helps** — it has to win the *right* pixels, and `shrubs` wins vegetation
+that was already correctly `trees`.
+
+### Predictions, scored
+
+| | prediction | measured | |
+|---|---|---|---|
+| **W1** | `shrubs` above 5.0 IoU | **5.19** | ✅ *barely* |
+| **W2** | `trailer` above 5.0 IoU | ⛔ **0.04** | ⛔ **FAIL** |
+| **W3** | `crop field` discard below 30.84% | 30.66% | ✅ *barely* |
+| **W4** | baseline rises ≥ +2.0 | ⛔ **+1.69** | ⛔ **FAIL** |
+| **W5** | discard below 3.78% | ⛔ **5.91%** | ⛔ **FAIL** |
+| **W6** | untouched classes move < 0.5 | ⛔ **4 breach** | ⛔ **FAIL — badly posed** |
+
+⛔ **W2 failed and it is the branch the pre-registration named as most informative.**
+`trailer` reaches **0.04**. ⭐ **`mobile home` is a VISUAL confusion a rename cannot
+reach, not a naming failure** — the units look like `buildings`. That is
+`VOCABULARY_RESULTS`' Potsdam result replicating: renaming `tree`'s competitor left its
+recall **38.63 → 38.63, unchanged to a hundredth**. ⭐ **So the vocabulary lever has a
+bound, and this is the first dataset where both sides of it are visible at once**:
+`chaparral` was a word problem, `mobile home` is not.
+
+⛔ **W6 was MY error, not the run's.** The prereg gave *"the only coupling is the
+argmax"* as the reason and then predicted the classes would not move — **the argmax
+coupling is precisely the mechanism by which they would.** The prediction contradicted
+its own stated justification, and its branch (*"stop, not a controlled comparison"*)
+rested on a false premise. The 560/0 check settles it: the run is controlled, the
+prediction was wrong. ⚠️ **Third badly-posed prediction in the project**, after UAVid's
+gauge-dependent U4 and DLRSD's own D6.
+
+### ⛔⭐ W5 IS THE IMPORTANT FAILURE: D1 STANDS AS STRUCTURAL
+
+The discard rate had to fall **2.38 points** to vindicate the vocabulary. It fell
+**0.25 — 11% of the gap** — and tiles discarded entirely got **worse, 22 → 29**.
+
+> ⛔⭐ **The vocabulary is largely exonerated. D1's failure is structural**: a 0%
+> catch-all genuinely does NOT produce the smallest residual, and `WEEK3 §7`'s
+> surviving half does not survive extrapolation past its measured range. The remaining
+> suspects are **17 competing classes** and **3.9x upsampling**, neither tested.
+
+⭐ That is a firmer negative than D1 alone gave, because the cheapest and most
+plausible alternative explanation has now been tested and rejected.
+
+### ⛔ What is reported
+
+**The method's DLRSD result stays 37.27 → 44.42 on the PUBLISHED vocabulary**, exactly
+as the pre-registration requires. The **+1.69** is its own result. ⚠️ And unlike
+UAVid's +3.53, it is **not** a clean win to fold in: it is +1.69 net of a **−4.11**
+regression on `trees`/`shrubs`, it raises the annihilated-tile count from 22 to 29, and
+two of its three prompt changes did not do what they were chosen to do.

@@ -389,6 +389,29 @@ DISCARDING** (11.1M px) rather than mislabelling (4.7M) — which is why aAcc st
 rises 6.84. ⛔ **22 tiles annihilated (1.0%) is a stated failure mode, not a
 footnote.** @DLRSD_RESULTS.md §10b.
 
+⛔⭐ **VOCABULARY ARM RUN — 4 of 6 predictions FAIL, and the failures are the result.**
+`prereg/predict_dlrsd_vocabulary.md` (`122f6e7`): `chaparral`→**`shrubs`**, `mobile
+home`→**`trailer`**, `field`→**`crop field`**, arity unchanged. **37.89 → 39.58
+(+1.69).** ✅ **Control exact: 560 untouched channels identical, 0 differing**, so every
+movement elsewhere is pure ARGMAX COMPETITION.
+⭐⭐ **THE FINDING: `field` was eating its neighbours and 75% of the fix lands on THEM** —
+`crop field` gains +7.80 itself and releases **+12.63 `court`, +5.89 `bare soil`, +5.40
+`grass`**, all with unchanged prompts. **The value of a prompt fix is the argmax
+competition it stops, not the class renamed.**
+⛔ **`shrubs` is NET NEGATIVE**: grounds where `chaparral` did not (0.00→5.19) then takes
+from `trees` (63.43→**54.13**) — **−4.11 net**. A prompt that grounds better must still
+win the RIGHT pixels.
+⛔ **`trailer` stays dead (0.04)** — `mobile home` is a **VISUAL** confusion a rename
+cannot reach, replicating Potsdam's `tree` (recall 38.63→38.63). ⭐ **First dataset
+showing both sides of the vocabulary lever's bound at once.**
+⛔⭐ **W5 FAILED AND THAT IS THE POINT: discard 6.16%→5.91%, only 11% of the gap, and
+annihilated tiles got WORSE (22→29). The vocabulary is exonerated and D1's failure is
+STRUCTURAL** — a 0% catch-all does not give the smallest residual. Remaining suspects:
+17 competing classes, 3.9x upsampling. Neither tested.
+⛔ **W6 was MY badly-posed prediction** — the prereg named the argmax as the only
+coupling, then predicted no movement through it. Third such case after UAVid's U4 and
+D6. @DLRSD_RESULTS.md §13.
+
 ⛔ **Never quote a DLRSD mean without the per-class table.** Six classes under 2% of the
 pixels own **35.3%** of the metric — WEEK3 §9h at its most extreme.
 ⚠️ **Do not compare 44.42 with Potsdam's 57.83.** mIoU is comparable only within a
