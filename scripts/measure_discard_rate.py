@@ -540,7 +540,12 @@ def main():
     # then `labels.py` guessed the first class and DLRSD's oracle and 5-fold
     # both produced complete, plausible, entirely void tables with `airplane`
     # as the discard target. Record it beside the cache instead of guessing.
-    if args.cache:
+    # ⛔ `args.cache` DOES NOT EXIST. The flags are --no-cache and --cache-dir,
+    # and `cache_dir` is None when caching is off. I added this block to a
+    # GPU-only script I cannot execute, so the typo shipped untested and cost a
+    # 40-minute pass -- it crashed AFTER the tile loop, so the .npz files
+    # survived and only the summary was lost.
+    if cache_dir is not None:
         import json
         (cache_dir / labels.CACHE_META).write_text(json.dumps({
             'bg_idx': int(getattr(model, 'bg_idx', 0)),
