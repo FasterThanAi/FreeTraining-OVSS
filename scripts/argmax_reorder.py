@@ -191,6 +191,15 @@ def fit_scale(S, G, bg, nc, nbins, grid, objective, rounds, tau_rounds, verbose=
                 sc, tt = score_w(S, G, trial, bg, nc, nbins, objective, tau_rounds)
                 if sc > best + 1e-9:
                     best, w, taus, moved = sc, trial, tt, True
+        # ⭐ Record which classes finished this round ON a search boundary,
+        # BEFORE renormalisation moves them off the grid values. A class the
+        # fit pushes to the edge of the range wants to go further, so the gain
+        # reported for it is a lower bound. Stored on the function rather than
+        # returned, so the signature used by reorder_deploy / scale_transfer is
+        # unchanged.
+        g = np.asarray(grid, float)
+        fit_scale.at_edge = {'max': [c for c in range(nc) if w[c] >= g.max() - 1e-9],
+                             'min': [c for c in range(nc) if w[c] <= g.min() + 1e-9]}
         w = w / float(np.exp(np.mean(np.log(w))))       # geometric mean -> 1
         best, taus = score_w(S, G, w, bg, nc, nbins, objective, tau_rounds)
         if verbose:
@@ -218,6 +227,18 @@ def main():
                     help='labelled pixels kept per tile for the w search')
     ap.add_argument('--objective', choices=['all', 'real'], default='real')
     ap.add_argument('--w-rounds', type=int, default=3)
+    ap.add_argument('--w-min', type=float, default=0.40,
+                    help='lower end of the class-scale search. Default 0.40 is '
+                         'the range every recorded result used.')
+    ap.add_argument('--w-max', type=float, default=2.50,
+                    help='upper end of the class-scale search. ⚠️ On DLRSD '
+                         '`ship` and `mobile home` finish at the 2.50 ceiling, '
+                         'so the fit may want more than the grid allows.')
+    ap.add_argument('--w-steps', type=int, default=11,
+                    help='log-spaced grid points. Defaults 0.40/2.50/11 '
+                         'reproduce the original grid exactly. To widen the '
+                         'range at the SAME resolution (step ratio ~1.20), use '
+                         '--w-min 0.10 --w-max 10 --w-steps 27.')
     ap.add_argument('--tau-rounds', type=int, default=3,
                     help='tau coordinate-ascent passes INSIDE the w search; the '
                          'reported fits use the full 6')
@@ -394,8 +415,16 @@ def main():
               f'folds are group-disjoint')
     rng = np.random.default_rng(args.seed + 1000)
     S, G, PT = load_full(files, args.subsample, nc, NBINS, rng)
-    grid = np.round(np.exp(np.linspace(np.log(0.40), np.log(2.50), 11)), 3)
-    print(f'\n  w grid: {list(grid)}\n')
+    # ⛔ With the defaults this is bit-identical to the original hardcoded grid
+    # (0.40, 2.50, 11), so every recorded lever-2 number reproduces.
+    if not (0 < args.w_min < 1 < args.w_max) or args.w_steps < 3:
+        raise SystemExit('⛔ the w grid must straddle 1: 0 < --w-min < 1 < --w-max, '
+                         '--w-steps >= 3')
+    grid = np.round(np.exp(np.linspace(np.log(args.w_min), np.log(args.w_max),
+                                       args.w_steps)), 3)
+    print(f'\n  w grid ({len(grid)} points, step ratio '
+          f'{(args.w_max / args.w_min) ** (1 / (args.w_steps - 1)):.3f}): {list(grid)}\n')
+    edge_hits = []
 
     _sid = None
     if args.stratify_re:
@@ -445,8 +474,10 @@ def main():
         B_sub = miou(confusion_at(Hs_te, tau_b_sub, bg, NBINS))
         gate_rows.append((k + 1, B_exact - A_exact, B_sub - A_sub))
 
+        fit_scale.at_edge = {'max': [], 'min': []}
         w, _ = fit_scale(Str, Gtr, bg, nc, NBINS, grid, args.objective,
                          args.w_rounds, args.tau_rounds)
+        edge_hits.append(dict(fit_scale.at_edge))
         Hc_tr = hist_at(Str, Gtr, w, nc, NBINS)
         tau_c = fit_tau(Hc_tr, bg, NBINS, objective=args.objective)
         Hc_te = hist_at(Ste, Gte, w, nc, NBINS)
@@ -596,6 +627,29 @@ def main():
     md.append('\nValues are renormalised to geometric mean 1, since only ratios '
               'affect an argmax. A class above 1 wins more argmaxes than before; '
               'below 1, fewer.\n')
+    # ⭐ Search-boundary check. A class that finishes ON the edge of the grid
+    # wants to move further than the search allows, so its scale -- and the
+    # gain -- is censored. Counted in the final round of each fold, before
+    # renormalisation shifts values off the grid.
+    from collections import Counter as _C
+    _hi = _C(c for e in edge_hits for c in e.get('max', []))
+    _lo = _C(c for e in edge_hits for c in e.get('min', []))
+    md.append(f'## Search boundary — grid {grid.min():.2f} to {grid.max():.2f}, '
+              f'{len(grid)} points\n')
+    if _hi or _lo:
+        md.append('| class | folds at the CEILING | folds at the FLOOR |')
+        md.append('|---|---|---|')
+        for c in sorted(set(_hi) | set(_lo), key=lambda c: -(_hi[c] + _lo[c])):
+            md.append(f'| `{LB.names[c]}` | {_hi[c]}/{len(edge_hits)} | '
+                      f'{_lo[c]}/{len(edge_hits)} |')
+        md.append(f'\n⚠️ **{len(set(_hi) | set(_lo))} class(es) finished on a '
+                  f'boundary in at least one fold**, so the search range is '
+                  f'binding there and C − B may be an UNDERESTIMATE. Re-run with a '
+                  f'wider range at the same step, e.g. `--w-min 0.10 --w-max 10 '
+                  f'--w-steps 27`, and compare.\n')
+    else:
+        md.append('✅ **No class finished on either boundary in any fold** — the '
+                  'range is not binding.\n')
     # ⭐ Added after the first real run, as a DIAGNOSTIC rather than a hypothesis:
     # the fold-to-fold spread of the fitted parameters separates "the fit is
     # unstable" from "the fit is stable and the evaluation folds are small". Those
