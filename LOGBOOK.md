@@ -1,5 +1,32 @@
 # Logbook
 
+## 2026-09-17 (evening) — letting the knobs turn further: +5.84 → +6.88
+
+The knobs (lever 2) had only been allowed to go from 0.40 to 2.50. On DLRSD two classes
+were stuck at the top of that range, so we let them go from 0.10 to 10 and ran it again
+(11 hours, CPU only). Everything else identical.
+
+**Result:** lever 2's gain goes from **+5.84 to +6.88**, all 5 splits positive. The old
+range reproduced +5.84 exactly first, so nothing else changed.
+
+**Where the extra came from:** almost all of it is **`mobile home`**, which we had called
+"dead" — 0.00 IoU no matter what. Allowed a big enough knob (about **100 times** louder
+than `buildings`), it reaches **about 14 IoU**. The price: `buildings` drops 4.41 IoU,
+because mobile homes look like buildings and now win those arguments.
+
+**Two of my four predictions were wrong.** I predicted the gain would change by less than
+0.5 and that `mobile home` would stay under 5 IoU. Both failed, because I believed
+`mobile home` was impossible to fix. It was not: the model sees it, it was just losing
+every pixel to `buildings`. (`chaparral` really is different — still 0, and there a
+better word, `shrubs`, is what helped.)
+
+**Careful:** the extra +1.04 from widening is 4 of 5 splits, not clean enough to call
+established. The checked number stays **44.42** until the wider setting is run through
+the real pipeline. And the other datasets used the same narrow range, so their lever-2
+gains may be a bit low too.
+
+---
+
 ## 2026-09-17 (later) — pixel accuracy: why the threshold step does not raise it
 
 Measured plain pixel accuracy (the % of all pixels labelled correctly) on the same held-out

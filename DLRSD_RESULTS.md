@@ -368,9 +368,10 @@ Changing a prompt because a result disappointed is exactly what pre-registration
 exists to prevent. A vocabulary arm is a **separate pre-registered experiment**, as
 `prereg/predict_uavid_vocabulary.md` was.
 
-⚠️ **Also unresolved: the `w` grid is binding.** `mobile home` and `ship` sit at the
-2.50 ceiling and `buildings` at the 0.40 floor. A wider grid is a cheap check and has
-not been run.
+⚠️ **The `w` grid WAS binding — run 17 Sep, §14.** A 0.10–10 range lifts C − B from
++5.84 to **+6.88**, and `mobile home` goes from 0.29 to **≥ 14.4 IoU** once it is allowed a
+~100x scale over `buildings`. **"Neither lever can reach it" is wrong for `mobile home`**
+(not yet verified end to end). `chaparral` stays at 0.00 with no range limit binding.
 
 ---
 
@@ -726,4 +727,88 @@ project. ⚠️ And 46.12 is **training-free**; OVRSISBench's best **training-fr
 number is 26.31 and its best **trained** one is **45.64** (Pi-Seg, ViT-L, trained on
 OVRSIS95K). Different backbone, resolution and unstated taxonomy — **not a controlled
 comparison, and most of the margin over CLIP is SAM 3.**
+
+---
+
+## 14. ⭐ THE SCALE SEARCH RANGE WAS BINDING — and `mobile home` is not dead
+
+`prereg/predict_dlrsd_wide_grid.md` (`5dd52a8`), committed before the run. Same cache,
+seed, stratified folds, τ and subsample; **only the search range changes**:
+default 0.40–2.50 (11 points) against wide **0.10–10.0 (27 points)**, same step.
+
+✅ **Control exact.** The default arm reproduces **+5.84 ± 1.03** fold for fold, and rungs
+A and B are identical in both arms, so the two runs score the same tiles.
+
+| fold | default C − B | **wide C − B** | wide − default |
+|---|---|---|---|
+| 1 | +5.73 | **+6.70** | +0.97 |
+| 2 | +6.85 | **+7.95** | +1.10 |
+| 3 | +4.14 | **+6.25** | +2.11 |
+| 4 | +6.21 | **+5.81** | ⛔ −0.40 |
+| 5 | +6.28 | **+7.71** | +1.43 |
+| **mean** | **+5.84 ± 1.03** | ⭐ **+6.88 ± 0.92** | **+1.04 ± 0.92** |
+
+⭐ The wide arm clears the gate on its own (5/5, mean−2sd **+5.04**). ⚠️ **The IMPROVEMENT
+from widening does not**: +1.04 ± 0.92, 4/5 folds, mean−2sd **−0.80**. Say "+6.88 with a
+wider range", never "widening is worth +1.04" as an established gain.
+
+### Where the extra mIoU came from — mostly one class
+
+| class | C − B, default | C − B, wide | change |
+|---|---|---|---|
+| ⭐ **mobile home** | +0.28 | **+14.44** | ⭐ **+14.16** |
+| ship | +13.07 | +19.29 | +6.22 |
+| cars | −1.46 | +1.73 | +3.19 |
+| tanks | +15.83 | +18.96 | +3.13 |
+| grass | +24.84 | +26.27 | +1.43 |
+| water | −3.39 | −2.69 | +0.70 |
+| ⛔ **buildings** | −0.30 | **−4.41** | ⛔ **−4.11** |
+| dock | −0.28 | −1.89 | −1.61 |
+| pavement | −0.68 | −2.28 | −1.60 |
+| field | +9.90 | +8.77 | −1.13 |
+| sea | +8.72 | +7.80 | −0.92 |
+| court | +19.49 | +18.63 | −0.86 |
+| *other 5* | | | *within ±0.52* |
+
+**Sum +17.67 IoU / 17 classes = +1.04 mIoU**, closing exactly. ⭐ **`mobile home` alone is
+80% of it.** The fit puts `mobile home` at **11.83** and `buildings` at **0.11** — a
+**~108x** ratio — so wherever `mobile home` has any score it now beats `buildings`. It
+wins mobile-home pixels and **pays 4.41 IoU of `buildings`** for them.
+
+⚠️ **Still binding:** `mobile home` at the ceiling in 5/5 folds and `buildings` at the floor
+in 4/5, even at 0.10–10. Not chased further: the ratio is already ~100x, the gain is one
+class, and the increment is not gated. ⚠️ `airplane` (5.77 ± 3.40) and `cars` (70% spread)
+are not identified — `airplane`'s IoU does not move at all.
+
+### Predictions, scored
+
+| | prediction | measured | |
+|---|---|---|---|
+| **G1** | default arm puts `ship` and `mobile home` at the ceiling | **5/5 each**; also `buildings` 3/5 at the floor, `chaparral` 2/5, `cars` 1/5 | ✅ |
+| **G2** | wide arm lets one of them pass 2.50 | `mobile home` **11.83**, `ship` **7.38** | ✅ |
+| **G3** ⭐ | C − B changes by **< +0.5** (point +0.2) | ⛔ **+1.04** | ⛔ **FAIL** |
+| **G4** | `mobile home` stays **< 5 IoU** | ⛔ **≥ 14.4** (Δ +14.44 over a rung-B value of ~0) | ⛔ **FAIL** |
+
+⛔ **G3 failed because my reasoning was wrong, not the run.** I argued `mobile home` is a
+visual confusion "no word and no lever has reached", so a wider range could only add
+`ship`'s few tenths. **G4's branch applies instead: `mobile home` was a SCALE problem, not
+purely visual.** Its score map carries the signal; it loses the argmax to `buildings` by a
+margin a 2.5x scale cannot close and a 100x scale can.
+⭐ **This refines §13's W2 rather than overturning it.** `trailer` failing and `mobile home`
+losing to `buildings` are the SAME fact: the units look like buildings, so no word
+separates them — but the model still scores them, and a large enough ratio arbitrates.
+⛔ **`chaparral` is different: 0.00 IoU in both arms and NOT at a boundary in the wide arm**
+(1.16). There the fit chose not to boost it, so it is not a range problem — the word
+`shrubs` is what reached it (§13).
+
+### ⛔ What this does NOT change yet
+
+- **The verified DLRSD result stays 37.27 → 39.04 → 44.42** on the default range. The
+  branch table requires the wide range to be **verified end to end** before any number
+  is replaced. `reorder_deploy.py` now takes `--w-min/--w-max/--w-steps` for that.
+- ⚠️ **Every other dataset used the same 0.40–2.50 range**, and several recorded scales
+  sit at its edges after renormalisation (LoveDA `background` 0.41 / `water` 2.55; UAVid
+  `vegetation` 0.40 / `road` 0.383 / `tree` 2.52; Potsdam `tree` 4.04). **Their lever-2
+  gains may be underestimates too.** Suggestive, not proven — the edge report did not exist
+  when they ran.
 

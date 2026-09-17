@@ -345,7 +345,12 @@ precision **59.03%**, fixed by τ = **0.955** → 85.05 / 84.87.
 
 ⛔⛔ **TWO PROMPTS ARE DEAD AND NEITHER LEVER REACHES THEM.** `chaparral` and
 `mobile home` score **0.00 IoU** at every rung. `mobile home` gets the largest scale in
-the vector (**2.488, at the grid ceiling**) and still reaches 0.29. **11.8% of the metric
+the vector (**2.488, at the grid ceiling**) and still reaches 0.29. ⛔⭐ **CORRECTED 17 Sep
+(@DLRSD_RESULTS.md §14): the grid was binding.** A 0.10–10 range gives C − B **+6.88 ± 0.92**
+(from +5.84) and `mobile home` **≥ 14.4 IoU** at a ~108x ratio over `buildings` (−4.41) —
+80% of the extra gain. **`mobile home` is a SCALE problem, `chaparral` is a WORD problem.**
+The increment itself is +1.04 ± 0.92 (4/5, not gated); **not verified end to end, 44.42
+stands.** ⚠️ Other datasets used the same range and some scales sit at its edges. **11.8% of the metric
 contributing nothing, worth ~+3.5 mIoU if they merely performed averagely — more than
 our whole method delivers here.** ⚠️ `field` is a third suspect (16.39% precision, 30.84%
 of its pixels discarded). ⛔ **NOT fixed here, deliberately** — the prereg fixes the

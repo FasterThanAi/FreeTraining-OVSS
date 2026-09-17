@@ -139,8 +139,20 @@ def main():
                          'scene categories, so a draw that misses a category '
                          'leaves that class with no calibration pixels. '
                          'Example: --stratify-re "^([a-z]+)"')
+    ap.add_argument('--w-min', type=float, default=0.40,
+                    help='lower end of the class-scale search (default = the range '
+                         'every recorded deployment used)')
+    ap.add_argument('--w-max', type=float, default=2.50)
+    ap.add_argument('--w-steps', type=int, default=11,
+                    help='log-spaced points. The DLRSD wide arm is '
+                         '--w-min 0.10 --w-max 10 --w-steps 27.')
     ap.add_argument('--md', default=None)
     args = ap.parse_args()
+    if not (0 < args.w_min < 1 < args.w_max) or args.w_steps < 3:
+        raise SystemExit('⛔ need 0 < --w-min < 1 < --w-max and --w-steps >= 3')
+    w_grid = np.round(np.exp(np.linspace(np.log(args.w_min), np.log(args.w_max),
+                                         args.w_steps)), 3)
+    print(f'  w grid ({args.w_steps} points): {list(w_grid)}')
 
     LB = labels.from_cache(args.cache)
     nc, bg = LB.n, LB.bg - 1
@@ -210,9 +222,8 @@ def main():
 
     # ---- rung 3: fit the scale, then refit tau underneath it
     print('\nfitting the scale:')
-    w, _ = fit_scale(Scal, Gcal, bg, nc, NBINS, np.round(
-        np.exp(np.linspace(np.log(0.40), np.log(2.50), 11)), 3),
-        args.objective, args.w_rounds, args.tau_rounds)
+    w, _ = fit_scale(Scal, Gcal, bg, nc, NBINS, w_grid,
+                     args.objective, args.w_rounds, args.tau_rounds)
     taus_all = fit_tau(hist_at(Scal, Gcal, w, nc, NBINS), bg, NBINS,
                        objective=args.objective)
     Hh_w = hist_at(Shel, Ghel, w, nc, NBINS)
