@@ -1,5 +1,44 @@
 # Logbook
 
+## 2026-09-17 (later) — pixel accuracy: why the threshold step does not raise it
+
+Measured plain pixel accuracy (the % of all pixels labelled correctly) on the same held-out
+tiles `eval.py` used, from the cache. `scripts/pixel_accuracy.py`,
+`fig_pixel_accuracy.py`, `fig_pixel_maps.py`. **Checked against `eval.py` first:** mIoU within
+0.06 on every step for both datasets, and DLRSD's pixel accuracy within 0.06 (59.00 vs 58.94)
+and 0.01 (65.79 vs 65.78).
+
+| pixel accuracy | A baseline | B + per-class τ | C + per-class scale |
+|---|---|---|---|
+| DLRSD | 59.00 | **58.51** (−0.49) | **65.79** (+6.79 total) |
+| Potsdam | 76.99 | **76.98** (−0.01) | **80.76** (+3.77 total) |
+
+**Lever 1 does not raise pixel accuracy, and on DLRSD it cannot.** In simple words: lever 1
+only decides whether to KEEP or DISCARD the label the model already picked. A discarded
+pixel on DLRSD always counts as wrong. So:
+- making a class's threshold STRICTER turns right pixels into wrong ones, and wrong pixels
+  into... still wrong. Pixel accuracy can only go down.
+- making it LOOSER can only bring pixels back, so accuracy can only go up.
+
+The fit made most thresholds stricter (discarded pixels **5.88% → 12.78%**), because it was
+fitted to raise **mIoU**, and mIoU rewards removing wrong guesses: every false `airplane`
+removed raises `airplane`'s IoU, while pixel accuracy does not care. That is why mIoU rises
+**+1.77** while pixel accuracy falls **0.49**. Visible per class: under step B a class's
+accuracy moves ONLY with its own threshold, and it falls for `water` 75.6→61.2, `airplane`
+97.7→84.9 (precision 59→85, which is the point), `field` 47.8→36.7, `tanks` 45.4→25.5.
+
+**Lever 2 is where pixel accuracy comes from** (DLRSD +7.28, Potsdam +3.78), because it
+changes WHICH class wins a pixel, so a wrong pixel can become a right one. Biggest per-class
+gains: DLRSD `grass` +26.5, `bare soil` +22.6, `court` +21.1; Potsdam `tree` +28.1.
+⚠️ Per-class accuracy is recall: `water` −18.3 is real harm (IoU also falls), `airplane`
+−12.8 is intended.
+
+⭐ **Not a defect, a choice of metric.** If pixel accuracy were the goal on DLRSD the best
+threshold would be zero for every class — never discard — which is not what the paper
+optimises. Say plainly in the paper: lever 1 trades accuracy for precision; lever 2 raises both.
+
+---
+
 ## 2026-09-17 — the corrected vocabulary, confirmed by the real pipeline
 
 Ran the corrected words through the actual evaluation, not just the cache. It landed within

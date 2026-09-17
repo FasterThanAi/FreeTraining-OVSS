@@ -59,7 +59,7 @@ def main():
     ax.set_xticklabels([f'{d["dataset"]}\n({d["n_tiles"]} held-out tiles)' for d in data])
     ax.set_ylabel('pixel accuracy (% of labelled pixels correct)')
     ax.set_title('Overall pixel accuracy')
-    ax.legend(fontsize=8, loc='lower right')
+    ax.legend(fontsize=8, loc='upper left')      # empty corner: no bar underneath
     ax.grid(axis='y', alpha=0.3)
     fig.tight_layout()
     for ext in ('png', 'pdf'):
@@ -95,8 +95,11 @@ def main():
         ax.set_title(f'{d["dataset"]} — per class  (C − A at right; share of pixels in brackets)',
                      fontsize=9)
         ax.grid(axis='x', alpha=0.3)
-        ax.legend(fontsize=7, loc='lower right')
-    fig.tight_layout()
+    # One legend for the whole figure, above the panels -- inside a panel it
+    # covered the C - A label of the bottom class.
+    h, l = axes[0][0].get_legend_handles_labels()
+    fig.legend(h, l, loc='upper center', ncol=3, fontsize=8, frameon=False)
+    fig.tight_layout(rect=(0, 0, 1, 0.97))
     for ext in ('png', 'pdf'):
         fig.savefig(f'{out}_per_class.{ext}', dpi=200)
     plt.close(fig)
