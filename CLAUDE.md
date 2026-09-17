@@ -349,8 +349,18 @@ the vector (**2.488, at the grid ceiling**) and still reaches 0.29. ⛔⭐ **COR
 (@DLRSD_RESULTS.md §14): the grid was binding.** A 0.10–10 range gives C − B **+6.88 ± 0.92**
 (from +5.84) and `mobile home` **≥ 14.4 IoU** at a ~108x ratio over `buildings` (−4.41) —
 80% of the extra gain. **`mobile home` is a SCALE problem, `chaparral` is a WORD problem.**
-The increment itself is +1.04 ± 0.92 (4/5, not gated); **not verified end to end, 44.42
-stands.** ⚠️ Other datasets used the same range and some scales sit at its edges. **11.8% of the metric
+✅✅ **VERIFIED END TO END 18 Sep: `eval.py` reads 45.52 against a predicted 45.52**, every
+class within 0.20, same 1701 tiles. ⛔⭐ **But it buys mIoU WITH PIXELS: aAcc 65.79 → 63.66
+(−2.13).** Four rare classes (7.3% of pixels) gain 34 IoU; `buildings` −9.43, `water` −9.04,
+`pavement` −2.76 (39.4% of pixels) pay. ⛔ **Headline stays 44.42 on the pre-registered
+range**; 45.52 is reported as a measured SENSITIVITY to a hyperparameter nobody reports.
+⭐ `mobile home` reaches **18.35** and `chaparral` **0.98**, so "two dead prompts" is now one.
+⭐⭐ **POTSDAM'S RANGE WAS BINDING TOO: C − B +4.86 → +5.52 ± 0.41**, 5/5, **no class on a
+boundary** so that range is settled there, and the correction is CLEAN — `tree` +23.36 at
+w 6.17, `car` +6.17 at w 0.15 (both clamped before), every real class still improving and no
+class paying. ⚠️ Cached, not yet verified end to end. @ARGMAX_SCALING_RESULTS.md.
+⚠️ **LoveDA and UAVid still use 0.40–2.50 and their scales sit at its edges — their lever-2
+numbers are probably underestimates too.** **11.8% of the metric
 contributing nothing, worth ~+3.5 mIoU if they merely performed averagely — more than
 our whole method delivers here.** ⚠️ `field` is a third suspect (16.39% precision, 30.84%
 of its pixels discarded). ⛔ **NOT fixed here, deliberately** — the prereg fixes the

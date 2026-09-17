@@ -1,5 +1,34 @@
 # Logbook
 
+## 2026-09-18 — the wider knobs, checked in the real pipeline, and a warning
+
+**DLRSD, run through `eval.py`:** the wider knob range gives **45.52** against a predicted
+45.52, every class within 0.20. So the prediction was right.
+
+**But look at what it trades.** Against the checked 44.42 run:
+
+| | old range | wide range |
+|---|---|---|
+| mIoU (average over the 17 classes) | 44.42 | **45.52** |
+| pixel accuracy (all pixels) | 65.79 | **63.66** |
+
+Four small classes (mobile home, tanks, ship, sand — together 7% of the pixels) gain 34 IoU
+between them. `buildings`, `water` and `pavement`, which are 39% of the pixels, pay for it:
+−9.4, −9.0 and −2.8. **mIoU counts every class once, so it likes the trade. Pixel accuracy
+counts pixels, so it does not.** We keep **44.42** as our DLRSD number and report 45.52 as
+"what happens if you widen a setting nobody ever reports".
+
+**Potsdam is the opposite, and it is good news.** The same widening lifts lever 2 from
+**+4.86 to +5.52**, no class hits the edge of the new range, and **no class pays**: `tree`
++23.4 and `car` +6.2 (both were being held back by the old limits), everything else still
+improving. Potsdam's recorded number was simply too low.
+
+**What this means overall:** the allowed knob range is a real setting that changes results,
+and its effect differs per dataset. LoveDA and UAVid still use the old narrow range, and
+their knobs also sit at its edges, so their numbers are probably a little low too.
+
+---
+
 ## 2026-09-17 (evening) — letting the knobs turn further: +5.84 → +6.88
 
 The knobs (lever 2) had only been allowed to go from 0.40 to 2.50. On DLRSD two classes

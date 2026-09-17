@@ -524,3 +524,46 @@ not simply splitting a fixed pool.
 ⛔ **Do not quote the +2.32 as a multi-dataset result.** It is LoveDA, and the honest headline
 until the transfer runs exist is *"on LoveDA the two levers give +2.32 together, of which
 +1.16 is the scale"*.
+
+---
+
+## ⭐⭐ POTSDAM'S RANGE WAS BINDING TOO — +4.86 becomes **+5.52**, 18 Sep
+
+Same cache, τ, folds and subsample as the 6 Sep run; **only the search range changes**,
+0.40–2.50 → **0.10–10.0 (27 points)**. ✅ **Rung A reproduces fold for fold** (58.33 /
+58.00 / 57.35 / 57.88 / 57.65), so the partition is identical and the two runs are
+comparable. ✅ Rung B reproduces at **+0.59 ± 0.50**.
+
+| | default range | **wide range** |
+|---|---|---|
+| **C − B** | +4.86 ± 0.35 | ⭐ **+5.52 ± 0.41** |
+| folds positive | 5/5 | **5/5**, range +5.09 to +6.07 |
+| mean − 2·sd | +4.16 | ⭐ **+4.69** |
+
+✅ **No class finishes on a boundary in any fold**, so 0.10–10 is wide enough here and this
+is the settled value, not another lower bound. Scales are **stable** (worst real class
+`tree` 11.5%).
+
+| class | `w` (wide) | Δ IoU, C over B | *(default run)* |
+|---|---|---|---|
+| ⭐ **tree** | **6.17** | ⭐ **+23.36** | *+21.56* |
+| ⭐ **car** | ⭐ **0.15** | ⭐ **+6.17** | *+2.81* |
+| grass | 0.57 | +3.07 | *+3.97* |
+| road | 0.49 | +0.85 | *+1.08* |
+| building | 0.78 | +0.59 | *+0.59* |
+| `clutter` *(catch-all)* | 5.14 | −0.94 | *−0.82* |
+
+⭐⭐ **The old range clamped BOTH ends here** — `tree` wanted 6.17 against a 2.50 ceiling and
+`car` 0.15 against a 0.40 floor — and the correction is **clean**: every real class still
+improves, and the extra gain is spread over `tree` and `car` rather than paid for by another
+class. ⛔ **That is the opposite of DLRSD**, where the wide range bought rare-class IoU with
+`buildings` and `water` and cost 2.13 points of pixel accuracy (@DLRSD_RESULTS.md §14).
+**The range is a real hyperparameter and its effect is dataset-specific.**
+
+⚠️ **Cached-histogram result — not yet verified end to end.** The recorded Potsdam chain
+(57.60 → 58.35 → 63.27) still stands as the verified one.
+⚠️ **LoveDA and UAVid have not been re-run**, and their recorded scales sit at the old
+edges after renormalisation (LoveDA `background` 0.41 / `water` 2.55; UAVid `vegetation`
+0.383 / `road` 0.383 / `tree` 2.52 / `human` 2.52). **Their lever-2 numbers are probably
+underestimates too.**
+

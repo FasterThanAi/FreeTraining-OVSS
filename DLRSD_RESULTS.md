@@ -812,3 +812,51 @@ separates them — but the model still scores them, and a large enough ratio arb
   gains may be underestimates too.** Suggestive, not proven — the edge report did not exist
   when they ran.
 
+### ✅✅ VERIFIED END TO END — the wide range measures **45.52**, and it BUYS mIoU WITH PIXELS
+
+`reorder_deploy.py --w-min 0.10 --w-max 10 --w-steps 27`, same cache, seed, calibration
+draw and **the same 1701 held-out tiles** (`cmp` on the split file). One `eval.py` pass.
+
+| | predicted | **`eval.py`** | Δ |
+|---|---|---|---|
+| **mIoU** | 45.52 | ⭐ **45.52** | ⭐ **0.00** |
+
+**Every class within 0.20** (worst `dock` 0.20, `tanks` 0.18, `mobile home` 0.17). Seventh
+verified chain in the project, and the first one to verify a *hyperparameter* rather than a
+result.
+
+| | default range | **wide range** | Δ |
+|---|---|---|---|
+| mIoU | 44.42 | ⭐ **45.52** | **+1.10** |
+| ⛔ **aAcc** *(pixel accuracy)* | **65.79** | ⛔ **63.66** | ⛔ **−2.13** |
+| mRecall | 54.19 | 55.24 | +1.05 |
+| mPrecision | 64.17 | 67.27 | +3.10 |
+
+⛔⭐ **THE FINDING, and it is a warning about our own metric: the wider range raises mIoU
+and LOWERS pixel accuracy.** Per class, wide minus default at rung C:
+
+| gains | | losses | |
+|---|---|---|---|
+| ⭐ `mobile home` *(1.8% of px)* | **+18.06** | ⛔ `buildings` *(10.2%)* | **−9.43** |
+| `tanks` *(0.8%)* | +7.90 | ⛔ `water` *(4.1%)* | **−9.04** |
+| `ship` *(1.5%)* | +4.96 | `pavement` *(25.1%)* | −2.76 |
+| `sea` (3.0%) · `sand` (3.2%) · `cars` (2.7%) · `chaparral` | +3.33 / +3.21 / +1.91 / +0.98 | `field` · `trees` · `dock` | −0.50 / −0.38 / −0.07 |
+
+**Sum +18.70 IoU over 17 classes = +1.10 mIoU**, closing exactly. ⭐ **Four rare classes
+(mobile home, tanks, ship, sand — 7.3% of the pixels) gain 34 IoU between them, paid for by
+buildings, water and pavement, which are 39.4% of the pixels.** mIoU counts every class once
+and rewards the trade; pixel accuracy counts pixels and refuses it.
+
+> ⭐⭐ **This is `WEEK3 §9h`'s leverage argument turning on the method itself.** Six DLRSD
+> classes under 2% of the pixels own 35.3% of the metric, so a search range wide enough to
+> chase them wins the average and loses the picture. **The wide range is not "the better
+> setting"; it is a different trade, and which is better depends on which metric the reader
+> cares about.**
+
+⛔ **Decision, stated rather than optimised:** the headline stays **44.42 on the
+pre-registered 0.40–2.50 range**. The wide range is reported as a **measured sensitivity**:
+`±1` mIoU sits inside a hyperparameter nobody reports, and a reviewer asking "why 2.5?" now
+gets a number instead of a shrug. ⚠️ Do **not** quote 45.52 as the method's DLRSD result.
+⭐ The deployed fit reaches `mobile home` **18.35** and `chaparral` **0.98**, so §10's "two
+dead prompts" is now **one** dead prompt.
+
