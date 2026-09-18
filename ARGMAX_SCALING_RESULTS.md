@@ -603,3 +603,50 @@ wider range costs: DLRSD trades common-class pixels for rare-class IoU (−2.13 
 barely trades at all (−0.28). ⛔ **So "use the wider range" is not a free upgrade — it is a
 dataset-dependent trade, and that is the honest sentence for the paper.**
 
+---
+
+## ⛔⭐ FOUR DATASETS ON BOTH RANGES — and a wider search is NOT better in general, 18 Sep
+
+Same caches, seeds, folds, τ and subsample as every recorded lever-2 run; **only the range
+changes**. ✅ **Both new arms reproduce their controls exactly**: LoveDA rung A per fold
+47.92 / 45.41 / 48.44 / 46.11 / 48.68 with **B − A = +1.18 ± 0.45**, UAVid **+1.54 ± 0.30** —
+identical to WEEK3 §9b and @UAVID_RESULTS.md §16. ⛔ Both md files printed the generic
+*"a partial or mixed cache produces exactly this signature"* verdict; **it is refuted by those
+two lines** and is the fifth occurrence of prose contradicting its own table.
+
+| dataset | **0.40 – 2.50** *(the method)* | **0.10 – 10.0** | gate on the wide arm | pixel cost |
+|---|---|---|---|---|
+| ⭐ **DLRSD** | +5.84 ± 1.03 | ⭐ **+6.88 ± 0.92** | ✅ | ⛔ aAcc **−2.13** |
+| ⭐ **Potsdam** | +4.86 ± 0.35 | ⭐ **+5.52 ± 0.41** | ✅ | aAcc −0.28 |
+| ⛔ **LoveDA** | ⭐ **+1.16 ± 0.19** | ⛔ **+0.97 ± 0.75** | ⛔ mean−2sd **−0.53** | *(not run)* |
+| **UAVid** | **+5.89 ± 1.51** | **+5.65 ± 1.77** | ✅ (+2.11) | *(not run)* |
+
+> ⭐⭐ **THE RESULT: widening the search wins on two datasets and LOSES on two.** It is a
+> **bias–variance trade**, not a free upgrade. Where a class is clamped hard and the
+> correction is large — DLRSD `mobile home` at ~108x, Potsdam `tree` at 6.17 against a 2.50
+> ceiling — the extra room pays. Where the old range was already near-right, the extra
+> freedom only adds variance.
+
+⛔ **LoveDA is the clearest case against widening.** The gain falls (+1.16 → +0.97), the sd
+**quadruples** (0.19 → 0.75), and the fitted scales spread **144.7%** (`building`) against
+**6.7%** on the default range. **It fails the project's own gate** (mean−2sd −0.53 against
++0.78). Per class the loss is concentrated where the default arm was strongest: `water`
++4.41 → **+3.66**, catch-all −0.03 → **−0.69**; `forest` is unchanged (+2.63 → +2.69).
+⚠️ UAVid is flat-to-slightly-worse (+5.89 → +5.65, sd 1.51 → 1.77) with the same two classes
+carrying it (`tree` +25.84, `vegetation` +12.99). `car` spreads 65%.
+
+### ⛔ The decision, and it stays where it was
+
+**The method's range is 0.40–2.50** — every verified number in the project uses it, it wins or
+ties on 2 of 4 datasets, and it is the only setting that clears the gate on all four. The wide
+arm is reported as a **four-dataset sensitivity**: the search range is an unreported
+hyperparameter worth **−0.19 to +1.04 mIoU** depending on the dataset, and on DLRSD the mIoU it
+buys costs pixel accuracy. ⭐ **No competitor reports this knob at all**, so the ablation is
+itself a contribution.
+
+⚠️ Boundary hits in the wide arms are now only the weakly identified classes — LoveDA
+`background` (floor, 1/5) and UAVid `human` (ceiling, 1/5) — so a third, wider range is not
+worth running. ⛔ **Fixed while writing this:** the boundary warning suggested re-running at
+`0.10–10` even when that *was* the range just used, and it now computes a genuinely wider one
+(and checks the suggested grid still contains w = 1).
+

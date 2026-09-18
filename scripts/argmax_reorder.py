@@ -642,11 +642,28 @@ def main():
         for c in sorted(set(_hi) | set(_lo), key=lambda c: -(_hi[c] + _lo[c])):
             md.append(f'| `{LB.names[c]}` | {_hi[c]}/{len(edge_hits)} | '
                       f'{_lo[c]}/{len(edge_hits)} |')
+        # ⛔ The suggested re-run must be WIDER THAN THE RANGE JUST USED. A fixed
+        # example text told a 0.10-10 run to re-run at 0.10-10, which reads as an
+        # instruction and is a no-op. Widen each end by 4x at the same step ratio.
+        _lo_s, _hi_s = round(args.w_min / 4, 3), round(args.w_max * 4, 1)
+        _r = (args.w_max / args.w_min) ** (1 / (args.w_steps - 1))
+        _steps = int(round(np.log(_hi_s / _lo_s) / np.log(_r))) + 1
+        # ⛔ The grid MUST contain 1.0 -- w = 1 is the published rule, and a grid
+        # that skips it cannot return "leave this class alone". Nudge the count
+        # until it does (checked for the default and the wide range).
+        for _k in range(_steps, _steps + 12):
+            _g = np.exp(np.linspace(np.log(_lo_s), np.log(_hi_s), _k))
+            if np.min(np.abs(_g - 1.0)) < 1e-9:
+                _steps = _k
+                break
         md.append(f'\n⚠️ **{len(set(_hi) | set(_lo))} class(es) finished on a '
                   f'boundary in at least one fold**, so the search range is '
-                  f'binding there and C − B may be an UNDERESTIMATE. Re-run with a '
-                  f'wider range at the same step, e.g. `--w-min 0.10 --w-max 10 '
-                  f'--w-steps 27`, and compare.\n')
+                  f'binding there and C − B may be an UNDERESTIMATE. A wider run '
+                  f'at the same step would be `--w-min {_lo_s} --w-max {_hi_s} '
+                  f'--w-steps {_steps}`. ⚠️ Wider is NOT automatically better: on '
+                  f'LoveDA 0.10-10 gave +0.97 ± 0.75 against 0.40-2.50\'s '
+                  f'+1.16 ± 0.19, with the fitted scales spreading 145%. Check '
+                  f'the stability line below before re-running.\n')
     else:
         md.append('✅ **No class finished on either boundary in any fold** — the '
                   'range is not binding.\n')

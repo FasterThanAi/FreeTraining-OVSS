@@ -1,5 +1,36 @@
 # Logbook
 
+## 2026-09-18 (night) — the knob range, on all four datasets: wider is not better
+
+Ran the wider knob range on the last two datasets. Both reproduced their old numbers first, so
+the comparisons are fair.
+
+| dataset | old range 0.40–2.50 | wider range 0.10–10 |
+|---|---|---|
+| DLRSD | +5.84 | **+6.88** |
+| Potsdam | +4.86 | **+5.52** |
+| **LoveDA** | **+1.16 ± 0.19** | **+0.97 ± 0.75** ⛔ |
+| UAVid | +5.89 ± 1.51 | +5.65 ± 1.77 |
+
+**So widening helps two datasets and hurts two.** On LoveDA it is clearly worse: the gain drops
+and the spread across splits grows four times, with the fitted knobs jumping 145% between
+splits — the fit is no longer finding the same rule twice. By our own rule that result does not
+pass.
+
+**Why:** more freedom only pays when a class was being held back hard — DLRSD's `mobile home`
+needed about 100 times, Potsdam's `tree` needed 6. When the old limits were roughly right, the
+extra freedom just adds noise.
+
+**Decision: our method keeps the original 0.40–2.50 range.** Every checked number uses it, and
+it is the only setting that passes on all four datasets. The wider range becomes an extra
+table in the paper: this setting is worth anywhere from −0.19 to +1.04 mIoU depending on the
+dataset, and nobody else reports it at all.
+
+Also fixed a small nuisance: when a class sat at the edge, the report told you to re-run at
+0.10–10 even when that was already the range you used.
+
+---
+
 ## 2026-09-18 (later) — Potsdam checked too, and the two datasets disagree
 
 Ran the wider knob range through the real pipeline on Potsdam: **63.82**, against a predicted

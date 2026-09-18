@@ -364,8 +364,15 @@ and aAcc costs only **−0.28** against DLRSD's −2.13. ⚠️ `clutter` fits a
 ceiling and NOT identified (`--objective real` does not score it) — never quote it.
 ⛔ **The wider range is a dataset-dependent TRADE, not a free upgrade.**
 @ARGMAX_SCALING_RESULTS.md.
-⚠️ **LoveDA and UAVid still use 0.40–2.50 and their scales sit at its edges — their lever-2
-numbers are probably underestimates too.** **11.8% of the metric
+⛔⭐ **ALL FOUR DATASETS NOW MEASURED ON BOTH RANGES, and widening WINS ON TWO AND LOSES ON
+TWO** — DLRSD +5.84→+6.88, Potsdam +4.86→+5.52, ⛔ **LoveDA +1.16 ± 0.19 → +0.97 ± 0.75**
+(sd 4x, scales spread 145%, **fails the gate at mean−2sd −0.53**), UAVid +5.89→+5.65. ✅ Both
+new arms reproduce their controls (B − A +1.18 ± 0.45 and +1.54 ± 0.30). **It is a
+bias–variance trade: the extra room pays only where a class was clamped HARD** (DLRSD
+`mobile home` ~108x, Potsdam `tree` 6.17). ⛔ **THE METHOD'S RANGE STAYS 0.40–2.50** — every
+verified number uses it and it is the only setting clearing the gate on all four. The wide arm
+is a four-dataset SENSITIVITY: an unreported hyperparameter worth **−0.19 to +1.04 mIoU**, and
+on DLRSD the mIoU costs pixel accuracy. @ARGMAX_SCALING_RESULTS.md. **11.8% of the metric
 contributing nothing, worth ~+3.5 mIoU if they merely performed averagely — more than
 our whole method delivers here.** ⚠️ `field` is a third suspect (16.39% precision, 30.84%
 of its pixels discarded). ⛔ **NOT fixed here, deliberately** — the prereg fixes the
