@@ -567,3 +567,39 @@ edges after renormalisation (LoveDA `background` 0.41 / `water` 2.55; UAVid `veg
 0.383 / `road` 0.383 / `tree` 2.52 / `human` 2.52). **Their lever-2 numbers are probably
 underestimates too.**
 
+### ✅✅ VERIFIED END TO END — **63.82**, and Potsdam pays almost nothing for it
+
+`reorder_deploy.py --w-min 0.10 --w-max 10 --w-steps 27`, same cache, seed and calibration
+draw, **the same 1816 held-out tiles** (`cmp` on the split file). One `eval.py` pass.
+
+| | predicted | **`eval.py`** | Δ |
+|---|---|---|---|
+| **mIoU** | 63.84 | ⭐ **63.82** | ⭐ **0.02** |
+
+Every class within **0.20** (`road` 0.20, `clutter` 0.17, the other four ≤ 0.10).
+**Eighth verified chain in the project.**
+
+| | default range | **wide range** | Δ |
+|---|---|---|---|
+| A published τ | 57.60 | 57.60 | — |
+| B per-class τ | 58.35 | 58.35 | — |
+| **C + scale** | 63.27 | ⭐ **63.82** | **+0.55** |
+| **total, A → C** | +5.67 | ⭐ **+6.22** | |
+| aAcc | 80.76 | 80.48 | ⚠️ **−0.28** |
+
+⭐⭐ **Compare DLRSD, where the same widening cost 2.13 points of pixel accuracy.** Here it
+costs **0.28** — about a seventh as much — because the range lets `tree` reach the value it
+wanted (deployed **4.335**, clamped at 2.50 before) rather than chasing a rare class into an
+extreme ratio. `tree` 59.09 → **59.40**, `car` **86.15**, and no class collapses.
+
+⚠️ **`clutter` is fitted at 9.904, effectively at the new ceiling — and it is NOT identified.**
+`--objective real` does not score the catch-all, so nothing in the objective pins it; its IoU
+moves 16.34 → 16.23. ⛔ **Do not quote the catch-all's scale.** The 5-fold reported no class on
+a boundary; this single 200-tile draw puts the *unscored* class on one, which is the same
+weak-identification signature as UAVid's `building` and LoveDA's `background`.
+
+⭐ **Both datasets tested are now verified on both ranges**, and they disagree about what the
+wider range costs: DLRSD trades common-class pixels for rare-class IoU (−2.13 aAcc), Potsdam
+barely trades at all (−0.28). ⛔ **So "use the wider range" is not a free upgrade — it is a
+dataset-dependent trade, and that is the honest sentence for the paper.**
+

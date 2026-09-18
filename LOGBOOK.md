@@ -1,5 +1,32 @@
 # Logbook
 
+## 2026-09-18 (later) — Potsdam checked too, and the two datasets disagree
+
+Ran the wider knob range through the real pipeline on Potsdam: **63.82**, against a predicted
+63.84, every class within 0.20. The old checked number was 63.27, so the wider range is worth
+**+0.55** here, on the same 1816 test images.
+
+**The interesting part is the comparison with DLRSD.** Both gained mIoU from the wider range,
+but they paid very differently:
+
+| | mIoU | pixel accuracy |
+|---|---|---|
+| DLRSD | +1.10 | **−2.13** |
+| Potsdam | +0.55 | **−0.28** |
+
+On DLRSD the wider range chases small classes (mobile home, tanks, ship) and takes the pixels
+from big ones (buildings, water). On Potsdam it simply lets `tree` reach the value it wanted
+(4.3, where the old limit was 2.5), and almost nothing is lost.
+
+**So widening is not a free upgrade** — it is a trade, and how good the trade is depends on
+the dataset. That sentence is worth more to the paper than either number.
+
+⚠️ One thing not to quote: on Potsdam the catch-all class `clutter` came out at 9.9, right at
+the new limit. The fit is not told to care about that class at all, so that number means
+nothing.
+
+---
+
 ## 2026-09-18 — the wider knobs, checked in the real pipeline, and a warning
 
 **DLRSD, run through `eval.py`:** the wider knob range gives **45.52** against a predicted

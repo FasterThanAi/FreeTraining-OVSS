@@ -358,7 +358,12 @@ range**; 45.52 is reported as a measured SENSITIVITY to a hyperparameter nobody 
 ⭐⭐ **POTSDAM'S RANGE WAS BINDING TOO: C − B +4.86 → +5.52 ± 0.41**, 5/5, **no class on a
 boundary** so that range is settled there, and the correction is CLEAN — `tree` +23.36 at
 w 6.17, `car` +6.17 at w 0.15 (both clamped before), every real class still improving and no
-class paying. ⚠️ Cached, not yet verified end to end. @ARGMAX_SCALING_RESULTS.md.
+class paying. ✅✅ **VERIFIED END TO END 18 Sep: `eval.py` 63.82 against a predicted 63.84**,
+classes within 0.20, same 1816 tiles — 57.60 → 58.35 → **63.82**, total **+6.22** (was +5.67),
+and aAcc costs only **−0.28** against DLRSD's −2.13. ⚠️ `clutter` fits at 9.904, at the new
+ceiling and NOT identified (`--objective real` does not score it) — never quote it.
+⛔ **The wider range is a dataset-dependent TRADE, not a free upgrade.**
+@ARGMAX_SCALING_RESULTS.md.
 ⚠️ **LoveDA and UAVid still use 0.40–2.50 and their scales sit at its edges — their lever-2
 numbers are probably underestimates too.** **11.8% of the metric
 contributing nothing, worth ~+3.5 mIoU if they merely performed averagely — more than
