@@ -860,3 +860,13 @@ gets a number instead of a shrug. ⚠️ Do **not** quote 45.52 as the method's 
 ⭐ The deployed fit reaches `mobile home` **18.35** and `chaparral` **0.98**, so §10's "two
 dead prompts" is now **one** dead prompt.
 
+---
+
+## 15. Pixel accuracy — see @PIXEL_ACCURACY_RESULTS.md
+
+`aAcc` **58.94 → 65.79 (+6.79)** on the same 1701 held-out tiles, verified against `eval.py`
+to 0.06 / 0.01. ⭐ The per-class recall table and the right/wrong maps live there, together with
+the proof that **lever 1 cannot raise pixel accuracy on this dataset** (the discard target is
+unscored, so `aAcc` is monotone in τ) and the case where the two metrics disagree — the wide
+search range gains 1.10 mIoU and loses 2.13 aAcc.
+

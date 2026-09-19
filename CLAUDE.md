@@ -302,6 +302,31 @@ lever 2 +2.03) · final **63.62**, still above the Oracle's 59.7.
 ⛔ **The method's UAVid contribution is +3.22, NOT +6.69** — the earlier figure bundled a
 prompt defect into the method. Consistent with LoveDA +2.32 and Potsdam +5.67.
 
+### ⭐ PIXEL ACCURACY — the picture improves, and lever 1 PROVABLY cannot move it. @PIXEL_ACCURACY_RESULTS.md, 18 Sep.
+
+Every headline here is mIoU, a mean over CLASSES. `aAcc` is the mean over PIXELS, so a rare
+class cannot move it — and it rises: **DLRSD 59.00 → 65.79 (+6.79)**, **Potsdam 76.99 → 80.76
+(+3.77)**, UAVid 79.24 → 84.81. ✅ Gate: the instrument's own mIoU matches `eval.py` within
+**0.06**, and DLRSD's `aAcc` matches to **0.06 / 0.01**.
+⭐⭐ **THE THEORY: on a dataset whose discard target is UNSCORED, `aAcc` is monotone in τ** —
+raising a threshold turns correct pixels into discards (−1) and wrong ones into discards (0), so
+it can only fall. **The aAcc-optimal τ is 0 everywhere.** Lever 1 raised most DLRSD thresholds
+(discard 5.88% → 12.78%) and pays **−0.49 aAcc** for **+1.77 mIoU**: the two metrics price
+different things. ⛔ Potsdam does NOT obey it — `bg_idx` is the scored `clutter`, so a discard
+can be correct, and lever 1 lands at −0.01.
+⭐ **Under rung B a class's recall depends on its OWN threshold alone** (the argmax is fixed), so
+a bar falls if and only if that class's τ rose — a reading rule for the per-class figure.
+⭐ **Lever 2 is where the pixels come from** (+7.28 DLRSD, +3.78 Potsdam): `tree` +28.1,
+`grass` +26.5, `bare soil` +22.6, `court` +21.1. ⛔ `water` −18.3 is a real loss (its IoU falls
+too); ⭐ `airplane` −12.8 is INTENDED (precision 59 → 85, IoU +15.6).
+⛔⭐ **The metrics DISAGREE on the wide search range, and that is the warning**: DLRSD
+44.42 → 45.52 mIoU while aAcc goes 65.79 → **63.66**. Four rare classes (7.3% of pixels) gain
+34 IoU; `buildings`/`water`/`pavement` (39.4%) pay. **A class-averaged metric can be improved by
+decisions that make the average picture worse.**
+⚠️ LoveDA and UAVid have no per-class accuracy table yet. `scripts/pixel_accuracy.py`,
+`fig_pixel_accuracy.py`, `fig_pixel_maps.py`; figures in `docs/fig_pixel_accuracy_*` and
+`docs/pixel_maps_*`.
+
 ### ✅✅ DLRSD IS A FIFTH DATASET, AND THE ONLY ONE WITH NO CATCH-ALL. @DLRSD_RESULTS.md, 15 Sep.
 
 2100 images, 256x256, **17 classes, 21 UC Merced scene categories x 100**. Pre-registered

@@ -111,10 +111,51 @@ confident predictions, so no labels are read.
 
 ---
 
+## The method — the two levers
+
+**Lever 1 — per-class threshold (τ vector)** — one threshold per class instead of one for the
+dataset. It decides whether the class that already won a pixel is **kept or discarded**, so it
+acts **after** the argmax. Fitted by coordinate ascent over 201 values (0.000–1.000, step
+0.005) on the calibration tiles.
+
+**Lever 2 — per-class scale (`w` vector)** — each class's whole score map is multiplied by its
+own number **before** the argmax, so it decides **which class wins**:
+`pred = argmax_c (w_c · s_c)`, and the threshold then reads the **raw, unscaled** score.
+⭐ Reading the raw score is what confines `w` to reordering — a scale applied *after* the argmax
+is monotone and would merely rename τ. Fitted over 11 log-spaced values, **0.40–2.50**.
+
+**Search range** — the interval `w` is searched over. ⚠️ An unreported hyperparameter: widening
+it to 0.10–10 is worth −0.19 to +1.04 mIoU depending on the dataset (@ARGMAX_SCALING_RESULTS.md).
+
+**Gauge / renormalisation** — only the *ratios* of `w` matter to an argmax, so the vector is
+rescaled to geometric mean 1 after each pass. ⛔ Any claim of the form "class c stayed near 1"
+is gauge-dependent and therefore meaningless (UAVid's U4).
+
+**Unscored sink** — a discard target that is **outside** the class list, so a discarded pixel is
+a false negative for its true class and a false positive for **nothing**. DLRSD's `bg_idx = 17`
+against 17 classes. Contrast a **scored catch-all** (Potsdam's `clutter`), where a discard is a
+prediction that can be right.
+
+**Stratified vs group-disjoint folds** — group-disjoint keeps near-duplicate tiles on one side
+(UAVid's flights; a frame-level split leaked +0.54 mIoU). Stratified gives every fold a share of
+each group, and is required where a class lives in only one group (DLRSD's `airplane`, `dock`,
+`tanks`). ⛔ Which to use is a property of the data, not a house style.
+
+---
+
 ## Evaluation
 
 **mIoU** — mean Intersection-over-Union across classes. **Mean over classes, not over pixels**,
 which is why fixing one pathologically bad class can move it a lot without improving anything else.
+
+**aAcc (overall pixel accuracy)** — correct labelled pixels ÷ all labelled pixels. **Weighted
+by pixel count**, so a rare class cannot move it — which is exactly why it is reported beside
+mIoU. @PIXEL_ACCURACY_RESULTS.md.
+
+**Per-class Acc** — correct pixels of class c ÷ pixels of class c. This **is recall**, so it
+rises whenever a class is predicted more, including wrongly. ⛔ Never read it without precision
+or IoU beside it: DLRSD's `airplane` loses 12.8 points of accuracy and gains 15.6 IoU, and that
+is the method working.
 
 **AUC** — for a detection signal, the probability it ranks a true positive above a true negative.
 0.5 is a coin flip. **Our empirical floor is ~0.53**, not 0.50, measured on random-colour controls.

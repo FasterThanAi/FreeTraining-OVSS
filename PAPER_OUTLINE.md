@@ -198,6 +198,8 @@ mIoU number here would have been misleading.
 | **7** | **the method**: fitted τ vs the global 0.5 · per-class ΔIoU, both protocols · calibration curve | ✅ `docs/fig7_method.{png,pdf}` · `scripts/fig_method.py` |
 | **8** | ⭐ **the method running**: 4 Potsdam tiles × input/truth/baseline/ours — two gains, a no-op and **a loss** | ✅ `docs/fig8_qualitative.{png,pdf}` · `scripts/fig_qualitative.py` |
 | **9** | ⭐ **open vocabulary**: 2 Indian UAV tiles × two class lists typed at inference | ✅ `docs/fig9_vocabulary.{png,pdf}` · `scripts/fig_vocabulary.py` |
+| **10** | ⭐ **pixel accuracy**: overall `aAcc` per rung, and per-class recall, DLRSD + Potsdam | ✅ `docs/fig_pixel_accuracy_{overall,per_class}.{png,pdf}` · `scripts/fig_pixel_accuracy.py` |
+| **11** | ⭐ **right/wrong maps**: every pixel green/red/grey, baseline vs ours, incl. a LOSS tile | ✅ `docs/pixel_maps_{dlrsd,potsdam}/sheet.png` · `scripts/fig_pixel_maps.py` |
 
 ⚠️ Figures 8 and 9 need a GPU (they run SAM 3); 2–5 and 7 are CPU-only.
 ⛔ Figure 8's fourth row is a tile where the method LOSES 7.72 mIoU, and figure 9

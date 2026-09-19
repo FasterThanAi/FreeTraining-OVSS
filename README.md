@@ -100,6 +100,7 @@ emptied entirely).
 | `ARGMAX_SCALING_RESULTS.md` | lever 2 on every dataset, and the search-range ablation |
 | `POTSDAM_RESULTS.md` · `UAVID_RESULTS.md` · `DLRSD_RESULTS.md` | one file per dataset |
 | `VOCABULARY_RESULTS.md` · `PROMPT_ENSEMBLE_RESULTS.md` | the wording experiments |
+| **`PIXEL_ACCURACY_RESULTS.md`** | does the *picture* improve — `aAcc`, per-class recall, right/wrong maps, and the proof that lever 1 cannot raise pixel accuracy on DLRSD |
 | `TTA_RESULTS.md` · `HEAD_FUSION_RESULTS.md` · `PRESENCE_POWER_RESULTS.md` · `AFFINE_RESULTS.md` | the four things that did **not** work, with their bounds |
 | `BASELINE_NUMBERS.md` | the baseline's published table — check before proposing a dataset |
 | `prereg/` | predictions committed **before** each run, scored afterwards |

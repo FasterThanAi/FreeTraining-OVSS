@@ -140,3 +140,18 @@ segmentor's *default*, not the config's override, and should read the actual val
 ⚠️ **`tau_cv.py`'s verdict printed LoveDA boilerplate again** ("the single-split
 +1.44 was a favourable draw"), for the fourth time on a non-LoveDA cache. The tables
 have been right every time; only the generated prose keeps needing a check.
+
+---
+
+## Pixel accuracy and the search range — see the dedicated files
+
+- **@PIXEL_ACCURACY_RESULTS.md** — `aAcc` **76.99 → 76.98 → 80.76** across the three rungs on
+  the 1816 held-out tiles, per-class recall for all six classes, and why lever 1 is ~neutral
+  here (`bg_idx` is the **scored** `clutter`, so a discarded pixel can still be correct) where
+  on DLRSD it is provably negative.
+- **@ARGMAX_SCALING_RESULTS.md** — the class-scale search range. Potsdam's 0.40–2.50 range was
+  **binding**: `tree` wanted **6.17** and `car` **0.15**. Widening to 0.10–10 gives
+  **+5.52 ± 0.41** (from +4.86 ± 0.35) and **63.82** verified by `eval.py` (from 63.27), at a
+  cost of only ~0.28 aAcc. ⛔ The method's reported range stays 0.40–2.50 — widening loses on
+  LoveDA — so 63.27 remains the quoted Potsdam number.
+
