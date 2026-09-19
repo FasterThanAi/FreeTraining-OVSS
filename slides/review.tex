@@ -273,16 +273,22 @@ appear to improve or degrade segmentation while land-cover quality is unchanged.
         \hfill \ok{two parameter sets}
 \end{enumerate}
 \end{block}
-\begin{block}{In progress}
+\begin{block}{Completed since the proposal}
 \begin{enumerate}
   \setcounter{enumi}{3}
-  \item \textbf{Extend} the correction beyond a single vector per dataset:
-        the fitted parameters are currently constant across tiles, and a
-        scene-adaptive formulation remains to be investigated.
-  \item \textbf{Investigate} a per-class fusion of SAM~3's semantic and instance
-        heads, which are presently combined by a fixed maximum.
-  \item \textbf{Broaden} the evaluation to further high-resolution benchmarks and
-        establish the conditions under which the correction transfers.
+  \item \textbf{Broaden} the evaluation: \ok{five datasets and a second
+        pipeline}, four confirmed by the official evaluator.
+  \item \textbf{Investigate} a per-class fusion of SAM~3's two heads, and a
+        per-class presence weight. \ok{Both measured; both null, with bounds.}
+\end{enumerate}
+\end{block}
+\begin{block}{In progress}
+\begin{enumerate}
+  \setcounter{enumi}{5}
+  \item \textbf{Extend} the correction beyond one parameter set per dataset: it
+        is correct on average and wrong on individual scenes.
+  \item \textbf{Write up}: the fifth dataset and the vocabulary study are
+        measured but not yet in the manuscript.
 \end{enumerate}
 \end{block}
 \end{frame}
@@ -301,6 +307,8 @@ appear to improve or degrade segmentation while land-cover quality is unchanged.
 \midrule
 LoveDA (val) & 1669 & 0.3\,m & 7 \\
 ISPRS Potsdam & 2016 & 5\,cm & 6 \\
+UAVid & 270 & oblique UAV & 7 \\
+DLRSD & \dlrTiles{} & 0.3\,m & \dlrClasses{} \\
 OpenEarthMap & \oemTiles{} & 0.25--0.5\,m & 9 \\
 \bottomrule
 \end{tabular}
@@ -309,6 +317,7 @@ OpenEarthMap & \oemTiles{} & 0.25--0.5\,m & 9 \\
 \textbf{Baselines and controls}
 \begin{itemize}\footnotesize
   \item SegEarth-OV3, reproduced --- the primary baseline
+  \item \best{ConInfer} (CLIP), the nearest published competitor, re-run
   \item Global $\tau$ sweep; presence-gating removal
   \item Per-class Otsu and eleven further label-free rules
 \end{itemize}
@@ -335,39 +344,81 @@ model behaviour.
 \end{columns}
 \end{frame}
 
-\begin{frame}{\textsc{7. Results}}
+\begin{frame}{\textsc{7. Results --- five datasets, one decision rule}}
 \vspace{-0.2em}
-\begin{center}\small
-\renewcommand{\arraystretch}{1.25}
-\begin{tabular}{@{}lccc@{}}
+\begin{center}\footnotesize
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}lccccc@{}}
 \toprule
-& \textbf{LoveDA} & \textbf{Potsdam} & \textbf{OpenEarthMap} \\
-& \footnotesize 1669 tiles & \footnotesize 2016 tiles & \footnotesize \oemTiles{} tiles \\
+& \textbf{LoveDA} & \textbf{Potsdam} & \textbf{UAVid} & \textbf{DLRSD} & \textbf{OEM} \\
 \midrule
-SegEarth-OV3, reproduced & 47.38 & \eePotsA{} & 44.16 \\
+SegEarth-OV3, reproduced & 47.65 & \eePotsA{} & \uavBase{} & \dlrEEa{} & 44.16 \\
+\;$+$ per-class thresholds & 47.68 & \eePotsB{} & \uavEEone{} & \dlrEEb{} & 44.47 \\
+\;$+$ per-class scaling & \best{49.02} & \best{\eePotsC{}} & \best{\uavEEtwo{}} & \best{\dlrEEc{}} & --- \\
 \midrule
-\;$+$ per-class thresholds & $\methodGain{} \pm 0.45$ & $+0.59$ & $+0.30$ \\
-\;$+$ per-class scaling & $\scLove{} \pm \scLoveSD{}$ & $\scPots{} \pm \scPotsSD{}$ & --- \\
-\midrule
-\textbf{Total $\Delta$ mIoU} & \best{\loveTotal{}} & \best{\potsTotal{}} & $+0.30$ \\
-$\Delta$ excluding catch-all & \scLoveExcl{} & \potsExcl{} & \best{\mrOemReal{}} \\
-Folds positive & \ok{5 / 5} & \ok{5 / 5} & --- \\
+\textbf{Total $\Delta$ mIoU} & \best{+1.37} & \best{\potsTotal{}} & \best{+6.69} & \best{\dlrTotal{}} & $+0.30$ \\
+Confirmed by \texttt{eval.py} & \ok{yes} & \ok{yes} & \ok{yes} & \ok{yes} & --- \\
 \bottomrule
 \end{tabular}
 \end{center}
-\vspace{0.5em}
+\vspace{0.3em}
+\begin{center}\footnotesize
+\begin{tabular}{@{}lcccc@{}}
+\multicolumn{5}{c}{\textit{five-fold, the figures that carry an error bar}}\\
+\toprule
+& LoveDA & Potsdam & UAVid & DLRSD \\
+\midrule
+per-class $\tau$ & $\methodGain{} \pm 0.45$ & $+0.59 \pm 0.50$ & $\uavTauCV{} \pm 0.39$ & $\dlrTauCV{} \pm \dlrTauSD{}$\\
+$+$ per-class scale & $\scLove{} \pm \scLoveSD{}$ & $\scPots{} \pm \scPotsSD{}$ & $\uavScaleCV{} \pm 1.51$ & $\dlrScaleCV{} \pm \dlrScaleSD{}$\\
+folds positive & \ok{5/5} & \ok{5/5} & \ok{5/5} & \ok{5/5}\\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.4em}
 \footnotesize
 \begin{itemize}\footnotesize
-  \item \textbf{Confirmed end to end.} On Potsdam the official evaluator gives
-        \eePotsA{} $\rightarrow$ \eePotsB{} $\rightarrow$ \eePotsC{} over 1816
-        held-out tiles, each stage within \best{0.05} mIoU of its predicted value.
+  \item \textbf{Not a SAM~3 artefact.} The same rule applied to \best{ConInfer}
+        (CLIP, a different backbone and method) gives \best{$+2.51 \pm 0.34$},
+        improving the nearest competitor rather than beating it.
+  \item \textbf{Pixel accuracy rises too}, so the gain is not an artefact of
+        averaging classes: DLRSD \dlraAccA{} $\rightarrow$ \best{\dlraAccC{}},
+        UAVid \uavaAccA{} $\rightarrow$ \best{\uavaAccC{}}.
   \item \textbf{Largest per-class change:} Potsdam \texttt{tree},
-        \best{\treeIoUa{} $\rightarrow$ \treeIoUb{}} IoU --- a class with
-        precision \treeP{}\% and recall \treeR{}\%, the asymmetry the method is
-        designed to correct.
-  \item \textbf{OpenEarthMap} is positive under the catch-all-excluded metric
-        (\mrOemReal{}) although full mIoU appears flat: its catch-all class
-        contributes one ninth of the mean and offsets the gain.
+        \best{\treeIoUa{} $\rightarrow$ \treeIoUb{}} IoU --- precision \treeP{}\%
+        against recall \treeR{}\%, the asymmetry the method targets, and one a
+        threshold alone moves by only $+0.32$.
+  \item \bad{Losses are reported, not hidden:} DLRSD \texttt{water}
+        \bad{\dlrWaterLoss{}}, and \dlrTilesDown{} of \dlrTiles{} tiles are worse
+        (against \dlrTilesUp{} better).
+\end{itemize}
+\end{frame}
+
+\begin{frame}{\textsc{7. Results --- what the words are worth}}
+\small
+The class list is typed at inference and every training-free method inherits one.
+\best{Nobody reports it.} Two single-word changes, each pre-registered:
+\vspace{0.3em}
+\begin{center}\footnotesize
+\begin{tabular}{@{}llcc@{}}
+\toprule
+dataset & change & $\Delta$ mIoU & \\
+\midrule
+UAVid & \texttt{vegetation} $\rightarrow$ \texttt{low vegetation} & \best{\vocUavGain{}} & one word\\
+Potsdam & \texttt{grass} $\rightarrow$ \texttt{low vegetation} & \bad{\vocPotsGain{}} & the same rule\\
+DLRSD & three words corrected & \dlrVocBase{} & \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.4em}
+\begin{itemize}\footnotesize
+  \item \textbf{The same principled rule helps one dataset and hurts another},
+        by more than our whole method delivers on LoveDA.
+  \item On UAVid the word removes \best{64\%} of the scale's gain --- typing two
+        words and fitting a reweighting are \emph{substitutes} there. On DLRSD
+        they \best{add exactly}: \dlrVocBase{} before the levers,
+        \dlrVocAfter{} after.
+  \item \textbf{A limit of the method, measured:} a class the model cannot
+        ground stays at 0.00 IoU under every threshold and scale.
 \end{itemize}
 \end{frame}
 

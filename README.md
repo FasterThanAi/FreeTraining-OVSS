@@ -1,263 +1,166 @@
 # FreeTraining-OVSS
 
-**Training-free open-vocabulary semantic segmentation for remote sensing images**, built on
-**SAM 3**.
+**Training-free open-vocabulary semantic segmentation for remote sensing**, built on **SAM 3**.
+Final-year project, IIITDM Kurnool. *Last updated 19 Sep 2026 — read this page first.*
 
-Given unlabelled satellite imagery and a list of class names, produce fully labelled
-segmentation masks — with no training data and no fine-tuning.
+You give the model an aerial image and a list of class names typed as words. It returns a
+labelled mask. **No model weights are trained and no annotation is used for the segmentation
+itself.**
 
-> **Terminology note.** This is *training-free open-vocabulary* segmentation, **not
-> unsupervised** segmentation. Class names are supplied as input, so the task is zero-shot
-> with a known vocabulary. The upstream work (SegEarth-OV, CVPR 2025) makes the same
-> distinction, noting the setting is strictly "annotation-free."
-
----
-
-## Motivation
-
-`SegEarth-OV3` assigns every pixel whose maximum class probability falls below a threshold
-τ to the **background** class. On LoveDA at the paper's own operating point (τ = 0.5) this
-discards **29.68% of all real land-cover pixels — 323,184,908 of them.**
-
-That residual is *not* reachable by simply relaxing the threshold. Dropping τ to 0.1 recovers
-roughly two-thirds of it and costs **5.54 mIoU** (47.37 → 41.83), because a scalar threshold
-carries no information about *which* class a region plausibly is: it buys 1 correct pixel per
-**1.73** wrong ones. Discard also outnumbers real-class confusion **3 : 1** — the baseline's
-dominant error mode is silence, not error.
-
-Our reproduction of the baseline makes this measurable:
-
-| Class | Precision | Recall | Gap |
-|---|---|---|---|
-| water | **89.5** | **54.7** | **+34.8** |
-| forest | 57.9 | 44.8 | +13.1 |
-| background | **56.9** | **69.4** | **−12.5** |
-| building | 77.2 | 78.6 | −1.4 |
-
-SAM 3 is right ~90% of the time it predicts water, yet finds only half the water present.
-Background shows the inverse — over-predicted and impure, absorbing pixels that belong to
-real classes. The weakness is concentrated in amorphous "stuff"; sharp-boundary "things"
-like buildings and roads are balanced.
-
-**Our aim:** recover those discarded pixels using a *semantic co-occurrence prior* over
-SAM 3's own region proposals.
-
-See [`WEEK1_RESULTS.md`](WEEK1_RESULTS.md) for the full baseline reproduction.
+> **Terminology.** This is *training-free, annotation-free, open-vocabulary* segmentation, **not
+> unsupervised** — the class names are supplied. `ANALYSIS.md` §3.6.
 
 ---
 
-## Status
+## 1. What we contribute, in one paragraph
 
-| Milestone | Status |
-|---|---|
-| Environment + SAM 3 running | ✅ |
-| LoveDA val prepared (1669 images) | ✅ |
-| GT co-occurrence premise validated | ✅ **1.3–1.7 bits** vs a 0.004 noise floor ([`ANALYSIS.md` §4](ANALYSIS.md)) |
-| **SegEarth-OV3 baseline reproduced** | ✅ **47.38 mIoU** (paper: 47.4) |
-| Discard-rate diagnostic | ✅ **29.68%** of real-class pixels discarded at τ=0.5 |
-| τ-sweep (0.5 / 0.3 / 0.1) | ✅ recovering ⅔ of the residual costs **−5.54 mIoU** |
-| Confusion + error-budget analysis | ✅ discard outnumbers confusion **3:1** |
-| Qualitative panels | ✅ `docs/25*.png` |
-| Per-class `S_pres` + `.npz` cache | 🔜 next ([`INSTRUMENTATION_PATCH.md`](INSTRUMENTATION_PATCH.md)) |
-| `M_global` construction (Week 3) | 🔜 |
-| Region-level label assignment | 🔜 |
+The baseline (SegEarth-OV3) scores every class separately, keeps the highest-scoring class per
+pixel, and throws the pixel away — to `background` — when that score falls below **one
+threshold used for every class**. We show that single threshold is the wrong *shape*, and
+replace the decision rule with two small parameter sets fitted on a few hundred labelled tiles,
+the same supervision the baseline already spends tuning its own threshold:
 
----
-
-## Environment
-
-⚠️ **The version combination below is not optional.** Three constraints intersect at
-exactly one workable point:
-
-| Component | Constraint |
-|---|---|
-| SAM 3 | **torch ≥ 2.3** (uses `torch.nn.attention`) |
-| mmcv prebuilt wheels | available for torch 2.1–2.4; **none for torch 2.5** |
-| mmsegmentation 1.2.2 | asserts `mmcv >= 2.0.0rc4, < 2.2.0` |
-
-→ **torch 2.4.1** is the only version satisfying SAM 3 that also has a prebuilt mmcv wheel.
-That wheel is mmcv 2.2.0, which mmseg excludes by one patch version, so `MMCV_MAX` must be
-raised to `2.3.0`.
-
-### Install
-
-```bash
-conda create -n segov3 python=3.11 -y
-conda activate segov3
-
-pip install torch==2.4.1 torchvision==0.19.1 \
-  --index-url https://download.pytorch.org/whl/cu121
-pip install "numpy<2"
-
-pip install mmcv==2.2.0 \
-  -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.4/index.html
-pip install "mmsegmentation==1.2.2"
-
-# raise mmseg's mmcv upper bound (2.2.0 -> 2.3.0)
-sed -i "s/MMCV_MAX = '2.2.0'/MMCV_MAX = '2.3.0'/" \
-  $CONDA_PREFIX/lib/python3.11/site-packages/mmseg/__init__.py
-
-pip install einops psutil pycocotools hydra-core iopath timm huggingface_hub omegaconf
-
-python -c "import torch, mmcv, mmseg; from mmcv.ops import point_sample; \
-  print('ok', torch.__version__, mmcv.__version__, torch.cuda.is_available())"
-```
-
-Or run [`scripts/setup_env.sh`](scripts/setup_env.sh).
-
-### SAM 3 checkpoint
-
-```bash
-huggingface-cli download facebook/sam3   # or download sam3.pt manually (~3.45 GB)
-
-mkdir -p weights/sam3
-ln -s "$(ls ~/.cache/huggingface/hub/models--facebook--sam3/snapshots/*/sam3.pt)" \
-  weights/sam3/sam3.pt
-```
-
-The reference implementation expects the checkpoint at `weights/sam3/sam3.pt` relative to
-the repo root.
-
-### Reference implementation
-
-The baseline lives in a separate clone — **do not vendor it into this repo**:
-
-```bash
-git clone https://github.com/earth-insights/SegEarth-OV-3.git
-```
-
----
-
-## Dataset — LoveDA
-
-| Item | Value |
-|---|---|
-| Split used | **Val** (Test has no ground truth — labels withheld for the challenge) |
-| Images | Rural 992 + Urban 677 = **1669** |
-| Classes | background, building, road, water, barren, forest, agricultural |
-| Label encoding | pixel values 1–7; **0 = no-data, ignored** (`reduce_zero_label=True`) |
-
-⚠️ The Kaggle archive nests an extra level: `archive/Val/Val/{Rural,Urban}/`.
-
-```bash
-mkdir -p ~/data/loveda/img_dir/val ~/data/loveda/ann_dir/val
-SRC=~/Downloads/archive/Val/Val
-cp $SRC/{Rural,Urban}/images_png/* ~/data/loveda/img_dir/val/
-cp $SRC/{Rural,Urban}/masks_png/*  ~/data/loveda/ann_dir/val/
-
-ls ~/data/loveda/img_dir/val | wc -l   # must be 1669
-ls ~/data/loveda/ann_dir/val | wc -l   # must be 1669
-```
-
-Both counts must match, or Rural/Urban filenames have collided.
-
----
-
-## Reproducing the baseline
-
-```bash
-cd /path/to/SegEarth-OV-3
-ln -s ~/data/loveda data/LoveDA
-python eval.py ./configs/cfg_loveda.py
-```
-
-Expected: **mIoU ≈ 47.4**. Roughly 24 minutes at 0.85 s/image; peak memory 6.1 GB.
-
-| Observed | Meaning |
-|---|---|
-| 46–48 | ✅ Reproduced |
-| 40–46 | Check prompt wording, τ, decoder confidence threshold |
-| < 40 | Structural bug — suspect `reduce_zero_label` or the Rural/Urban merge |
-| > 50 | Also a bug — likely mishandling the ignore class |
-
-### Key parameters (`configs/cfg_loveda.py`)
-
-| Parameter | Value | Meaning |
+| | what it changes | where it acts |
 |---|---|---|
-| `prob_thd` (**τ**) | 0.5 | Below this, a pixel is discarded to background |
-| `confidence_threshold` | 0.5 | Transformer decoder confidence |
-| Input resolution | 1024×1024 | LoveDA native; no `Resize` in the test pipeline |
+| **Lever 1 — per-class threshold** | whether the winning class is kept or discarded | **after** the argmax |
+| **Lever 2 — per-class scale** | **which class wins** the pixel | **at** the argmax |
+
+**Nothing else changes** — same model, same weights, same forward pass, no extra inference cost.
 
 ---
 
-## Proposed method
+## 2. Results — five datasets, four verified by the official evaluator
 
-Under active development; the design below supersedes the original five-step sketch.
+Every number below is measured on **held-out tiles**, with the parameters fitted on a disjoint
+calibration split and the baseline recomputed on the *same* tiles.
 
-1. **SAM 3 pass** — dual-head mask fusion + presence-guided filtering, giving per-region
-   scores and class-agnostic mask proposals.
-2. **Region proposals from SAM 3 itself** — *not* SLIC or Felzenszwalb superpixels. SAM's
-   own masks are strictly better region proposals; classical over-segmentation would be a
-   regression.
-3. **Corpus-level co-occurrence matrix M** — built across the whole unlabelled dataset from
-   **spatial adjacency** of high-confidence regions, not per-image co-presence. A per-image
-   matrix over 7 classes is nearly information-free.
-4. **Label assignment as energy minimisation** over SAM-derived regions:
-   - unary — SAM 3 fused probability × presence score
-   - pairwise appearance — DINOv3 / SAM 3 feature similarity
-   - pairwise semantic — −log M(cᵢ, cⱼ)
-   - solved by mean-field or graph cut
-5. **Fusion** with the confident predictions.
+| dataset | baseline (ours) | + lever 1 | + lever 2 | total | verified by `eval.py` |
+|---|---|---|---|---|---|
+| **LoveDA** (1469 held out) | 47.65 | 47.68 | **49.02** | **+1.37** | ✅ |
+| **Potsdam** (1816) | 57.60 | 58.35 | **63.27** | **+5.67** | ✅ |
+| **UAVid** (70 frames) | 56.86 | 57.92 | **63.55** | **+6.69** | ✅ |
+| **DLRSD** (1701) | 37.27 | 39.04 | **44.42** | **+7.15** | ✅ |
+| OpenEarthMap (384) | 44.16 | 44.47 | — | +0.30 *(+1.75 excl. catch-all)* | ⚠️ underpowered |
+| ConInfer (CLIP, not SAM 3) | 36.99 | **39.52** | −0.10 | **+2.51** | 5-fold |
 
-### Known risk: circularity
+**The five-fold figures, which carry an error bar and are the headline:**
 
-M and the class prototypes are both derived from SAM 3's own confident predictions. If
-SAM 3 is systematically wrong on a class, M encodes that error and propagation amplifies
-it. Mitigation (entropy weighting, symmetric consistency checks) must be explicit and
-ablated.
+| dataset | lever 1 | lever 2 (on top) |
+|---|---|---|
+| LoveDA | +1.18 ± 0.45 | +1.16 ± 0.19 |
+| Potsdam | +0.59 ± 0.50 | **+4.86 ± 0.35** |
+| UAVid | +1.34 ± 0.39 | **+5.89 ± 1.51** |
+| DLRSD | **+2.37 ± 0.63** | **+5.84 ± 1.03** |
+| ConInfer (CLIP) | **+2.51 ± 0.34** | −0.10 (a clean null) |
+
+⭐ **It is not a SAM 3 quirk.** Lever 1 also works on ConInfer, a CLIP-based competitor: their
+36.99 → 39.52. We *improve* the nearest published method rather than beat it.
+⭐ **Pixel accuracy rises too**, so this is not an artefact of averaging classes: DLRSD
+58.94 → **65.79**, Potsdam 76.99 → **80.76**, UAVid 79.24 → **84.81**.
+
+⚠️ **Always quote the per-class table with any mean.** On DLRSD, six classes covering under 2%
+of the pixels own 35% of the metric. Real per-class losses exist and are reported — DLRSD
+`water` −2.73, LoveDA `road` −0.53.
 
 ---
 
-## Related work
+## 3. The four findings worth presenting
 
-| Work | Relation |
+1. **One threshold is worth nothing; N thresholds are worth a lot.** On DLRSD the *best
+   possible* single threshold is worth **+0.04** mIoU, and per-class thresholds **+2.99**.
+   LoveDA's global row is also +0.04. The level was already right; the shape was wrong.
+2. **The two levers do different jobs, and only the second can fix a stolen pixel.** A
+   threshold can discard the winner; it can never hand the pixel to the class that should have
+   won. Potsdam `tree` (precision 93 / recall 39) moved **+0.32** under thresholds and
+   **+21.6** under the scale.
+3. ⭐ **The typed vocabulary is the largest single lever in this pipeline, and there is no rule
+   for choosing it.** One word on UAVid (`vegetation` → `low vegetation`) is worth **+3.53**;
+   the *same* rule on Potsdam costs **−2.71**. Every training-free paper inherits a hand-written
+   class list and none report it.
+4. **What the model cannot be told, it cannot fix.** DLRSD's `chaparral` scores 0.00 IoU under
+   every threshold and scale; renaming it to `shrubs` reaches 13.4. `mobile home` is the
+   opposite: no word helps, but a large enough scale does.
+
+**Honest limits, stated everywhere we quote a gain:** the parameters do not transfer across a
+domain shift (LoveDA rural +2.77 vs urban +0.10, and the wrong domain's values are worse than
+none); calibration must come from the distribution being evaluated; one parameter set is right
+on average and wrong on individual scenes (DLRSD: 1057 tiles improve, 769 get worse, 22 are
+emptied entirely).
+
+---
+
+## 4. Where everything lives
+
+| file | what is in it |
 |---|---|
-| [SegEarth-OV3](https://arxiv.org/abs/2512.08730) | Direct baseline. SAM 3 for remote-sensing OVSS |
-| [SegEarth-OV](https://openaccess.thecvf.com/) (CVPR 2025) | CLIP-based predecessor |
-| **[ConInfer](https://arxiv.org/abs/2603.29271)** | **Closest related work.** Context-at-inference for OVRSS via DINOv3 GMM clustering + KL consensus. Purely *visual* context, patch-level, CLIP-based — no semantic class-pair prior. Names pixel/region-level contextual modelling as future work. |
-
-Our differentiation: a **semantic co-occurrence prior** combined with **SAM 3's
-region-level granularity**, versus ConInfer's purely visual patch-level context.
+| **`CLAUDE.md`** | the working state of the project, newest first. **Start here for detail.** |
+| **`LOGBOOK.md`** | one entry per working day, in plain language |
+| `WEEK1_RESULTS.md` | baseline reproduction, the discard diagnostic, presence gating |
+| `WEEK3_RESULTS.md` | the mechanism (catch-all share), the method, the label-free bound |
+| `ARGMAX_SCALING_RESULTS.md` | lever 2 on every dataset, and the search-range ablation |
+| `POTSDAM_RESULTS.md` · `UAVID_RESULTS.md` · `DLRSD_RESULTS.md` | one file per dataset |
+| `VOCABULARY_RESULTS.md` · `PROMPT_ENSEMBLE_RESULTS.md` | the wording experiments |
+| `TTA_RESULTS.md` · `HEAD_FUSION_RESULTS.md` · `PRESENCE_POWER_RESULTS.md` · `AFFINE_RESULTS.md` | the four things that did **not** work, with their bounds |
+| `BASELINE_NUMBERS.md` | the baseline's published table — check before proposing a dataset |
+| `prereg/` | predictions committed **before** each run, scored afterwards |
+| `paper/` · `slides/` | the write-up and the review decks; `paper/numbers.tex` is the only place a number is typed |
+| `docs/` | figures, including the pixel-accuracy plots and the per-tile comparisons |
+| `results/` | the machine-readable outputs behind the figures |
 
 ---
 
-## Repository layout
+## 5. Reproducing a result
 
+All measurement runs on the lab workstation (GPU + data); the Mac holds docs and analysis only.
+
+```bash
+# the gate: this must print 47.38 before any other number is trusted
+cd ~/SegEarth-OV-3 && python eval.py ./configs/cfg_loveda.py
+
+# fit both levers on a calibration split and write the configs + held-out list
+python scripts/reorder_deploy.py --cache ~/outputs/dlrsd_full/cache --tau 0.1 \
+  --objective real --stratify-re "^([a-z]+)" --calib 400 --seed 0 \
+  --base-cfg cfg_dlrsd.py --cls-file cls_dlrsd.txt \
+  --split-out ~/splits/dlrsd_heldout.txt \
+  --cfg-out ~/SegEarth-OV-3/configs/cfg_dlrsd_perclass.py \
+  --md ~/outputs/dlrsd/deploy.md
+# then run the three eval.py passes the .md prints, and compare to its predictions
+
+# pixel accuracy and the plots (CPU, from the cached scores)
+python scripts/pixel_accuracy.py --preset dlrsd
+python scripts/fig_pixel_accuracy.py --json results/*/pixel_accuracy.json \
+  --out docs/fig_pixel_accuracy
 ```
-FreeTraining-OVSS/
-├── WEEK1_RESULTS.md        # all measurements to date — start here
-├── ANALYSIS.md             # problem framing + measured PMI findings (§4)
-├── ROADMAP.md              # 12-week plan and phase gates
-├── CLAUDE.md               # working conventions; settled design decisions
-├── SETUP_SAM3.md           # detailed environment notes
-├── INSTRUMENTATION_PATCH.md
-├── docs/                   # qualitative panels (25*.png)
-├── papers/
-└── scripts/
-    ├── setup_env.sh              # rebuilds the pinned env — do not install by hand
-    ├── cooccurrence_gt.py        # GT co-occurrence + PMI (ANALYSIS §4)
-    ├── sam3_smoke_test.py        # --raw dumps forward_grounding tensors
-    └── recover_week2_artifacts.sh
-```
 
-> **This repo holds analysis, scripts and results — not the pipeline.** Method code is built by
-> forking `segearthov3_segmentor.py` inside a separate `SegEarth-OV-3/` clone, which is
-> deliberately not vendored here. The original SAM 1 + CLIP scaffold was removed on 21 Aug
-> (`ANALYSIS.md` §3.7); it remains in git history.
->
-> **Environment is defined by [`scripts/setup_env.sh`](scripts/setup_env.sh), not by a
-> `requirements.txt`.** The torch/mmcv/mmseg versions are a three-way deadlock with exactly one
-> working solution — see the Environment section above. Never `pip install -U` into `segov3`.
+**Rules the project runs on:** every number is predicted from the cache first and then confirmed
+by the unmodified evaluator; predictions are committed to `prereg/` before the run and scored
+afterwards, including the ones that fail; a calibration tile is never an evaluation tile.
 
-## Citation
+---
 
-```bibtex
-@article{li2025segearthov3,
-  title={SegEarth-OV3: Exploring SAM 3 for Open-Vocabulary Semantic
-         Segmentation in Remote Sensing Images},
-  author={Li, Kaiyu and Zhang, Shengqi and Wang, Yujie and Deng, Yupeng
-          and Wang, Zhi and Meng, Deyu and Cao, Xiangyong},
-  journal={arXiv preprint arXiv:2512.08730},
-  year={2025}
-}
-```
+## 6. Environment — do not upgrade anything
+
+Three constraints intersect at exactly one workable point (five other combinations failed):
+
+| | |
+|---|---|
+| Python | 3.11 (conda env `segov3`) |
+| torch | 2.4.1+cu121 |
+| mmcv | 2.2.0 (prebuilt wheel, torch2.4/cu121 index) |
+| mmsegmentation | 1.2.2, `MMCV_MAX` patched to `'2.3.0'` |
+
+Hardware: RTX 2000 Ada, 16 GB, capped at 70 W. Full rationale in `WEEK1_RESULTS.md` §2.
+
+---
+
+## 7. Status and what is left
+
+✅ Baseline reproduced · five datasets · two levers · four end-to-end verifications · the
+vocabulary study · four negative levers closed with bounds · a competitor (ConInfer) run and
+improved · the search-range ablation.
+
+⏳ **Open:** DLRSD is not yet written into the paper (which still describes four datasets); the
+paper needs ~2,000 words moved to supplementary; pixel accuracy is measured on DLRSD and Potsdam
+and not yet on LoveDA and UAVid.
+
+**Venue:** IEEE TGRS (rolling). **Content freeze: 1 Jan 2027.**

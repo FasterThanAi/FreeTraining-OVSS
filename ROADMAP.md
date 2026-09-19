@@ -542,6 +542,27 @@ better one past the deadline.
 
 # PHASE 7 — Six months, not six days (added 1 Sep 2026)
 
+> ## ⭐ STATUS, 19 Sep 2026 — Phase 7 is essentially DONE except the writing
+>
+> | item | state |
+> |---|---|
+> | §7.1 ConInfer comparison | ✅ run; reproduction imperfect (36.99 vs 39.33), LoveDA row used, OEM row dropped |
+> | §7.1a per-class τ on ConInfer | ✅ **+2.51 ± 0.34** — the claim is not SAM 3-specific |
+> | §7.2 datasets three and four | ✅ Potsdam **and** UAVid, plus a fifth (DLRSD) that was not planned |
+> | §7.2 vocabulary intervention, second dataset | ✅ UAVid **+3.53**, Potsdam **−2.71**, DLRSD **+1.71** |
+> | §7.3 coupled label-free objective | ⛔ **not run** — §9d/§9f bound the family; deprioritised, not forgotten |
+> | §7.4 writing pass | ⏳ open, and now the critical path |
+>
+> ⛔ **The remaining work is writing, not measuring.** The manuscript still
+> describes four datasets and contains no DLRSD, no vocabulary study and no
+> search-range ablation. ⚠️ Mid-project review: `slides/review.tex`, updated
+> 19 Sep to five datasets and both levers.
+>
+> ⭐ **One extra ablation exists that was never planned:** the class-scale search
+> range, measured on four datasets (@ARGMAX_SCALING_RESULTS.md). It is an
+> unreported hyperparameter worth −0.19 to +1.04 mIoU.
+
+
 ⚠️ **The Phase 6 stop rule was written assuming a near deadline. There isn't one.**
 EarthVision 2027 runs with CVPR 2027; the submission date is **not yet officially published**, and
 past years put it in **early March**. Check the real CFP when it posts (usually with the CVPR

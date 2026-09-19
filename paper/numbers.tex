@@ -516,3 +516,61 @@
 % a value rather than a meaning would have put the wrong citation in the paper.
 \newcommand{\oemTauCV}{+0.16}        % WEEK3 §9b OpenEarthMap, 5-fold, full mIoU
 \newcommand{\oemTauSD}{0.93}
+
+% =====================================================================
+%  DLRSD -- the fifth dataset, and the only one with NO catch-all.
+%  @DLRSD_RESULTS.md.  Added 19 Sep 2026; nothing here appears in the
+%  paper body yet.
+% =====================================================================
+\newcommand{\dlrTiles}{2100}         % DLRSD §2  images, 256 x 256
+\newcommand{\dlrHeld}{1701}          % DLRSD §1  held-out tiles
+\newcommand{\dlrCalib}{399}          % DLRSD §1  calibration draw, stratified
+\newcommand{\dlrClasses}{17}
+\newcommand{\dlrCatchShare}{0.00\%}  % DLRSD §2  no catch-all class exists
+\newcommand{\dlrDiscard}{6.16\%}     % DLRSD §5  real-class pixels to the sink
+% ---- the three verified rungs (eval.py, published vocabulary) --------
+\newcommand{\dlrEEa}{37.27}          % DLRSD §1  baseline, published tau = 0.1
+\newcommand{\dlrEEb}{39.04}          % + per-class tau
+\newcommand{\dlrEEc}{44.42}          % + per-class scale
+\newcommand{\dlrTotal}{+7.15}
+% ---- five-fold, the figures with an error bar -----------------------
+\newcommand{\dlrTauCV}{+2.37}        % DLRSD §7  lever 1
+\newcommand{\dlrTauSD}{0.63}
+\newcommand{\dlrScaleCV}{+5.84}      % DLRSD §8  lever 2 on top of lever 1
+\newcommand{\dlrScaleSD}{1.03}
+% ---- the oracle: one threshold against seventeen --------------------
+\newcommand{\dlrOracleGlobal}{+0.04} % DLRSD §6  best POSSIBLE single tau
+\newcommand{\dlrOraclePer}{+2.99}    % best per-class tau
+% ---- pixel accuracy, so the mean cannot be dismissed as class averaging
+\newcommand{\dlraAccA}{58.94}        % DLRSD §9  eval.py, baseline
+\newcommand{\dlraAccC}{65.79}        % both levers
+% ---- the vocabulary arm, its own result -----------------------------
+\newcommand{\dlrVocBase}{+1.71}      % DLRSD §13 corrected words, before the levers
+\newcommand{\dlrVocAfter}{+1.70}     % after them -- the two ADD
+\newcommand{\dlrVocEEc}{46.12}       % best verified configuration
+% ---- the honest per-class costs -------------------------------------
+\newcommand{\dlrWaterLoss}{-2.73}    % DLRSD §9  worst class, under BOTH levers
+\newcommand{\dlrTilesUp}{1057}       % DLRSD §10b per-tile outcome
+\newcommand{\dlrTilesDown}{769}
+\newcommand{\dlrTilesDead}{22}       % emptied entirely -- a stated failure mode
+\newcommand{\dlrLeverage}{35.3\%}    % share of the metric owned by classes under 2% of pixels
+
+% =====================================================================
+%  The class-scale SEARCH RANGE -- an unreported hyperparameter, measured
+%  on four datasets.  @ARGMAX_SCALING_RESULTS.md, 18 Sep 2026.
+%  The method's range is 0.40--2.50; these are the sensitivity figures.
+% =====================================================================
+\newcommand{\rangeLo}{0.40}
+\newcommand{\rangeHi}{2.50}
+\newcommand{\rangeWideLo}{0.10}
+\newcommand{\rangeWideHi}{10}
+\newcommand{\rangeDlr}{+1.04}        % wide minus default, DLRSD  (+5.84 -> +6.88)
+\newcommand{\rangePots}{+0.66}       % Potsdam (+4.86 -> +5.52)
+\newcommand{\rangeLove}{-0.19}       % LoveDA  (+1.16 -> +0.97) and the fit destabilises
+\newcommand{\rangeUav}{-0.24}        % UAVid   (+5.89 -> +5.65)
+\newcommand{\rangeLoveSDa}{0.19}     % LoveDA fold sd, default range
+\newcommand{\rangeLoveSDb}{0.75}     % ... wide range: four times larger
+\newcommand{\rangeLoveSpread}{144.7\%} % fitted scales across folds, wide range
+\newcommand{\rangeDlrEE}{45.52}      % DLRSD, wide range, verified by eval.py
+\newcommand{\rangeDlraAcc}{63.66}    % ... and its pixel accuracy: 65.79 -> 63.66
+\newcommand{\rangePotsEE}{63.82}     % Potsdam, wide range, verified

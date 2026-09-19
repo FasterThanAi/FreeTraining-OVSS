@@ -1,5 +1,25 @@
 # Paper outline
 
+> ## ⚠️ STATUS, 19 Sep 2026 — this outline is behind the results
+>
+> It was written for **two** datasets and a method of **one** lever. The project now
+> has **five datasets plus a second pipeline**, **two levers**, a vocabulary study
+> and a search-range ablation. What must change before the next draft:
+>
+> | section | change needed |
+> |---|---|
+> | §1 the claim | lever 2 is missing, and it is the larger gain on 3 of 4 datasets |
+> | §3 setup | add UAVid and DLRSD; DLRSD has **no catch-all**, which retires three standing objections |
+> | §7 tables | five datasets, both levers, both metrics, plus pixel accuracy (aAcc) |
+> | new section | the vocabulary result — the largest single lever and no rule for it |
+> | new ablation | the class-scale search range, four datasets |
+> | limitations | per-tile losses (DLRSD 769 of 2100 worse, 22 emptied) and the two dead prompts |
+>
+> ⭐ The headline claim as it now stands: *a single confidence threshold is the wrong
+> shape, and the pixel a wrong class already won needs a second lever no threshold
+> can reach.* Verified end to end on **four** datasets by the official evaluator.
+
+
 **Purpose.** Fix the shape of the paper so every remaining experiment drops into a section instead
 of becoming another loose results file. Start the LaTeX in Week 9 at the latest (`ROADMAP.md`
 Phase 5); this document is what gets pasted into it.
